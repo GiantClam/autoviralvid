@@ -58,3 +58,24 @@ __pycache__/
 # python
 .venv/
 .langgraph_api/
+
+# logs and renders
+*.log
+logs/
+renders/
+server.log
+agent.log
+
+# temp and cache
+.tmp-*
+.cache/
+.playwright-mcp/
+
+# test outputs
+test_outputs/
+test_reports/
+
+# IDE
+.cursor/
+.vscode/
+*.code-workspace

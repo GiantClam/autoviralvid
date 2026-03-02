@@ -1,0 +1,410 @@
+# Skills Configuration
+# This file defines the available skills for video generation.
+# Skills can also be loaded from the Supabase database at runtime.
+# Provider: RunningHub (ComfyUI-based workflows)
+
+# ============================================================
+# Pipelines - Bundles of co-dependent skills
+# A pipeline ensures that its T2I and I2V skills are always
+# used together. Never mix skills across different pipelines.
+# ============================================================
+pipelines:
+  - name: sora2
+    display_name: "Sora2 Pipeline (Qwen Image + Sora2 Video)"
+    description: >-
+      完整的 Sora2 视频生成管线。使用 Qwen 模型生成分镜头场景图片，
+      再通过 Sora2 模型将图片转为视频。两个 skill 必须配套使用，
+      因为 Sora2 对输入图片有特殊要求（无人脸、特定分辨率等）。
+    t2i_skill: runninghub_qwen_t2i
+    i2v_skill: runninghub_sora2_i2v
+    priority: 10
+    tags:
+      - sora2
+      - runninghub
+      - production
+
+  - name: qwen_product
+    display_name: "Qwen Product Showcase Pipeline"
+    description: >-
+      产品展示视频管线。使用 Qwen+NextScene 一次性生成多张分镜头图片和描述，
+      再将相邻图片两两配对为首尾帧，配合分镜描述提示词生成视频片段。
+      适合美妆/消费品等产品广告场景。T2I 和 I2V 必须配套使用。
+    t2i_skill: runninghub_qwen_storyboard_t2i
+    i2v_skill: runninghub_qwen_fl_i2v
+    priority: 15
+    tags:
+      - qwen
+      - product
+      - runninghub
+      - production
+
+  # ── 数字人 Pipeline ──
+  # 数字人无需 T2I（用户直接上传形象图），仅需 I2V（图片+音频驱动数字人）
+  - name: digital_human
+    display_name: "Digital Human Pipeline (数字人)"
+    description: >-
+      数字人视频生成管线。用户上传数字人形象图+音频，驱动数字人说话和做动作。
+      支持两种声音模式：
+      - 模式0：直接使用上传音频合成数字人视频
+      - 模式1：克隆上传音频中的声音，再使用文本合成新语音后驱动数字人
+      适用于口播带货、知识科普、品牌宣传等需要人物出镜的场景。
+    t2i_skill: null                           # 数字人不需要 T2I，用户直接上传形象图
+    i2v_skill: runninghub_digital_human_i2v   # 图片+音频→数字人视频
+    priority: 20
+    is_enabled: true
+    tags:
+      - digital-human
+      - runninghub
+      - character
+      - talking-head
+      - production
+    suitable_for:
+      - 短剧
+      - 谈话节目
+      - 知识科普
+      - 口播带货
+      - 数字人直播
+      - 品牌故事
+
+  # Future pipeline example (uncomment when ready):
+  # - name: wan21
+
+  - name: tutorial
+    display_name: "Tutorial Pipeline (教程视频)"
+    description: >-
+      教程视频生成管线。支持软件操作教程、知识讲解教程、产品使用教程。
+      T2I 使用 Qwen 生成步骤图/图文卡片，I2V 使用 Sora2 生成过渡动画。
+      最终通过 Remotion Tutorial Composition 合成步骤编号、标注、进度条等元素。
+    t2i_skill: runninghub_qwen_t2i
+    i2v_skill: runninghub_sora2_i2v
+    priority: 25
+    is_enabled: true
+    tags:
+      - tutorial
+      - education
+      - how-to
+      - runninghub
+      - production
+    suitable_for:
+      - 软件操作教程
+      - 知识讲解教程
+      - 产品使用教程
+      - 技能培训
+      - 操作指南
+  #   display_name: "Wan2.1 Pipeline"
+  #   description: "Wan2.1 视频生成管线（待配置）"
+  #   t2i_skill: runninghub_wan21_t2i    # 需新建对应 skill
+  #   i2v_skill: runninghub_wan21_i2v
+  #   priority: 20
+  #   is_enabled: false
+  #   tags:
+  #     - wan21
+  #     - runninghub
+
+# ============================================================
+# Skills - Individual capabilities
+# Each skill belongs to a pipeline via the 'pipeline' field.
+# Skills with a pipeline MUST NOT be used outside that pipeline.
+# ============================================================
+skills:
+  # --- Sora2 Pipeline Skills ---
+
+  # Image-to-Video: RunningHub Sora2 (pipeline: sora2)
+  - name: runninghub_sora2_i2v
+    display_name: "RunningHub Sora2 Video"
+    category: i2v
+    provider: runninghub
+    pipeline: sora2
+    workflow_id: "1985261217524629506"  # Override via RUNNINGHUB_SORA2_WORKFLOW_ID env var
+    node_mappings:
+      prompt:
+        nodeId: "41"
+        fieldName: "prompt"
+      image:
+        nodeId: "40"
+        fieldName: "image"
+    capabilities:
+      max_duration: 10
+      min_duration: 5
+      orientations:
+        - landscape
+        - portrait
+      supports_image_ref: true
+      supports_audio: true
+      output_formats:
+        - mp4
+    priority: 10
+    requires_upload: true
+    description: "High-quality video generation using Sora2 model via RunningHub ComfyUI workflow"
+    tags:
+      - video
+      - sora2
+      - high-quality
+      - i2v
+
+  # Text-to-Image: RunningHub Qwen (pipeline: sora2)
+  - name: runninghub_qwen_t2i
+    display_name: "RunningHub Qwen Scene Image"
+    category: t2i
+    provider: runninghub
+    pipeline: sora2
+    workflow_id: null  # Set via RUNNINGHUB_IMAGE_WORKFLOW_ID env var
+    node_mappings:
+      prompt:
+        nodeId: "3"
+        fieldName: "text"
+      image:
+        nodeId: "21"
+        fieldName: "image"
+    capabilities:
+      supports_image_ref: true
+      output_formats:
+        - png
+        - jpg
+    priority: 10
+    requires_upload: true
+    description: "Scene image generation using Qwen model with product reference via RunningHub (Sora2 pipeline only)"
+    tags:
+      - image
+      - qwen
+      - scene-generation
+      - t2i
+      - sora2
+
+  # --- Qwen Product Pipeline Skills ---
+
+  # Text-to-Image (batch): RunningHub Qwen+NextScene Storyboard (pipeline: qwen_product)
+  # API 参考: https://www.runninghub.cn/call-api/api-detail/1991312445449023489?apiType=5
+  # Workflow: https://www.runninghub.cn/workflow/2021433434782044162
+  # 一次性生成多张分镜头图片和分镜头描述文件
+  - name: runninghub_qwen_storyboard_t2i
+    display_name: "RunningHub Qwen 分镜出图"
+    category: t2i
+    provider: runninghub
+    pipeline: qwen_product
+    workflow_id: "2021433434782044162"  # Override via RUNNINGHUB_QWEN_STORYBOARD_WORKFLOW_ID env var
+    node_mappings:
+      image:
+        nodeId: "74"
+        fieldName: "image"
+      prompt:
+        nodeId: "103"
+        fieldName: "text"
+    capabilities:
+      supports_image_ref: true
+      supports_batch_output: true   # Returns multiple storyboard images + description file
+      output_formats:
+        - png
+        - jpg
+        - txt
+    priority: 15
+    requires_upload: true
+    description: >-
+      使用 Qwen+NextScene 模型一次性生成多张产品广告分镜头图片及描述文件。
+      输入产品参考图和提示词，输出角色一致性的多分镜画面。
+      提示词样例："这是一部化妆品广告宣传片，参考图片，帮我生成12张美女化妆品广告宣传片，
+      从坐姿到站起身，不同运镜和角度，不同的视角和景别"
+    tags:
+      - image
+      - qwen
+      - storyboard
+      - batch
+      - product
+      - t2i
+      - qwen_product
+
+  # Image-to-Video (first+last frame): RunningHub Qwen I2V (pipeline: qwen_product)
+  # Workflow: https://www.runninghub.cn/workflow/2019403401959837698
+  # 将分镜头图片两两分组，首尾帧+提示词生成视频片段
+  - name: runninghub_qwen_fl_i2v
+    display_name: "RunningHub Qwen 首尾帧视频"
+    category: i2v
+    provider: runninghub
+    pipeline: qwen_product
+    workflow_id: "2019403401959837698"  # Override via RUNNINGHUB_QWEN_FL_WORKFLOW_ID env var
+    node_mappings:
+      first_frame:
+        nodeId: "48"
+        fieldName: "image"
+      last_frame:
+        nodeId: "49"
+        fieldName: "image"
+      prompt:
+        nodeId: "34"
+        fieldName: "text"
+      width:
+        nodeId: "30"
+        fieldName: "width"
+        default: 720
+      height:
+        nodeId: "29"
+        fieldName: "height"
+        default: 1280
+      duration:
+        nodeId: "56"
+        fieldName: "num_frames"
+        default: 5
+    capabilities:
+      max_duration: 10
+      min_duration: 3
+      orientations:
+        - landscape
+        - portrait
+      supports_image_ref: true
+      supports_first_last_frame: true     # Accepts paired first+last frame images
+      supports_custom_resolution: true    # Width/height configurable per clip
+      supports_audio: false
+      default_width: 720
+      default_height: 1280
+      output_formats:
+        - mp4
+    priority: 15
+    requires_upload: true
+    description: >-
+      使用首尾帧+提示词生成视频片段。将分镜头图片两两配对作为首帧和尾帧，
+      配合分镜头描述提示词，生成首尾衔接的视频素材。
+      支持自定义宽高和时长。适合产品展示类广告视频。
+    tags:
+      - video
+      - qwen
+      - first-last-frame
+      - product
+      - i2v
+      - qwen_product
+
+  # --- Digital Human Pipeline Skills ---
+
+  # Image+Audio → Digital Human Video
+  # Workflow: https://www.runninghub.cn/workflow/2019410250268418050
+  # 图片驱动数字人：上传形象图+音频，生成数字人说话/动作视频
+  # 支持两种声音模式：0=直接用音频，1=克隆声音+文本合成
+  - name: runninghub_digital_human_i2v
+    display_name: "RunningHub 数字人视频驱动"
+    category: i2v
+    provider: runninghub
+    pipeline: digital_human
+    workflow_id: "2019410250268418050"  # Override via RUNNINGHUB_DIGITAL_HUMAN_WORKFLOW_ID env var
+    node_mappings:
+      # 数字人形象图片（必需）
+      image:
+        nodeId: "343"
+        fieldName: "image"
+      # 数字人动作描述提示词
+      prompt:
+        nodeId: "349"
+        fieldName: "text"
+        default: "模特正在做产品展示，进行电商直播带货"
+      # 音频文件上传（必需，用于驱动嘴型 或 用于声音克隆）
+      audio:
+        nodeId: "243"
+        fieldName: "audio"
+      # 声音模式开关：0=直接使用音频合成数字人，1=克隆声音后用文本合成
+      voice_mode:
+        nodeId: "288"
+        fieldName: "index"
+        default: 0
+      # 克隆声音后合成语音的文本内容（仅 voice_mode=1 时使用）
+      voice_text:
+        nodeId: "244"
+        fieldName: "text"
+    capabilities:
+      max_duration: 60
+      min_duration: 5
+      orientations:
+        - portrait
+        - landscape
+      supports_image_ref: true
+      supports_audio: true            # 需要音频输入
+      supports_voice_clone: true      # 支持声音克隆模式
+      output_formats:
+        - mp4
+    priority: 20
+    requires_upload: true             # 图片和音频都需要上传到 RunningHub
+    description: >-
+      数字人视频驱动工作流。输入数字人形象图片和音频文件，生成数字人说话和做动作的视频。
+      支持两种声音模式：
+      - voice_mode=0：直接使用上传的音频驱动数字人嘴型和动作
+      - voice_mode=1：从上传音频中克隆声音，再根据 voice_text 文本合成新语音后驱动数字人
+      适合电商直播带货、知识科普口播、品牌代言等场景。
+    tags:
+      - video
+      - digital-human
+      - audio-driven
+      - voice-clone
+      - i2v
+      - talking-head
+
+  # --- Standalone / Future Skills (no pipeline yet) ---
+
+  # Alternative: RunningHub Wan2.1 (future workflow)
+  - name: runninghub_wan21_i2v
+    display_name: "RunningHub Wan2.1 Video"
+    category: i2v
+    provider: runninghub
+    pipeline: null  # Will be assigned to a pipeline when configured
+    workflow_id: null  # Set via RUNNINGHUB_WAN21_WORKFLOW_ID env var
+    node_mappings:
+      prompt:
+        nodeId: null
+        fieldName: "prompt"
+      image:
+        nodeId: null
+        fieldName: "image"
+    capabilities:
+      max_duration: 5
+      min_duration: 3
+      orientations:
+        - landscape
+        - portrait
+      supports_image_ref: true
+      supports_audio: false
+      output_formats:
+        - mp4
+    priority: 20
+    requires_upload: true
+    is_enabled: false  # Enable when workflow is configured
+    description: "Video generation using Wan2.1 model via RunningHub ComfyUI workflow"
+    tags:
+      - video
+      - wan21
+      - i2v
+
+  # Alternative: RunningHub Flux (future workflow)
+  - name: runninghub_flux_t2i
+    display_name: "RunningHub Flux Image"
+    category: t2i
+    provider: runninghub
+    pipeline: null
+    workflow_id: null  # Set via RUNNINGHUB_FLUX_WORKFLOW_ID env var
+    node_mappings:
+      prompt:
+        nodeId: null
+        fieldName: "prompt"
+    capabilities:
+      supports_image_ref: false
+      output_formats:
+        - png
+        - jpg
+    priority: 20
+    requires_upload: false
+    is_enabled: false  # Enable when workflow is configured
+    description: "Image generation using Flux model via RunningHub ComfyUI workflow"
+    tags:
+      - image
+      - flux
+      - t2i
+
+# Default preferences for skill selection
+default_preferences:
+  quality_weight: 0.40
+  speed_weight: 0.30
+  cost_weight: 0.30
+  max_fallbacks: 3
+
+# Provider-specific settings (RunningHub only)
+providers:
+  runninghub:
+    base_url: "https://www.runninghub.cn"
+    timeout_seconds: 300
+    max_retries: 3
+    poll_interval_seconds: 5
