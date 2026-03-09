@@ -1,0 +1,46 @@
+# Dependencies
+node_modules/
+agent/.venv/
+__pycache__/
+
+# Build outputs
+.next/
+out/
+build/
+dist/
+
+# Version control
+.git/
+.gitignore
+
+# IDE / editor
+.vscode/
+.cursor/
+.idea/
+*.swp
+*.swo
+
+# Environment files (use env_file in docker-compose)
+.env
+.env.local
+.env.*.local
+agent/.env
+
+# Temporary files
+.tmp-*/
+*.tmp
+nul
+
+# Documentation & plans
+docs/
+*.md
+!README.md
+
+# Test files
+agent/tests/
+**/*.test.*
+**/*.spec.*
+
+# OS files
+.DS_Store
+Thumbs.db
