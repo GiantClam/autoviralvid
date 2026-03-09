@@ -79,3 +79,12 @@ test_reports/
 .cursor/
 .vscode/
 *.code-workspace
+
+# local agent/workflow tooling
+.agent/
+.claude/
+.opencode/
+task_plan.md
+findings.md
+progress.md
+nul

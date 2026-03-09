@@ -562,7 +562,11 @@ class ProjectService:
                 if i2v_skill_name and registry:
                     _skill = registry.get_skill(i2v_skill_name)
                     if _skill:
-                        i2v_skill_id = _skill.id
+                        # DB column autoviralvid_video_tasks.skill_id is UUID.
+                        # Some skill registries use string IDs like
+                        # "yaml_runninghub_digital_human_i2v", which would
+                        # cause Postgres 22P02 on insert. Only persist UUIDs.
+                        i2v_skill_id = str(_skill.id) if _is_uuid(_skill.id) else None
             except Exception as exc:
                 logger.warning(f"[submit_videos] Skills module unavailable: {exc}")
 
@@ -741,7 +745,8 @@ class ProjectService:
                     "duration": exec_params["duration"],
                     "status": "queued",
                     "skill_name": i2v_skill,
-                    "skill_id": skill.id if skill.id else None,
+                    # Keep schema-compatible UUID only.
+                    "skill_id": str(skill.id) if _is_uuid(skill.id) else None,
                     "exec_params": json.dumps(exec_params),
                     "created_at": _utcnow_iso(),
                     "updated_at": _utcnow_iso(),

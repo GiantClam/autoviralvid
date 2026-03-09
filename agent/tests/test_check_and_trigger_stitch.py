@@ -59,6 +59,7 @@ def _make_queue(supabase_mock):
     q._worker_task = None
     q._retry_interval = 10
     q._max_concurrent = 1
+    q._stitch_in_progress = set()
     return q
 
 
@@ -444,3 +445,59 @@ class TestCheckAndTriggerStitchOrdering:
                 "https://cdn/seg1.mp4",
                 "https://cdn/seg2.mp4",
             ], f"URL 排序不正确: {video_urls}"
+
+
+class TestCheckAndTriggerStitchIdempotency:
+    """Existing final URLs should keep the run in a completed state."""
+
+    @pytest.mark.asyncio
+    async def test_existing_final_url_keeps_completed_state(self):
+        sb = MagicMock()
+        update_calls = {}
+
+        tasks_data = [
+            {"status": "succeeded", "video_url": "https://cdn/seg0.mp4", "clip_idx": 0, "skill_name": "x"},
+            {"status": "succeeded", "video_url": "https://cdn/seg1.mp4", "clip_idx": 1, "skill_name": "x"},
+        ]
+        job_data = [{
+            "storyboards": json.dumps({"_meta": {"pipeline_name": "digital_human"}, "scenes": []}),
+            "video_url": "https://cdn/final.mp4",
+        }]
+
+        def table_side_effect(name):
+            chain = MagicMock()
+            chain.select.return_value = chain
+            chain.eq.return_value = chain
+            chain.limit.return_value = chain
+
+            def capture_update(payload):
+                update_calls.setdefault(name, []).append(payload)
+                chain2 = MagicMock()
+                chain2.eq.return_value = chain2
+                chain2.execute.return_value = MagicMock(data=None)
+                return chain2
+
+            chain.update.side_effect = capture_update
+
+            result = MagicMock()
+            if name == "autoviralvid_video_tasks":
+                result.data = tasks_data
+            elif name == "autoviralvid_jobs":
+                result.data = job_data
+            else:
+                result.data = None
+            chain.execute.return_value = result
+            return chain
+
+        sb.table.side_effect = table_side_effect
+        q = _make_queue(sb)
+
+        with patch("src.video_stitcher.stitch_video_segments", new_callable=AsyncMock) as mock_stitch:
+            await q.check_and_trigger_stitch("run-already-completed")
+            mock_stitch.assert_not_called()
+
+        job_updates = update_calls.get("autoviralvid_jobs", [])
+        session_updates = update_calls.get("autoviralvid_crew_sessions", [])
+
+        assert any(u.get("status") == "completed" for u in job_updates)
+        assert any(u.get("status") == "completed" for u in session_updates)
