@@ -41,7 +41,7 @@ yarn-error.log*
 next-env.d.ts
 
 # lock files
-package-lock.json
+# Keep package-lock.json committed for reproducible frontend builds.
 yarn.lock
 pnpm-lock.yaml
 bun.lockb
