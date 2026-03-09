@@ -10,6 +10,7 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { randomBytes } from "crypto";
+import { getAppOrigin } from "@/lib/runtime-env";
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { prisma } = require("@/lib/prisma");
@@ -46,7 +47,7 @@ export async function POST(req: NextRequest) {
         });
 
         // TODO: Send email via configured SMTP / transactional service
-        const resetUrl = `${process.env.NEXTAUTH_URL || "http://localhost:3000"}/reset-password?token=${token}&email=${encodeURIComponent(email)}`;
+        const resetUrl = `${getAppOrigin()}/reset-password?token=${token}&email=${encodeURIComponent(email)}`;
         console.warn(
             `[forgot-password] SMTP not configured. Reset URL for ${email}: ${resetUrl}`,
         );

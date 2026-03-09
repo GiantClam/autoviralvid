@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getAgentServiceUrl } from '@/lib/runtime-env';
 
 type Params = Promise<{ run_id: string }>;
 
@@ -17,7 +18,7 @@ export async function POST(
         }
 
         // Forward the request to the backend agent service
-        const backendUrl = process.env.NEXT_PUBLIC_AGENT_URL || process.env.AGENT_URL || 'http://localhost:8123';
+        const backendUrl = getAgentServiceUrl();
         const url = `${backendUrl}/jobs/${encodeURIComponent(run_id)}/retry`;
 
         console.log(`[Frontend API] Forwarding retry request to: ${url}`);

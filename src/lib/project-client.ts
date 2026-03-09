@@ -6,7 +6,21 @@
  * /api/auth/api-token and attaches it as a Bearer token.
  */
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8123';
+function getApiBase() {
+  const configured =
+    process.env.NEXT_PUBLIC_API_BASE ||
+    process.env.NEXT_PUBLIC_AGENT_URL;
+
+  if (configured) {
+    return configured.replace(/\/+$/, '');
+  }
+
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('Missing NEXT_PUBLIC_API_BASE or NEXT_PUBLIC_AGENT_URL for production deployment.');
+  }
+
+  return 'http://localhost:8123';
+}
 
 // ---------------------------------------------------------------------------
 // Token management — cache the JWT and refresh before it expires
@@ -50,7 +64,7 @@ export function clearApiToken() {
 // Core fetch wrapper
 // ---------------------------------------------------------------------------
 async function apiFetch<T = unknown>(path: string, init?: RequestInit): Promise<T> {
-  const url = `${API_BASE}/api/v1${path}`;
+  const url = `${getApiBase()}/api/v1${path}`;
 
   // Build auth header
   const token = await getApiToken();

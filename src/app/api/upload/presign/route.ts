@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getAgentServiceUrl } from "@/lib/runtime-env";
 
 export const POST = async (req: NextRequest) => {
     const body = await req.json();
-    const agentUrl = process.env.AGENT_URL || "http://localhost:8123";
 
     try {
+        const agentUrl = getAgentServiceUrl();
         const res = await fetch(`${agentUrl}/upload/presign`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },

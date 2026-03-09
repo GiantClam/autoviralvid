@@ -8,17 +8,11 @@
 import { NextResponse } from "next/server";
 import { SignJWT } from "jose";
 import { auth } from "@/lib/auth";
-
-const AUTH_SECRET =
-    process.env.AUTH_SECRET ||
-    process.env.NEXTAUTH_SECRET ||
-    "dev-secret-change-in-production";
-
-// Encode the secret into bytes once
-const secretKey = new TextEncoder().encode(AUTH_SECRET);
+import { getAuthSecret } from "@/lib/runtime-env";
 
 export async function POST() {
     try {
+        const secretKey = new TextEncoder().encode(getAuthSecret());
         const session = await auth();
 
         if (!session?.user?.id) {

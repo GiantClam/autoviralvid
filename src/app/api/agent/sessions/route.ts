@@ -1,20 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { SignJWT } from "jose";
 import { auth } from "@/lib/auth";
-
-const AUTH_SECRET =
-    process.env.AUTH_SECRET ||
-    process.env.NEXTAUTH_SECRET ||
-    "dev-secret-change-in-production";
-
-const secretKey = new TextEncoder().encode(AUTH_SECRET);
+import { getAgentServiceUrl, getAuthSecret } from "@/lib/runtime-env";
 
 export const GET = async (req: NextRequest) => {
     const { searchParams } = new URL(req.url);
     const limit = searchParams.get("limit") || "40";
-    const agentUrl = process.env.AGENT_URL || "http://localhost:8123";
 
     try {
+        const agentUrl = getAgentServiceUrl();
+        const secretKey = new TextEncoder().encode(getAuthSecret());
         // Build auth header for backend
         const headers: Record<string, string> = {};
         const session = await auth();

@@ -3,6 +3,7 @@ import Credentials from "next-auth/providers/credentials";
 import Google from "next-auth/providers/google";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import bcrypt from "bcryptjs";
+import { getAuthSecret } from "@/lib/runtime-env";
 
 /**
  * NextAuth v5 with lazy initialization.
@@ -80,6 +81,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth(() => {
         pages: {
             signIn: "/",
         },
-        secret: process.env.NEXTAUTH_SECRET || process.env.AUTH_SECRET || "dev-secret-change-in-production",
+        secret: getAuthSecret(),
     };
 });

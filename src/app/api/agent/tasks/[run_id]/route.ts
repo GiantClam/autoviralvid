@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getAgentServiceUrl } from '@/lib/runtime-env';
 
 type Params = Promise<{ run_id: string }>;
 
@@ -12,7 +13,7 @@ export async function GET(
             return NextResponse.json({ error: 'Missing run_id parameter' }, { status: 400 });
         }
 
-        const backendUrl = process.env.NEXT_PUBLIC_AGENT_URL || process.env.AGENT_URL || 'http://localhost:8123';
+        const backendUrl = getAgentServiceUrl();
         const url = `${backendUrl}/jobs/${encodeURIComponent(run_id)}/tasks`;
 
         const response = await fetch(url);

@@ -38,9 +38,16 @@ export function uuidv4() {
     });
 }
 
-const DEFAULT_BASE = typeof process !== 'undefined' && (process.env.NEXT_PUBLIC_AGENT_URL || process.env.AGENT_URL) ? (process.env.NEXT_PUBLIC_AGENT_URL || process.env.AGENT_URL)! : 'http://localhost:8123'
+function resolveDefaultBase() {
+    const configured = process.env.NEXT_PUBLIC_AGENT_URL || process.env.AGENT_URL
+    if (configured) return configured
+    if (process.env.NODE_ENV === 'production') {
+        throw new Error('Missing NEXT_PUBLIC_AGENT_URL or AGENT_URL for production deployment.')
+    }
+    return 'http://localhost:8123'
+}
 
-export function getBaseUrl(base?: string) { return base !== undefined ? base : DEFAULT_BASE }
+export function getBaseUrl(base?: string) { return base !== undefined ? base : resolveDefaultBase() }
 
 export async function postJson<T>(url: string, body: any, init?: RequestInit): Promise<T> {
     const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), ...(init || {}) })

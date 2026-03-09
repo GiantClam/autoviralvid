@@ -14,7 +14,7 @@ This is a starter template for building AI agents using [LangGraph](https://www.
   - [bun](https://bun.sh/)
 - OpenAI API Key (for the LangGraph agent)
 
-> **Note:** This repository ignores lock files (package-lock.json, yarn.lock, pnpm-lock.yaml, bun.lockb) to avoid conflicts between different package managers. Each developer should generate their own lock file using their preferred package manager. After that, make sure to delete it from the .gitignore.
+> **Note:** `package-lock.json` is committed and should stay in sync with `package.json` so frontend builds remain reproducible across local, CI, and Vercel environments.
 
 ## Getting Started
 
@@ -79,7 +79,36 @@ The following scripts can also be run using your preferred package manager:
 - `build` - Builds the Next.js application for production
 - `start` - Starts the production server
 - `lint` - Runs ESLint for code linting
+- `test` - Runs offline-safe frontend unit tests
+- `test:integration` - Runs renderer/API integration tests that require local services
 - `install:agent` - Installs Python dependencies for the agent
+
+## Vercel Deployment
+
+The Next.js frontend compiles on Vercel, but production deployment requires explicit environment variables. The app no longer falls back to `localhost` in production.
+
+Required Vercel env vars:
+
+- `AUTH_SECRET` or `NEXTAUTH_SECRET`
+- `NEXTAUTH_URL` or `NEXT_PUBLIC_SITE_URL`
+- `AGENT_URL` or `NEXT_PUBLIC_AGENT_URL`
+
+Optional but commonly needed:
+
+- `NEXT_PUBLIC_API_BASE`
+- `REMOTION_RENDERER_URL`
+- `GOOGLE_CLIENT_ID`
+- `GOOGLE_CLIENT_SECRET`
+- `PAYPAL_CLIENT_ID`
+- `PAYPAL_CLIENT_SECRET`
+- `PAYPAL_PLAN_PRO`
+- `PAYPAL_PLAN_ENTERPRISE`
+
+Notes:
+
+- The frontend expects the Python backend to be reachable at `AGENT_URL` in production.
+- `npm run build` runs `prisma generate` automatically before the Next.js build.
+- `npm test` excludes service-dependent integration tests by default so CI and Vercel checks stay deterministic.
 
 ## Documentation
 
@@ -107,7 +136,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ### Agent Connection Issues
 If you see "I'm having trouble connecting to my tools", make sure:
-1. The LangGraph agent is running on port 8000
+1. The LangGraph agent is running on port 8123
 2. Your OpenAI API key is set correctly
 3. Both servers started successfully
 
