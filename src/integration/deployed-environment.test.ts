@@ -227,10 +227,15 @@ async function fetchDigitalHumanStatus(runId: string) {
   };
 }
 
-async function waitForFinalVideo(runId: string, timeoutMs: number) {
+async function waitForFinalVideo(
+  runId: string,
+  timeoutMs: number,
+  options?: { requireProjectVideoUrl?: boolean },
+) {
   const startedAt = Date.now();
   let lastStatusPayload: any = null;
   let lastProjectPayload: any = null;
+  const requireProjectVideoUrl = options?.requireProjectVideoUrl === true;
 
   while (Date.now() - startedAt < timeoutMs) {
     const statusResult = await fetchDigitalHumanStatus(runId);
@@ -253,7 +258,11 @@ async function waitForFinalVideo(runId: string, timeoutMs: number) {
     }
 
     const taskVideoUrls = extractTaskVideoUrls(lastStatusPayload);
-    if (taskVideoUrls.length > 0 && pendingTaskCount(lastStatusPayload) === 0) {
+    if (
+      !requireProjectVideoUrl &&
+      taskVideoUrls.length > 0 &&
+      pendingTaskCount(lastStatusPayload) === 0
+    ) {
       return {
         finalVideoUrl: taskVideoUrls[taskVideoUrls.length - 1],
         lastStatusPayload,
@@ -431,7 +440,9 @@ shortDhDescribe('Deployed Digital Human E2E', () => {
       expect(submitResult.response.ok).toBe(true);
       expectJsonContentType(submitResult.response);
 
-      const completion = await waitForFinalVideo(runId, DIGITAL_HUMAN_TIMEOUT_MS);
+      const completion = await waitForFinalVideo(runId, DIGITAL_HUMAN_TIMEOUT_MS, {
+        requireProjectVideoUrl: true,
+      });
       expect(completion.finalVideoUrl).toMatch(/^https?:\/\//);
     },
   );
@@ -463,7 +474,9 @@ longDhDescribe('Deployed Long Digital Human E2E', () => {
       const submitResult = await submitDigitalHumanProject(runId);
       expect(submitResult.response.ok).toBe(true);
 
-      const completion = await waitForFinalVideo(runId, DIGITAL_HUMAN_TIMEOUT_MS);
+      const completion = await waitForFinalVideo(runId, DIGITAL_HUMAN_TIMEOUT_MS, {
+        requireProjectVideoUrl: true,
+      });
       expect(completion.finalVideoUrl).toMatch(/^https?:\/\//);
       expect(pendingTaskCount(completion.lastStatusPayload)).toBe(0);
     },
