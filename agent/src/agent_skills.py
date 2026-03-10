@@ -2687,7 +2687,7 @@ def stitch_video_impl(clip_results_json: str, run_id: str) -> str:
                 f"Registering callback instead of blocking..."
             )
 
-            # Registering session status for tracking (optional, replaced by poller_node in LangGraph)
+            # Register session status for tracking. Polling now handles completion updates.
             try:
                 if supabase:
                     supabase.table("autoviralvid_crew_sessions").update(

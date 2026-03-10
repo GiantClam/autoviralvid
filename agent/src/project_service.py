@@ -1,7 +1,7 @@
-"""
-ProjectService — encapsulates the full project lifecycle for a
-form-driven video generation workflow, replacing the LangGraph
-chat-driven flow with direct async function calls.
+﻿"""
+ProjectService encapsulates the full project lifecycle for a
+form-driven video generation workflow with direct async function calls.
+
 
 Usage:
     svc = ProjectService()
@@ -34,6 +34,7 @@ from src.creative_agent import (
     STYLE_OPTIONS,
     VIDEO_TYPES,
 )
+from src.qwen_product_pipeline import batch_t2i as qwen_product_batch_t2i
 from src.r2 import upload_url_to_r2
 
 logger = logging.getLogger("project_service")
@@ -64,7 +65,7 @@ def _normalise_orientation(raw: Optional[str]) -> str:
     if not raw or not isinstance(raw, str):
         return "landscape"
     lower = raw.lower()
-    if "竖" in raw or "vertical" in lower or "portrait" in lower:
+    if "vertical" in lower or "portrait" in lower:
         return "portrait"
     return "landscape"
 
@@ -74,7 +75,7 @@ def _normalise_orientation(raw: Optional[str]) -> str:
 # ---------------------------------------------------------------------------
 
 class ProjectService:
-    """Stateless service — every public method receives a ``run_id`` and
+    """Stateless service: every public method receives a ``run_id`` and
     performs the corresponding lifecycle step against Supabase."""
 
     def __init__(self, supabase_client: Optional[Client] = None):
@@ -90,14 +91,14 @@ class ProjectService:
                 )
             self._sb = create_client(sb_url, sb_key)
 
-    # ── helpers ──────────────────────────────────────────────────────────
+    # 鈹€鈹€ helpers 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
     def _load_project(self, run_id: str) -> Dict[str, Any]:
         """Load a single project row from autoviralvid_jobs.
 
         Merges the ``_meta`` block stored inside ``storyboards`` JSONB back
         into the top-level dict so downstream code can use ``project["theme"]``
-        etc. transparently — regardless of whether the columns exist in the DB.
+        etc. transparently regardless of whether the columns exist in the DB.
         """
         res = (
             self._sb.table("autoviralvid_jobs")
@@ -162,7 +163,7 @@ class ProjectService:
         orientation: str = "landscape",
     ) -> Tuple[Optional[str], Optional[str], Optional[str]]:
         """
-        Resolve pipeline → (pipeline_name, t2i_skill_name, i2v_skill_name).
+        Resolve pipeline to ``(pipeline_name, t2i_skill_name, i2v_skill_name)``.
 
         Priority:
         1. ``pipeline_hint`` from template config
@@ -210,7 +211,7 @@ class ProjectService:
 
         return None, None, None
 
-    # ── 1. create_project ────────────────────────────────────────────────
+    # 鈹€鈹€ 1. create_project 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
     async def create_project(
         self,
@@ -227,7 +228,7 @@ class ProjectService:
             tpl_cfg = TEMPLATE_CONFIG.get(template_id, TEMPLATE_CONFIG.get("empty", {}))
             narrative_key = tpl_cfg.get("narrative", "product_showcase")
             pipeline_hint = tpl_cfg.get("pipeline_hint")
-            video_type = params.get("video_type") or tpl_cfg.get("video_type", "自定义视频")
+            video_type = params.get("video_type") or tpl_cfg.get("video_type", "custom-video")
 
             narrative_structure = NARRATIVE_STRUCTURES.get(
                 narrative_key, NARRATIVE_STRUCTURES.get("product_showcase")
@@ -235,7 +236,7 @@ class ProjectService:
 
             now = _utcnow_iso()
 
-            # Build extended metadata — stored inside `storyboards` JSONB
+            # Build extended metadata stored inside `storyboards` JSONB
             # because the original DB schema only has a few TEXT columns.
             # The `storyboards` field will hold a JSON object with both
             # storyboard data (scenes) and project metadata (_meta).
@@ -244,7 +245,7 @@ class ProjectService:
                 "theme": params.get("theme", ""),
                 "style": params.get("style", ""),
                 "duration": params.get("duration", 30),
-                "orientation": params.get("orientation", "横屏"),
+                "orientation": params.get("orientation", "妯睆"),
                 "product_image_url": params.get("product_image_url", ""),
                 "video_type": video_type,
                 "pipeline_hint": pipeline_hint,
@@ -262,7 +263,7 @@ class ProjectService:
             if params.get("motion_prompt"):
                 meta["motion_prompt"] = params["motion_prompt"]
 
-            # DB row — only use columns that exist in the original schema
+            # DB row: only use columns that exist in the original schema
             db_row = {
                 "run_id": run_id,
                 "slogan": params.get("theme", "")[:200],
@@ -287,7 +288,7 @@ class ProjectService:
             logger.exception(f"[create_project] Failed: {exc}")
             return {"error": str(exc)}
 
-    # ── 2. generate_storyboard ───────────────────────────────────────────
+    # 鈹€鈹€ 2. generate_storyboard 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
     async def generate_storyboard(self, run_id: str) -> Dict[str, Any]:
         """Generate a storyboard for an existing project and persist it."""
@@ -305,7 +306,7 @@ class ProjectService:
                 "style": style,
                 "duration": duration,
                 "video_type": project.get("video_type", ""),
-                "orientation": project.get("orientation", "横屏"),
+                "orientation": project.get("orientation", "妯睆"),
                 "product_image": project.get("product_image_url", ""),
                 "template_id": project.get("template_id"),
                 "pipeline_hint": project.get("pipeline_hint"),
@@ -336,7 +337,7 @@ class ProjectService:
 
             storyboard = json.loads(storyboard_json)
 
-            # Persist storyboard — preserve _meta block from original storyboards
+            # Persist storyboard while preserving the original _meta block
             sb_raw = project.get("storyboards")
             sb_existing = json.loads(sb_raw) if isinstance(sb_raw, str) and sb_raw else (sb_raw if isinstance(sb_raw, dict) else {})
             meta_block = sb_existing.get("_meta", {}) if isinstance(sb_existing, dict) else {}
@@ -359,7 +360,7 @@ class ProjectService:
             logger.exception(f"[generate_storyboard] Failed: {exc}")
             return {"error": str(exc)}
 
-    # ── 3. generate_images ───────────────────────────────────────────────
+    # 鈹€鈹€ 3. generate_images 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
     async def generate_images(self, run_id: str) -> Dict[str, Any]:
         """Generate images for every scene in the storyboard."""
@@ -385,23 +386,21 @@ class ProjectService:
                 f"scenes={len(scenes)}"
             )
 
-            # ── PATH A: qwen_product batch T2I ──
+            # 鈹€鈹€ PATH A: qwen_product batch T2I 鈹€鈹€
             if pipeline_name == "qwen_product":
                 collected_info = {
-                    "topic": project.get("theme", "产品展示"),
+                    "topic": project.get("theme", "product showcase"),
                     "style": project.get("style", ""),
                 }
                 batch_prompt = (
-                    f"这是一部{collected_info['topic']}广告宣传片，参考图片，"
-                    f"帮我生成{max(len(scenes), 6)}张产品广告宣传片分镜头，"
-                    f"不同运镜和角度，不同的视角和景别。"
+                    f"Generate {max(len(scenes), 6)} product-ad storyboard frames for "
+                    f"{collected_info['topic']} using the reference image. Vary the "
+                    f"camera movement, angle, framing, and scene composition."
                 )
                 if collected_info["style"]:
-                    batch_prompt += f" 风格: {collected_info['style']}"
+                    batch_prompt += f" Style: {collected_info['style']}"
 
-                from src.langgraph_workflow import _qwen_product_batch_t2i
-
-                image_urls, descriptions = await _qwen_product_batch_t2i(
+                image_urls, descriptions = await qwen_product_batch_t2i(
                     product_image_url=product_image_url,
                     prompt=batch_prompt,
                 )
@@ -412,7 +411,7 @@ class ProjectService:
                 # Rebuild scenes from batch output
                 new_scenes = []
                 for idx, img_url in enumerate(image_urls):
-                    desc = descriptions[idx] if idx < len(descriptions) else f"产品展示场景 {idx + 1}"
+                    desc = descriptions[idx] if idx < len(descriptions) else f"Product scene {idx + 1}"
                     new_scenes.append({
                         "scene_idx": idx + 1,
                         "narration": desc,
@@ -422,7 +421,7 @@ class ProjectService:
                 storyboard["scenes"] = new_scenes
                 storyboard["_batch_descriptions"] = descriptions
 
-            # ── PATH B: per-scene provider (sora2 / legacy) ──
+            # 鈹€鈹€ PATH B: per-scene provider (sora2 / legacy) 鈹€鈹€
             else:
                 from src.providers import get_image_provider
 
@@ -447,7 +446,7 @@ class ProjectService:
                         scene["visual_error"] = str(exc)
                         logger.warning(f"[generate_images] Scene {i + 1} failed: {exc}")
 
-            # Save pipeline + updated storyboard — preserve _meta
+            # Save pipeline metadata plus the updated storyboard
             meta_block = storyboard.get("_meta", {}) if isinstance(storyboard, dict) else {}
             meta_block.update({
                 "pipeline_name": pipeline_name,
@@ -474,7 +473,7 @@ class ProjectService:
             logger.exception(f"[generate_images] Failed: {exc}")
             return {"error": str(exc)}
 
-    # ── 4. submit_videos ─────────────────────────────────────────────────
+    # 鈹€鈹€ 4. submit_videos 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
     async def submit_videos(self, run_id: str) -> List[Dict[str, Any]]:
         """Submit video generation tasks for every scene / frame pair."""
@@ -502,7 +501,7 @@ class ProjectService:
                 f"scenes={len(scenes)}"
             )
 
-            # ── Build task list ──
+            # 鈹€鈹€ Build task list 鈹€鈹€
             video_tasks: List[Dict[str, Any]] = []
 
             if pipeline_name == "qwen_product" and len(scenes) >= 2:
@@ -511,7 +510,7 @@ class ProjectService:
                 for i in range(len(scenes) - 1):
                     first_url = scenes[i].get("keyframes", {}).get("in", "")
                     last_url = scenes[i + 1].get("keyframes", {}).get("in", "")
-                    desc = descriptions[i] if i < len(descriptions) else scenes[i].get("narration", f"场景 {i + 1}")
+                    desc = descriptions[i] if i < len(descriptions) else scenes[i].get("narration", f"鍦烘櫙 {i + 1}")
                     video_tasks.append({
                         "idx": i + 1,
                         "prompt": desc,
@@ -536,7 +535,7 @@ class ProjectService:
                         "orientation": orientation,
                     })
 
-            # ── Resolve skills ──
+            # 鈹€鈹€ Resolve skills 鈹€鈹€
             selected_skills: List[str] = []
             i2v_skill_name: Optional[str] = None
             i2v_skill_id: Optional[str] = None
@@ -570,7 +569,7 @@ class ProjectService:
             except Exception as exc:
                 logger.warning(f"[submit_videos] Skills module unavailable: {exc}")
 
-            # ── Enqueue all tasks (Worker will submit to RunningHub) ──
+            # 鈹€鈹€ Enqueue all tasks (Worker will submit to RunningHub) 鈹€鈹€
             results: List[Dict[str, Any]] = []
 
             logger.info(
@@ -630,12 +629,12 @@ class ProjectService:
             logger.exception(f"[submit_videos] Failed: {exc}")
             return [{"error": str(exc)}]
 
-    # ── 4b. submit_digital_human ─────────────────────────────────────────
+    # 鈹€鈹€ 4b. submit_digital_human 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
     async def submit_digital_human(self, run_id: str) -> List[Dict[str, Any]]:
         """Submit digital human video generation task(s).
 
-        Digital human flow skips storyboard/image generation — the user directly
+        Digital human flow skips storyboard/image generation 鈥?the user directly
         provides a person image and audio. For short audio (<= 45s), a single
         task is created. For long audio (up to 30 min), the audio is
         automatically split into segments at silence points, with each segment
@@ -648,20 +647,20 @@ class ProjectService:
             # _load_project inflates _meta from storyboards JSONB
             person_image_url = project.get("product_image_url") or project.get("image_control", "")
             if not person_image_url:
-                return [{"error": "数字人形象图片为必填项 (product_image_url)"}]
+                return [{"error": "Digital human avatar image is required (product_image_url)"}]
 
             audio_url = project.get("audio_url", "")
             if not audio_url:
-                return [{"error": "数字人音频文件为必填项 (audio_url)"}]
+                return [{"error": "Digital human audio file is required (audio_url)"}]
 
             voice_mode = int(project.get("voice_mode", 0))
             voice_text = project.get("voice_text", "")
-            motion_prompt = project.get("motion_prompt", "模特正在做产品展示，进行电商直播带货")
-
-            # If voice clone mode (1), voice_text is required
+            motion_prompt = project.get(
+                "motion_prompt",
+                "Presenter demonstrates the product with natural sales motion",
+            )
             if voice_mode == 1 and not voice_text:
-                return [{"error": "声音克隆模式需要提供合成文本 (voice_text)"}]
-
+                return [{"error": "voice_text is required when voice_mode=1"}]
             pipeline_name = "digital_human"
             i2v_skill = "runninghub_digital_human_i2v"
 
@@ -670,7 +669,7 @@ class ProjectService:
                 f"voice_mode={voice_mode}, motion='{motion_prompt[:40]}...'"
             )
 
-            # ── Determine whether to split audio ──
+            # 鈹€鈹€ Determine whether to split audio 鈹€鈹€
             from src.audio_splitter import (
                 get_audio_duration,
                 split_audio,
@@ -685,7 +684,7 @@ class ProjectService:
             )
 
             if audio_duration <= MAX_SINGLE_SEGMENT_SECONDS:
-                # Short audio → single segment, no splitting needed
+                # Short audio: single segment, no splitting needed
                 segments = [
                     SegmentInfo(
                         index=0,
@@ -696,7 +695,7 @@ class ProjectService:
                     )
                 ]
             else:
-                # Long audio → split at silence points
+                # Long audio: split at silence points
                 logger.info(
                     f"[submit_digital_human] Long audio detected ({audio_duration:.1f}s), "
                     f"splitting into segments..."
@@ -710,7 +709,7 @@ class ProjectService:
                     f"[submit_digital_human] Audio split into {len(segments)} segments"
                 )
 
-            # ── Validate skill exists ──
+            # 鈹€鈹€ Validate skill exists 鈹€鈹€
             from src.skills import get_skills_registry
 
             registry = await get_skills_registry()
@@ -718,7 +717,7 @@ class ProjectService:
             if not skill:
                 return [{"error": f"Skill '{i2v_skill}' not found in registry"}]
 
-            # ── Enqueue all segments (Worker will submit to RunningHub) ──
+            # 鈹€鈹€ Enqueue all segments (Worker will submit to RunningHub) 鈹€鈹€
             results: List[Dict[str, Any]] = []
 
             logger.info(
@@ -764,7 +763,7 @@ class ProjectService:
                     f"duration={seg.duration_s:.1f}s, audio={seg.url[:60]}..."
                 )
 
-            # ── Update session tracking ──
+            # 鈹€鈹€ Update session tracking 鈹€鈹€
             try:
                 self._sb.table("autoviralvid_crew_sessions").upsert({
                     "run_id": run_id,
@@ -796,7 +795,7 @@ class ProjectService:
                 pass
             return [{"error": str(exc)}]
 
-    # ── 5. get_status ────────────────────────────────────────────────────
+    # 鈹€鈹€ 5. get_status 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
     async def get_status(self, run_id: str) -> Dict[str, Any]:
         """Return aggregated status of all video tasks for a project."""
@@ -831,7 +830,7 @@ class ProjectService:
             logger.exception(f"[get_status] Failed: {exc}")
             return {"error": str(exc), "run_id": run_id}
 
-    # ── 6. render_final ──────────────────────────────────────────────────
+    # 鈹€鈹€ 6. render_final 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
     async def render_final(self, run_id: str) -> Dict[str, Any]:
         """Stitch all completed video clips into one final video."""
@@ -855,7 +854,7 @@ class ProjectService:
             logger.exception(f"[render_final] Failed: {exc}")
             return {"error": str(exc), "run_id": run_id}
 
-    # ── 7. create_batch ──────────────────────────────────────────────────
+    # 鈹€鈹€ 7. create_batch 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
     async def create_batch(
         self,
@@ -883,3 +882,4 @@ class ProjectService:
             f"[create_batch] Created {len(run_ids)} projects for template={template_id}"
         )
         return run_ids
+

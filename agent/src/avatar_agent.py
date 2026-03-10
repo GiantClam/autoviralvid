@@ -32,7 +32,7 @@ class AvatarAgent:
 
 async def avatar_node(state: Dict[str, Any]):
     """
-    LangGraph node for avatar synthesis.
+    Workflow node for avatar synthesis.
     """
     if not state.get("use_avatar", False):
         return state

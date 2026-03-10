@@ -76,7 +76,7 @@ class VideoQueueConfig:
 
 @dataclass
 class WorkflowConfig:
-    """Configuration for the LangGraph workflow."""
+    """Configuration for the video generation workflow."""
 
     # Default clip settings
     default_clip_duration: float = field(

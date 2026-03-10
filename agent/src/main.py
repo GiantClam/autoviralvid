@@ -6,7 +6,7 @@ Railway and local production should run ``agent/main.py`` instead:
     uvicorn main:app --host 0.0.0.0 --port ${PORT}
 
 This wrapper exists so that accidental references to ``src/main.py`` do not
-boot the retired LangGraph application or fail with missing imports.
+boot a retired legacy entrypoint or fail with missing imports.
 """
 
 from __future__ import annotations
