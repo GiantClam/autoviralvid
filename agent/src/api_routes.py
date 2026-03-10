@@ -674,29 +674,30 @@ async def get_project_status(run_id: str, user: AuthUser = Depends(get_current_u
 
         if all_succeeded and not job.get("video_url") and job.get("status") != "completed":
             try:
-                from src.video_task_queue_supabase import (
-                    ensure_supabase_queue_worker,
-                    get_supabase_queue,
-                )
+                if total == 1:
+                    svc = _get_project_service()
+                    await svc.render_final(run_id)
+                    refreshed_job = (
+                        sb.table("autoviralvid_jobs")
+                        .select("run_id, status, updated_at, video_url")
+                        .eq("run_id", run_id)
+                        .single()
+                        .execute()
+                    )
+                    if refreshed_job.data:
+                        job = refreshed_job.data
+                    logger.info(
+                        f"[get_project_status] Completed synchronous render self-heal for run_id={run_id}"
+                    )
+                else:
+                    from src.video_task_queue_supabase import (
+                        ensure_supabase_queue_worker,
+                        get_supabase_queue,
+                    )
 
-                ensure_supabase_queue_worker("project_status")
-                queue = get_supabase_queue()
-                if queue:
-                    if total == 1:
-                        await queue.check_and_trigger_stitch(run_id)
-                        refreshed_job = (
-                            sb.table("autoviralvid_jobs")
-                            .select("run_id, status, updated_at, video_url")
-                            .eq("run_id", run_id)
-                            .single()
-                            .execute()
-                        )
-                        if refreshed_job.data:
-                            job = refreshed_job.data
-                        logger.info(
-                            f"[get_project_status] Completed synchronous stitch self-heal for run_id={run_id}"
-                        )
-                    else:
+                    ensure_supabase_queue_worker("project_status")
+                    queue = get_supabase_queue()
+                    if queue:
                         asyncio.create_task(queue.check_and_trigger_stitch(run_id))
                         logger.info(
                             f"[get_project_status] Triggered async stitch self-heal for run_id={run_id}"

@@ -56,20 +56,16 @@ async def test_get_project_status_triggers_stitch_self_heal():
 
     svc = MagicMock()
     svc.get_status = AsyncMock(return_value={"run_id": "run-123", "all_done": True})
+    svc.render_final = AsyncMock(return_value={"run_id": "run-123", "final_video_url": "https://cdn/final.mp4"})
     queue = MagicMock()
     queue.check_and_trigger_stitch = AsyncMock()
 
-    with patch.object(api_routes, "supabase", sb), patch(
-        "src.video_task_queue_supabase.ensure_supabase_queue_worker",
-        return_value={"running": True},
-    ) as ensure_worker, patch(
-        "src.video_task_queue_supabase.get_supabase_queue",
-        return_value=queue,
-    ), patch.object(api_routes, "_get_project_service", return_value=svc):
+    with patch.object(api_routes, "supabase", sb), patch.object(
+        api_routes, "_get_project_service", return_value=svc
+    ):
         result = await api_routes.get_project_status("run-123", SimpleNamespace(id="u1"))
 
     assert result["all_succeeded"] is True
     assert result["project_status"] == "completed"
-    ensure_worker.assert_any_call("get_project_status")
-    ensure_worker.assert_any_call("project_status")
-    queue.check_and_trigger_stitch.assert_awaited_once_with("run-123")
+    svc.render_final.assert_awaited_once_with("run-123")
+    queue.check_and_trigger_stitch.assert_not_called()
