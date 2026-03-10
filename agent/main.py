@@ -237,6 +237,24 @@ async def webhook_runninghub(request: Request):
                     logger.info(
                         f"[webhook_runninghub] Task {task_id} completed: {cdn_url}"
                     )
+                    try:
+                        from src.video_task_queue_supabase import (
+                            ensure_supabase_queue_worker,
+                            get_supabase_queue,
+                        )
+
+                        ensure_supabase_queue_worker("runninghub_webhook")
+                        queue = get_supabase_queue()
+                        if queue and run_id:
+                            asyncio.create_task(queue.check_and_trigger_stitch(run_id))
+                            logger.info(
+                                f"[webhook_runninghub] Triggered stitch check for run_id={run_id}"
+                            )
+                    except Exception as stitch_err:
+                        logger.warning(
+                            f"[webhook_runninghub] Failed to trigger stitch check for {run_id}: {stitch_err}",
+                            exc_info=True,
+                        )
     except Exception as e:
         logger.error(f"[webhook_runninghub] Error: {e}")
 
