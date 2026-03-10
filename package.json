@@ -13,6 +13,7 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:integration": "cross-env RUN_INTEGRATION_TESTS=1 vitest run src/lib/render/render-api.test.ts src/lib/render/remotion-full-render.test.ts src/lib/render/remotion-integration.test.ts src/lib/render/remotion-perf.test.ts",
+    "test:deployed": "cross-env RUN_DEPLOYED_INTEGRATION_TESTS=1 vitest run src/integration/deployed-environment.test.ts",
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
     "install:agent": "cd agent && uv sync",

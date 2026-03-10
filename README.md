@@ -1,6 +1,6 @@
-# CopilotKit <> LangGraph Starter
+# AutoViralVid
 
-This is a starter template for building AI agents using [LangGraph](https://www.langchain.com/langgraph) and [CopilotKit](https://copilotkit.ai). It provides a modern Next.js application with an integrated LangGraph agent to be built on top of.
+This repository contains a Next.js frontend plus a Python backend for video generation, digital-human orchestration, stitching, and rendering. The production backend entrypoint is `agent/main.py`.
 
 ## Prerequisites
 
@@ -12,7 +12,7 @@ This is a starter template for building AI agents using [LangGraph](https://www.
   - npm
   - [yarn](https://classic.yarnpkg.com/lang/en/docs/install/#mac-stable)
   - [bun](https://bun.sh/)
-- OpenAI API Key (for the LangGraph agent)
+- Backend service credentials for the integrations you use
 
 > **Note:** `package-lock.json` is committed and should stay in sync with `package.json` so frontend builds remain reproducible across local, CI, and Vercel environments.
 
@@ -33,7 +33,7 @@ yarn install
 bun install
 ```
 
-2. Install Python dependencies for the LangGraph agent:
+2. Install Python dependencies for the backend service:
 ```bash
 # Using pnpm
 pnpm install:agent
@@ -48,9 +48,9 @@ yarn install:agent
 bun run install:agent
 ```
 
-3. Set up your OpenAI API key:
+3. Configure backend environment variables:
 ```bash
-echo 'OPENAI_API_KEY=your-openai-api-key-here' > agent/.env
+cp agent/.env.example agent/.env
 ```
 
 4. Start the development server:
@@ -75,12 +75,13 @@ The following scripts can also be run using your preferred package manager:
 - `dev` - Starts both UI and agent servers in development mode
 - `dev:debug` - Starts development servers with debug logging enabled
 - `dev:ui` - Starts only the Next.js UI server
-- `dev:agent` - Starts only the LangGraph agent server
+- `dev:agent` - Starts only the Python backend server
 - `build` - Builds the Next.js application for production
 - `start` - Starts the production server
 - `lint` - Runs ESLint for code linting
 - `test` - Runs offline-safe frontend unit tests
 - `test:integration` - Runs renderer/API integration tests that require local services
+- `test:deployed` - Runs deployed-environment smoke tests against Vercel/Railway targets
 - `install:agent` - Installs Python dependencies for the agent
 
 ## Vercel Deployment
@@ -109,6 +110,25 @@ Notes:
 - The frontend expects the Python backend to be reachable at `AGENT_URL` in production.
 - `npm run build` runs `prisma generate` automatically before the Next.js build.
 - `npm test` excludes service-dependent integration tests by default so CI and Vercel checks stay deterministic.
+- `npm run test:deployed` requires `DEPLOYED_FRONTEND_URL` and `DEPLOYED_BACKEND_URL`; set `ALLOW_PAID_DEPLOYED_E2E=1` plus the digital-human audio env vars only when you want real end-to-end generation against production services.
+
+## Railway Deployment
+
+Deploy the Python backend as a separate Railway service.
+
+- Set the Railway service `Root Directory` to `agent`
+- Use [agent/Dockerfile](d:/github/with-langgraph-fastapi/agent/Dockerfile)
+- If you want config-as-code, point Railway to [agent/railway.toml](d:/github/with-langgraph-fastapi/agent/railway.toml)
+- Health check path: `/healthz`
+- Keep the service at a single replica because the queue worker runs in-process
+
+Canonical backend start command:
+
+```bash
+uv run uvicorn main:app --host 0.0.0.0 --port ${PORT}
+```
+
+Do not deploy `agent/src/main.py`; it is a legacy compatibility wrapper only.
 
 ## Documentation
 
@@ -117,12 +137,10 @@ The main UI component is in `src/app/page.tsx`. You can:
 - Add new frontend actions
 - Customize the CopilotKit sidebar appearance
 
-## 📚 Documentation
+## Additional Docs
 
-- [LangGraph Documentation](https://langchain-ai.github.io/langgraph/) - Learn more about LangGraph and its features
-- [CopilotKit Documentation](https://docs.copilotkit.ai) - Explore CopilotKit's capabilities
 - [Next.js Documentation](https://nextjs.org/docs) - Learn about Next.js features and API
-- [YFinance Documentation](https://pypi.org/project/yfinance/) - Financial data tools
+- [DEPLOYED_TESTING.md](d:/github/with-langgraph-fastapi/docs/DEPLOYED_TESTING.md) - Deployed-environment smoke tests and paid E2E checks
 
 ## Contributing
 
@@ -136,13 +154,13 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ### Agent Connection Issues
 If you see "I'm having trouble connecting to my tools", make sure:
-1. The LangGraph agent is running on port 8123
-2. Your OpenAI API key is set correctly
+1. The Python backend is running on port 8123
+2. Your backend environment variables are set correctly
 3. Both servers started successfully
 
 ### Python Dependencies
 If you encounter Python import errors:
 ```bash
 cd agent
-poetry lock && poetry install
+uv sync
 ```
