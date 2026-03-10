@@ -6,6 +6,7 @@ generation, status polling, final rendering, batch creation, and an AI
 assistant chat endpoint.
 """
 
+import asyncio
 import os
 import uuid
 import json
@@ -641,7 +642,7 @@ async def get_project_status(run_id: str, user: AuthUser = Depends(get_current_u
         # Job-level status
         job_res = (
             sb.table("autoviralvid_jobs")
-            .select("run_id, status, updated_at")
+            .select("run_id, status, updated_at, video_url")
             .eq("run_id", run_id)
             .single()
             .execute()
@@ -670,6 +671,26 @@ async def get_project_status(run_id: str, user: AuthUser = Depends(get_current_u
 
         all_succeeded = total > 0 and counts.get("succeeded", 0) == total
         has_failed = counts.get("failed", 0) > 0
+
+        if all_succeeded and not job.get("video_url") and job.get("status") != "completed":
+            try:
+                from src.video_task_queue_supabase import (
+                    ensure_supabase_queue_worker,
+                    get_supabase_queue,
+                )
+
+                ensure_supabase_queue_worker("project_status")
+                queue = get_supabase_queue()
+                if queue:
+                    asyncio.create_task(queue.check_and_trigger_stitch(run_id))
+                    logger.info(
+                        f"[get_project_status] Triggered stitch self-heal for run_id={run_id}"
+                    )
+            except Exception as stitch_exc:
+                logger.warning(
+                    f"[get_project_status] Failed to trigger stitch self-heal for {run_id}: {stitch_exc}",
+                    exc_info=True,
+                )
 
         # Try to also get service-level status if available
         service_status = None
