@@ -32,6 +32,8 @@ DEPLOYED_TEST_EMAIL=integration-test@example.com
 ## Optional paid E2E
 
 These tests create real digital-human jobs and may incur external API costs.
+The default short-audio fixture now uses `https://s.autoviralvid.com/uploads/test_dh_audio_20s_20260310.mp3`
+to avoid third-party CDN access issues.
 
 ```bash
 ALLOW_PAID_DEPLOYED_E2E=1
@@ -50,6 +52,8 @@ RUN_DEPLOYED_LONG_DIGITAL_HUMAN_E2E=1
 DEPLOYED_LONG_DIGITAL_HUMAN_AUDIO_URL=https://...
 DEPLOYED_LONG_DIGITAL_HUMAN_DURATION=240
 ```
+
+Paid E2E also requires the deployed backend to have a valid `RUNNINGHUB_API_KEY`.
 
 ## What the suite checks
 

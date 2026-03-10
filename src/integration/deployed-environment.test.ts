@@ -8,7 +8,7 @@ const ALLOW_PAID_DEPLOYED_E2E = process.env.ALLOW_PAID_DEPLOYED_E2E === '1';
 const DEFAULT_AVATAR_URL =
   'https://cdn.pixabay.com/photo/2016/11/29/13/14/attractive-1869761_1280.jpg';
 const DEFAULT_SHORT_AUDIO_URL =
-  'https://cdn.pixabay.com/audio/2024/11/08/audio_93a1e8eb4e.mp3';
+  'https://s.autoviralvid.com/uploads/test_dh_audio_20s_20260310.mp3';
 
 const FRONTEND_BASE_URL = normalizeBaseUrl(
   process.env.DEPLOYED_FRONTEND_URL || process.env.API_BASE,
@@ -22,6 +22,14 @@ const BACKEND_BASE_URL = normalizeBaseUrl(
 const BACKEND_BEARER_TOKEN = process.env.DEPLOYED_BACKEND_BEARER_TOKEN;
 const DEPLOYED_TEST_EMAIL =
   process.env.DEPLOYED_TEST_EMAIL || 'integration-test@example.com';
+const DEPLOYED_SMOKE_TEST_TIMEOUT_MS = parseInteger(
+  process.env.DEPLOYED_SMOKE_TEST_TIMEOUT_MS,
+  15_000,
+);
+const DEPLOYED_FETCH_RETRY_COUNT = parseInteger(
+  process.env.DEPLOYED_FETCH_RETRY_COUNT,
+  3,
+);
 const DIGITAL_HUMAN_TIMEOUT_MS = parseInteger(
   process.env.DEPLOYED_DIGITAL_HUMAN_TIMEOUT_MS,
   15 * 60 * 1000,
@@ -85,10 +93,24 @@ function createBackendHeaders() {
 }
 
 async function fetchWithTimeout(url: string, init?: RequestInit, timeoutMs = 30_000) {
-  return fetch(url, {
-    ...init,
-    signal: AbortSignal.timeout(timeoutMs),
-  });
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= DEPLOYED_FETCH_RETRY_COUNT; attempt += 1) {
+    try {
+      return await fetch(url, {
+        ...init,
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+    } catch (error) {
+      lastError = error;
+      if (attempt >= DEPLOYED_FETCH_RETRY_COUNT) {
+        throw error;
+      }
+      await new Promise((resolve) => setTimeout(resolve, attempt * 500));
+    }
+  }
+
+  throw lastError;
 }
 
 async function readJsonResponse(response: Response) {
@@ -255,7 +277,7 @@ async function waitForFinalVideo(runId: string, timeoutMs: number) {
   );
 }
 
-smokeDescribe('Deployed Environment Smoke Tests', () => {
+smokeDescribe('Deployed Environment Smoke Tests', { timeout: DEPLOYED_SMOKE_TEST_TIMEOUT_MS }, () => {
   it('requires DEPLOYED_FRONTEND_URL when deployed tests are enabled', () => {
     expect(requireEnv('DEPLOYED_FRONTEND_URL', FRONTEND_BASE_URL)).toMatch(/^https?:\/\//);
   });
