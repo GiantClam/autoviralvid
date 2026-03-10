@@ -53,6 +53,14 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Install ffmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+      - name: Verify ffmpeg
+        run: ffmpeg -version
+
       - name: Install uv
         run: pip install uv
 
