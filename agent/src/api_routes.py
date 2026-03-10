@@ -682,10 +682,25 @@ async def get_project_status(run_id: str, user: AuthUser = Depends(get_current_u
                 ensure_supabase_queue_worker("project_status")
                 queue = get_supabase_queue()
                 if queue:
-                    asyncio.create_task(queue.check_and_trigger_stitch(run_id))
-                    logger.info(
-                        f"[get_project_status] Triggered stitch self-heal for run_id={run_id}"
-                    )
+                    if total == 1:
+                        await queue.check_and_trigger_stitch(run_id)
+                        refreshed_job = (
+                            sb.table("autoviralvid_jobs")
+                            .select("run_id, status, updated_at, video_url")
+                            .eq("run_id", run_id)
+                            .single()
+                            .execute()
+                        )
+                        if refreshed_job.data:
+                            job = refreshed_job.data
+                        logger.info(
+                            f"[get_project_status] Completed synchronous stitch self-heal for run_id={run_id}"
+                        )
+                    else:
+                        asyncio.create_task(queue.check_and_trigger_stitch(run_id))
+                        logger.info(
+                            f"[get_project_status] Triggered async stitch self-heal for run_id={run_id}"
+                        )
             except Exception as stitch_exc:
                 logger.warning(
                     f"[get_project_status] Failed to trigger stitch self-heal for {run_id}: {stitch_exc}",
