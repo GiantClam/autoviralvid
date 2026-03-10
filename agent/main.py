@@ -517,7 +517,7 @@ async def stitch_run(
         except Exception as e:
             logger.error(f"[stitch] Failed for run {run_id}: {e}", exc_info=True)
 
-    background_tasks.add_task(asyncio.ensure_future, _do_stitch())
+    background_tasks.add_task(_do_stitch)
 
     return {
         "status": "stitching",
