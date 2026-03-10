@@ -62,9 +62,104 @@ class SupabaseVideoTaskQueue:
         self._worker_task: Optional[asyncio.Task] = None
         self._running = False
         self._stitch_in_progress: set[str] = set()
+        self._worker_started_at: Optional[str] = None
+        self._worker_start_count = 0
+        self._last_loop_started_at: Optional[str] = None
+        self._last_loop_completed_at: Optional[str] = None
+        self._last_progress_at: Optional[str] = None
+        self._last_error: Optional[str] = None
+        self._last_task_counts: Dict[str, int] = {}
 
         # Verify the backing table and expected columns.
         self._ensure_table()
+
+    def _start_worker_task(self, reason: str) -> None:
+        """Start or restart the background worker task."""
+        asyncio.get_running_loop()
+        self._running = True
+        self._worker_task = asyncio.create_task(self._worker_loop())
+        self._worker_started_at = _utcnow_iso()
+        self._worker_start_count += 1
+        self._last_error = None
+        self.logger.info(
+            f"[SupabaseVideoTaskQueue] Worker started (reason={reason}, starts={self._worker_start_count})"
+        )
+
+    def _record_task_counts(self, tasks: List[Dict[str, Any]]) -> None:
+        counts: Dict[str, int] = {}
+        for task in tasks:
+            status = task.get("status") or "unknown"
+            counts[status] = counts.get(status, 0) + 1
+        if counts != self._last_task_counts:
+            self._last_task_counts = counts
+            self._last_progress_at = _utcnow_iso()
+
+    def get_worker_snapshot(self) -> Dict[str, Any]:
+        worker_task_done = bool(self._worker_task and self._worker_task.done())
+        stale_after_seconds = max(self.retry_interval * 3, 60.0)
+        last_tick_reference = self._last_loop_completed_at or self._last_loop_started_at
+        heartbeat_age_seconds = None
+        if last_tick_reference:
+            try:
+                heartbeat_age_seconds = (
+                    _utcnow() - datetime.fromisoformat(last_tick_reference)
+                ).total_seconds()
+            except ValueError:
+                heartbeat_age_seconds = None
+        worker_healthy = bool(
+            self._running
+            and self._worker_task is not None
+            and not worker_task_done
+            and (
+                heartbeat_age_seconds is None
+                or heartbeat_age_seconds <= stale_after_seconds
+            )
+        )
+        snapshot = {
+            "running": self._running,
+            "worker_task_present": self._worker_task is not None,
+            "worker_task_done": worker_task_done,
+            "worker_started_at": self._worker_started_at,
+            "worker_start_count": self._worker_start_count,
+            "last_loop_started_at": self._last_loop_started_at,
+            "last_loop_completed_at": self._last_loop_completed_at,
+            "last_progress_at": self._last_progress_at,
+            "last_error": self._last_error,
+            "last_task_counts": self._last_task_counts,
+            "heartbeat_age_seconds": heartbeat_age_seconds,
+            "worker_healthy": worker_healthy,
+            "retry_interval_seconds": self.retry_interval,
+            "runninghub_max_concurrent": self.RUNNINGHUB_MAX_CONCURRENT,
+        }
+        if worker_task_done and self._worker_task is not None:
+            try:
+                exc = self._worker_task.exception()
+            except asyncio.CancelledError:
+                exc = "cancelled"
+            except Exception as worker_exc:
+                exc = f"exception_unavailable: {worker_exc}"
+            snapshot["worker_task_exception"] = str(exc) if exc else None
+        return snapshot
+
+    def ensure_worker_running(self, reason: str = "runtime_check") -> Dict[str, Any]:
+        """Ensure the worker task exists and is alive. Returns current snapshot."""
+        snapshot_before = self.get_worker_snapshot()
+        should_restart = (
+            self._worker_task is None
+            or not self._running
+            or snapshot_before.get("worker_task_done") is True
+        )
+
+        if should_restart:
+            self._start_worker_task(reason)
+            snapshot_after = self.get_worker_snapshot()
+            snapshot_after["restarted"] = True
+            snapshot_after["restart_reason"] = reason
+            return snapshot_after
+
+        snapshot_before["restarted"] = False
+        snapshot_before["restart_reason"] = reason
+        return snapshot_before
     
     def _ensure_table(self):
         """Best-effort verification that the task table is available."""
@@ -138,10 +233,7 @@ class SupabaseVideoTaskQueue:
             if not self._running:
                 try:
                     # Only works when an event loop is already running.
-                    loop = asyncio.get_running_loop()
-                    self._running = True
-                    self._worker_task = asyncio.create_task(self._worker_loop())
-                    self.logger.info("[SupabaseVideoTaskQueue] Worker task created in add_task")
+                    self._start_worker_task("add_task")
                 except RuntimeError:
                     # In sync contexts the application startup hook must own worker startup.
                     self.logger.warning(
@@ -183,6 +275,7 @@ class SupabaseVideoTaskQueue:
         max_consecutive_errors = 5
 
         while self._running:
+            self._last_loop_started_at = _utcnow_iso()
             try:
                 await asyncio.sleep(self.retry_interval)
 
@@ -219,7 +312,9 @@ class SupabaseVideoTaskQueue:
                         continue
 
                     tasks = result.data if result.data else []
+                    self._record_task_counts(tasks)
                     if not tasks:
+                        self._last_loop_completed_at = _utcnow_iso()
                         continue
 
                     # Separate tasks by status.
@@ -291,8 +386,11 @@ class SupabaseVideoTaskQueue:
                             f"all {self.RUNNINGHUB_MAX_CONCURRENT} slots occupied"
                         )
 
+                    self._last_loop_completed_at = _utcnow_iso()
+
                 except Exception as e:
                     consecutive_errors += 1
+                    self._last_error = f"{type(e).__name__}: {e}"
                     etype = type(e).__name__
                     if isinstance(e, (httpx.ConnectError, httpx.TimeoutException,
                                       httpx.NetworkError, httpx.PoolTimeout)):
@@ -305,6 +403,7 @@ class SupabaseVideoTaskQueue:
 
             except Exception as e:
                 consecutive_errors += 1
+                self._last_error = f"{type(e).__name__}: {e}"
                 self.logger.error(
                     f"[Worker] Loop error: {type(e).__name__}: {e}", exc_info=True,
                 )
@@ -1093,11 +1192,8 @@ def get_supabase_queue() -> Optional[SupabaseVideoTaskQueue]:
             )
             # Try to start the worker immediately if an event loop is already running.
             try:
-                loop = asyncio.get_running_loop()
                 if not _supabase_queue._running:
-                    _supabase_queue._running = True
-                    _supabase_queue._worker_task = asyncio.create_task(_supabase_queue._worker_loop())
-                    logger.info("[get_supabase_queue] Worker started")
+                    _supabase_queue._start_worker_task("singleton_init")
             except RuntimeError:
                 # In sync startup paths the app startup hook will start the worker later.
                 logger.debug("[get_supabase_queue] No running event loop, worker will start on app startup")
@@ -1119,12 +1215,32 @@ def start_supabase_queue_worker():
     
     if _supabase_queue and not _supabase_queue._running:
         try:
-            loop = asyncio.get_running_loop()
-            _supabase_queue._running = True
-            _supabase_queue._worker_task = asyncio.create_task(_supabase_queue._worker_loop())
-            logger.info("[start_supabase_queue_worker] Worker started on application startup")
+            _supabase_queue._start_worker_task("app_startup")
         except RuntimeError:
             logger.warning("[start_supabase_queue_worker] No running event loop, cannot start worker")
+
+
+def ensure_supabase_queue_worker(reason: str = "runtime_check") -> Dict[str, Any]:
+    """Return queue snapshot and restart the worker if needed."""
+    queue = get_supabase_queue()
+    if queue is None:
+        return {
+            "available": False,
+            "running": False,
+            "worker_healthy": False,
+            "restarted": False,
+            "restart_reason": reason,
+        }
+    try:
+        snapshot = queue.ensure_worker_running(reason)
+        snapshot["available"] = True
+        return snapshot
+    except RuntimeError:
+        snapshot = queue.get_worker_snapshot()
+        snapshot["available"] = True
+        snapshot["restarted"] = False
+        snapshot["restart_reason"] = reason
+        return snapshot
 
 
 # Schema reference removed from runtime module; see migrations.

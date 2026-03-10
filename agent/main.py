@@ -46,10 +46,10 @@ supabase = (
 async def lifespan(app: FastAPI):
     # Startup
     try:
-        from src.video_task_queue_supabase import start_supabase_queue_worker
+        from src.video_task_queue_supabase import ensure_supabase_queue_worker
 
-        start_supabase_queue_worker()
-        logger.info("[startup] Supabase queue worker started")
+        snapshot = ensure_supabase_queue_worker("app_startup")
+        logger.info(f"[startup] Supabase queue worker state: {snapshot}")
     except Exception as e:
         logger.warning(f"[startup] Failed to start Supabase queue worker: {e}")
 
@@ -153,7 +153,31 @@ async def generic_exception_handler(_request: Request, exc: Exception):
 @app.get("/healthz", tags=["System"], summary="Health check")
 async def healthz():
     """Returns `{ok: true}` when the server is running. Used by load balancers and Docker health checks."""
-    return {"ok": True}
+    queue_state = None
+    try:
+        from src.video_task_queue_supabase import ensure_supabase_queue_worker
+
+        queue_state = ensure_supabase_queue_worker("healthz")
+    except Exception as exc:
+        logger.warning(f"[healthz] Failed to inspect queue worker: {exc}")
+        queue_state = {
+            "available": False,
+            "worker_healthy": False,
+            "error": str(exc),
+        }
+    return {"ok": True, "queue": queue_state}
+
+
+@app.get("/debug/queue", tags=["System"])
+async def debug_queue():
+    """Return current queue worker liveness and restart state."""
+    try:
+        from src.video_task_queue_supabase import ensure_supabase_queue_worker
+
+        return ensure_supabase_queue_worker("debug_queue")
+    except Exception as exc:
+        logger.error(f"[debug_queue] {exc}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc))
 
 
 @app.get("/debug/auth", tags=["System"])

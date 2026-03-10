@@ -72,6 +72,17 @@ def _require_supabase() -> Client:
     return supabase
 
 
+def _ensure_queue_worker(reason: str) -> None:
+    """Best-effort queue worker keepalive for long-running background video tasks."""
+    try:
+        from src.video_task_queue_supabase import ensure_supabase_queue_worker
+
+        snapshot = ensure_supabase_queue_worker(reason)
+        logger.debug(f"[queue_worker] {reason}: {snapshot}")
+    except Exception as exc:
+        logger.warning(f"[queue_worker] Failed to ensure worker ({reason}): {exc}")
+
+
 # ---------------------------------------------------------------------------
 # Router
 # ---------------------------------------------------------------------------
@@ -512,6 +523,8 @@ async def submit_digital_human(run_id: str, background_tasks: BackgroundTasks, u
     if not job_res.data:
         raise HTTPException(status_code=404, detail=f"Project {run_id} not found")
 
+    _ensure_queue_worker("submit_digital_human")
+
     sb.table("autoviralvid_jobs").update(
         {"status": "generating_videos", "updated_at": datetime.utcnow().isoformat()}
     ).eq("run_id", run_id).execute()
@@ -623,6 +636,7 @@ async def regenerate_video(
 async def get_project_status(run_id: str, user: AuthUser = Depends(get_current_user)):
     """Return detailed generation status with per-task breakdown."""
     sb = _require_supabase()
+    _ensure_queue_worker("get_project_status")
     try:
         # Job-level status
         job_res = (
