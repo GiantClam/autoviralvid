@@ -18,15 +18,16 @@
 
 import asyncio
 import json
-import sys
-import io
 import time
 
 import httpx
+import pytest
 
-# Force UTF-8 output on Windows
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
-sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
+if __name__ != "__main__":
+    pytest.skip(
+        "Manual long-running integration script. Run with `uv run python tests/test_digital_human_long_audio.py`.",
+        allow_module_level=True,
+    )
 
 BASE = "http://localhost:8123/api/v1"
 

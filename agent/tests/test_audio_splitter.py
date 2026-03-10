@@ -445,15 +445,9 @@ class TestUploadBytesToR2:
 
     def test_raises_when_r2_not_configured(self):
         """R2 未配置时应抛出 RuntimeError"""
-        with patch("src.audio_splitter.get_r2_client", return_value=None):
-            # 需要 mock 掉 from src.r2 import get_r2_client
-            pass
-        # 注意：由于 _upload_bytes_to_r2 内部使用 from src.r2 import...
-        # 这里需要间接测试或通过环境变量控制
-        # 简化：验证未配置时的行为
         original_env = {
             k: os.environ.pop(k, None)
-            for k in ["R2_ACCOUNT_ID", "R2_ACCESS_KEY", "R2_SECRET_KEY"]
+            for k in ["R2_ACCOUNT_ID", "R2_ACCESS_KEY", "R2_SECRET_KEY", "R2_BUCKET"]
         }
         try:
             with pytest.raises(RuntimeError, match="R2 未配置"):
