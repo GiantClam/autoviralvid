@@ -844,9 +844,19 @@ class ProjectService:
                 return {"error": "Stitching produced no output URL."}
 
             self._update_project(run_id, {
+                "video_url": final_url,
                 "final_video_url": final_url,
                 "status": "completed",
             })
+
+            try:
+                self._sb.table("autoviralvid_crew_sessions").update({
+                    "status": "completed",
+                    "result": {"video_url": final_url},
+                    "updated_at": _utcnow_iso(),
+                }).eq("run_id", run_id).execute()
+            except Exception as exc:
+                logger.warning(f"[render_final] Failed to update crew_sessions: {exc}")
 
             logger.info(f"[render_final] Final video: {final_url}")
             return {"run_id": run_id, "final_video_url": final_url}

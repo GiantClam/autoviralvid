@@ -510,10 +510,10 @@ async def stitch_run(
 
     async def _do_stitch():
         try:
-            from src.video_stitcher import stitch_videos_for_run
+            from src.project_service import ProjectService
 
-            final_url = await stitch_videos_for_run(run_id)
-            logger.info(f"[stitch] Run {run_id} stitched: {final_url}")
+            result = await ProjectService(supabase).render_final(run_id)
+            logger.info(f"[stitch] Run {run_id} stitched: {result}")
         except Exception as e:
             logger.error(f"[stitch] Failed for run {run_id}: {e}", exc_info=True)
 
