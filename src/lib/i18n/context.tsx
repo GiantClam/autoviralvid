@@ -2,22 +2,19 @@
 
 import React, {
   createContext,
-  useContext,
-  useState,
   useCallback,
+  useContext,
   useEffect,
   useMemo,
+  useSyncExternalStore,
 } from "react";
-import zh from "./zh";
 import en from "./en";
-
-// ── Types ──
+import zh from "./zh";
 
 export type Locale = "zh" | "en";
 
 type Dict = typeof zh;
 
-/** Recursively extract dot-separated leaf keys from nested object type */
 type Leaves<T, Prefix extends string = ""> = T extends object
   ? {
       [K in keyof T & string]: T[K] extends object
@@ -27,8 +24,6 @@ type Leaves<T, Prefix extends string = ""> = T extends object
   : never;
 
 export type TranslationKey = Leaves<Dict>;
-
-// ── Flatten utility ──
 
 function flatten(obj: Record<string, unknown>, prefix = ""): Record<string, string> {
   const result: Record<string, string> = {};
@@ -43,29 +38,25 @@ function flatten(obj: Record<string, unknown>, prefix = ""): Record<string, stri
   return result;
 }
 
-// Pre-flatten dictionaries for fast runtime lookup
 const DICTS: Record<Locale, Record<string, string>> = {
   zh: flatten(zh as unknown as Record<string, unknown>),
   en: flatten(en as unknown as Record<string, unknown>),
 };
 
 const LOCALE_KEY = "autoviralvid-locale";
+const LOCALE_EVENT = "autoviralvid-locale-change";
 
 function getInitialLocale(): Locale {
   if (typeof window === "undefined") return "zh";
   try {
     const stored = localStorage.getItem(LOCALE_KEY);
     if (stored === "zh" || stored === "en") return stored;
-    // Auto-detect from browser language
-    const browserLang = navigator.language.toLowerCase();
-    if (browserLang.startsWith("zh")) return "zh";
-    return "en";
+
+    return navigator.language.toLowerCase().startsWith("zh") ? "zh" : "en";
   } catch {
     return "zh";
   }
 }
-
-// ── Context ──
 
 interface LocaleContextValue {
   locale: Locale;
@@ -75,40 +66,51 @@ interface LocaleContextValue {
 
 const LocaleContext = createContext<LocaleContextValue | null>(null);
 
-// ── Provider ──
+function subscribeLocaleChange(onStoreChange: () => void) {
+  if (typeof window === "undefined") {
+    return () => {};
+  }
+
+  const handleChange = () => onStoreChange();
+  window.addEventListener("storage", handleChange);
+  window.addEventListener(LOCALE_EVENT, handleChange);
+
+  return () => {
+    window.removeEventListener("storage", handleChange);
+    window.removeEventListener(LOCALE_EVENT, handleChange);
+  };
+}
 
 export function LocaleProvider({ children }: { children: React.ReactNode }) {
-  const [locale, setLocaleState] = useState<Locale>("zh"); // SSR default
-  const [hydrated, setHydrated] = useState(false);
-
-  // Hydrate from localStorage after mount
-  useEffect(() => {
-    setLocaleState(getInitialLocale());
-    setHydrated(true);
-  }, []);
+  const locale = useSyncExternalStore<Locale>(
+    subscribeLocaleChange,
+    getInitialLocale,
+    () => "zh",
+  );
 
   const setLocale = useCallback((newLocale: Locale) => {
-    setLocaleState(newLocale);
     try {
       localStorage.setItem(LOCALE_KEY, newLocale);
-    } catch { /* ignore */ }
-    // Update html lang attribute
-    document.documentElement.lang = newLocale === "zh" ? "zh-CN" : "en";
+    } catch {
+      // ignore storage failures
+    }
+
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event(LOCALE_EVENT));
+    }
   }, []);
 
-  // Update html lang on mount
   useEffect(() => {
-    if (hydrated) {
-      document.documentElement.lang = locale === "zh" ? "zh-CN" : "en";
-    }
-  }, [locale, hydrated]);
+    document.documentElement.lang = locale === "zh" ? "zh-CN" : "en";
+  }, [locale]);
 
   const t = useCallback(
     (key: TranslationKey, params?: Record<string, string | number>): string => {
-      let text = DICTS[locale][key] ?? DICTS.zh[key] ?? key;
+      const localeDict = DICTS[locale];
+      let text = localeDict[key] ?? DICTS.zh[key] ?? key;
       if (params) {
-        for (const [k, v] of Object.entries(params)) {
-          text = text.replace(`{${k}}`, String(v));
+        for (const [paramKey, value] of Object.entries(params)) {
+          text = text.replace(`{${paramKey}}`, String(value));
         }
       }
       return text;
@@ -116,25 +118,19 @@ export function LocaleProvider({ children }: { children: React.ReactNode }) {
     [locale],
   );
 
-  const value = useMemo(
-    () => ({ locale, setLocale, t }),
-    [locale, setLocale, t],
-  );
+  const value = useMemo(() => ({ locale, setLocale, t }), [locale, setLocale, t]);
 
-  return (
-    <LocaleContext.Provider value={value}>{children}</LocaleContext.Provider>
-  );
+  return <LocaleContext.Provider value={value}>{children}</LocaleContext.Provider>;
 }
-
-// ── Hooks ──
 
 export function useLocale() {
   const ctx = useContext(LocaleContext);
-  if (!ctx) throw new Error("useLocale must be used within LocaleProvider");
+  if (!ctx) {
+    throw new Error("useLocale must be used within LocaleProvider");
+  }
   return ctx;
 }
 
-/** Shorthand: returns just the `t` function */
 export function useT() {
   return useLocale().t;
 }

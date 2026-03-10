@@ -12,14 +12,20 @@
 
 type EventProperties = Record<string, string | number | boolean | null>;
 
+declare global {
+    interface Window {
+        gtag?: (...args: unknown[]) => void;
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Provider implementation — swap this for production
 // ---------------------------------------------------------------------------
 
 function _send(event: string, properties?: EventProperties) {
     // Google Analytics (gtag) example:
-    if (typeof window !== "undefined" && "gtag" in window) {
-        (window as any).gtag("event", event, properties);
+    if (typeof window !== "undefined" && typeof window.gtag === "function") {
+        window.gtag("event", event, properties);
         return;
     }
 

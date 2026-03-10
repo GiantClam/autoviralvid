@@ -1,3 +1,6 @@
+export type JsonPrimitive = string | number | boolean | null;
+export type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue };
+
 export type ClipKeyframes = { in?: string; out?: string }
 export type ClipSpec = {
     idx: number;
@@ -12,17 +15,23 @@ export type ClipSpec = {
     text?: string;
     video_url?: string;
 }
-export type EventItem = { thread_id?: string; run_id?: string; agent?: string; type: string; delta?: string | null; payload?: any; progress?: { current: number; total: number }; ts?: number; code?: string; content?: string }
-export type RunClipResult = { idx: number; status: 'succeeded' | 'failed'; video_url?: string; detail?: any }
+export type EventItem = { thread_id?: string; run_id?: string; agent?: string; type: string; delta?: string | null; payload?: JsonValue; progress?: { current: number; total: number }; ts?: number; code?: string; content?: string }
+export type RunClipResult = { idx: number; status: 'succeeded' | 'failed'; video_url?: string; detail?: JsonValue }
 export type JobInfo = { run_id: string; slogan?: string; cover_url?: string; video_url?: string; share_slug?: string; status?: string; created_at?: string; updated_at?: string }
+export type WorkflowSummary = {
+    run_id: string;
+    video_topic?: string;
+    goal?: string;
+    [key: string]: JsonValue | undefined;
+}
 export type CrewStatus = {
     run_id: string;
     status: string;
     result?: string;
     error?: string;
     expected_clips?: number;
-    video_tasks?: any[];
-    context?: any;
+    video_tasks?: JsonValue[];
+    context?: JsonValue;
     created_at?: string;
     updated_at?: string;
 }
@@ -33,7 +42,8 @@ export interface PlanResponse {
 
 export function uuidv4() {
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-        var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+        const r = Math.random() * 16 | 0;
+        const v = c == 'x' ? r : (r & 0x3 | 0x8);
         return v.toString(16);
     });
 }
@@ -49,7 +59,7 @@ function resolveDefaultBase() {
 
 export function getBaseUrl(base?: string) { return base !== undefined ? base : resolveDefaultBase() }
 
-export async function postJson<T>(url: string, body: any, init?: RequestInit): Promise<T> {
+export async function postJson<T>(url: string, body: unknown, init?: RequestInit): Promise<T> {
     const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), ...(init || {}) })
     if (!res.ok) { try { const err = await res.json(); throw new Error(err?.error || err?.detail || `HTTP ${res.status}`) } catch { throw new Error(`HTTP ${res.status}`) } }
     const data = await res.json()
@@ -72,10 +82,10 @@ export async function listWorkflows(limit: number = 20) {
     const url = `/api/agent/sessions?limit=${limit}`
     const res = await fetch(url)
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    return res.json() as Promise<{ workflows: any[] }>
+    return res.json() as Promise<{ workflows: WorkflowSummary[] }>
 }
 
-export async function uploadFile(file: File, base?: string): Promise<string> {
+export async function uploadFile(file: File): Promise<string> {
     const url = `/api/upload/presign`
     const data = await postJson<{ upload_url?: string; public_url?: string; headers?: Record<string, string>; error?: string }>(url, {
         filename: file.name,

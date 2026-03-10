@@ -2,47 +2,49 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
 export default function TermsOfService() {
-    return (
-        <div className="min-h-screen bg-[#060610] text-white">
-            <div className="h-16 border-b border-white/[0.08] flex items-center px-8 gap-4">
-                <Link href="/" className="p-2 rounded-lg hover:bg-white/[0.04] transition-colors">
-                    <ArrowLeft className="w-4 h-4 text-gray-400" />
-                </Link>
-                <h1 className="font-semibold text-lg">服务条款</h1>
-            </div>
+  return (
+    <div className="min-h-screen bg-[#060610] text-white">
+      <div className="flex h-16 items-center gap-4 border-b border-white/[0.08] px-8">
+        <Link href="/" className="rounded-lg p-2 transition-colors hover:bg-white/[0.04]">
+          <ArrowLeft className="h-4 w-4 text-gray-400" />
+        </Link>
+        <h1 className="text-lg font-semibold">Terms of Service</h1>
+      </div>
 
-            <article className="max-w-2xl mx-auto px-6 py-10 prose prose-invert prose-sm prose-gray">
-                <p className="text-gray-500 text-xs">最后更新: 2025 年 1 月</p>
+      <article className="prose prose-invert prose-sm prose-gray mx-auto max-w-2xl px-6 py-10">
+        <p className="text-xs text-gray-500">Last updated: January 1, 2025</p>
 
-                <h2 className="text-base font-semibold text-gray-200 mt-8">1. 服务说明</h2>
-                <p className="text-sm text-gray-400 leading-relaxed">
-                    AutoViralVid（以下简称"本平台"）是一款 AI 驱动的短视频生成 SaaS 服务。用户可通过本平台上传素材、
-                    配置参数，由 AI 自动生成视频内容。
-                </p>
+        <h2 className="mt-8 text-base font-semibold text-gray-200">1. Service Overview</h2>
+        <p className="text-sm leading-relaxed text-gray-400">
+          AutoViralVid is an AI-assisted short-video creation platform. Users can upload
+          media, configure generation parameters, and create publishable marketing videos.
+        </p>
 
-                <h2 className="text-base font-semibold text-gray-200 mt-8">2. 用户义务</h2>
-                <p className="text-sm text-gray-400 leading-relaxed">
-                    用户承诺所上传的素材（图片、音频、文本等）不侵犯任何第三方的知识产权、肖像权或其他合法权益。
-                    用户对生成内容的合规性承担最终责任。
-                </p>
+        <h2 className="mt-8 text-base font-semibold text-gray-200">2. User Responsibilities</h2>
+        <p className="text-sm leading-relaxed text-gray-400">
+          You are responsible for the legality of uploaded media, prompts, and generated
+          outputs. Do not upload content that infringes intellectual property, portrait
+          rights, privacy rights, or any other third-party rights.
+        </p>
 
-                <h2 className="text-base font-semibold text-gray-200 mt-8">3. 付费与退款</h2>
-                <p className="text-sm text-gray-400 leading-relaxed">
-                    本平台采用订阅制收费，具体方案详见定价页面。已消耗的 AI 生成配额不予退款。
-                    未使用部分的退款按照所在地区消费者保护法规处理。
-                </p>
+        <h2 className="mt-8 text-base font-semibold text-gray-200">3. Billing and Refunds</h2>
+        <p className="text-sm leading-relaxed text-gray-400">
+          Paid plans are billed as subscriptions unless stated otherwise. Consumed AI
+          generation quota is generally non-refundable. Any mandatory refund rights are
+          handled under the consumer protection rules applicable to your jurisdiction.
+        </p>
 
-                <h2 className="text-base font-semibold text-gray-200 mt-8">4. 免责声明</h2>
-                <p className="text-sm text-gray-400 leading-relaxed">
-                    AI 生成内容可能存在不准确或不完美的情况。本平台不对生成内容的准确性、完整性或适用性作任何保证。
-                    用户应在发布前审核所有生成内容。
-                </p>
+        <h2 className="mt-8 text-base font-semibold text-gray-200">4. Disclaimer</h2>
+        <p className="text-sm leading-relaxed text-gray-400">
+          AI-generated content may contain factual, stylistic, or compliance defects. You
+          must review all generated outputs before publishing or using them commercially.
+        </p>
 
-                <h2 className="text-base font-semibold text-gray-200 mt-8">5. 联系方式</h2>
-                <p className="text-sm text-gray-400 leading-relaxed">
-                    如有疑问，请发送邮件至 support@autoviralvid.com。
-                </p>
-            </article>
-        </div>
-    );
+        <h2 className="mt-8 text-base font-semibold text-gray-200">5. Contact</h2>
+        <p className="text-sm leading-relaxed text-gray-400">
+          For legal or support questions, contact support@autoviralvid.com.
+        </p>
+      </article>
+    </div>
+  );
 }

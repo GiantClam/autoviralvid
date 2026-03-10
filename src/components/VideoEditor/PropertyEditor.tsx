@@ -1,6 +1,6 @@
 import React from 'react';
 import { useEditor } from '../../contexts/EditorContext';
-import { ItemType } from '../../lib/types';
+import { ItemType, TimelineItem } from '../../lib/types';
 import { Type, Video, Trash2 } from 'lucide-react';
 
 const PropertyEditor: React.FC = () => {
@@ -23,13 +23,17 @@ const PropertyEditor: React.FC = () => {
         );
     }
 
-    const handleChange = (field: string, value: any, isStyle = false) => {
+    const handleChange = (
+        field: keyof TimelineItem | keyof NonNullable<TimelineItem["style"]>,
+        value: string | number,
+        isStyle = false,
+    ) => {
         if (isStyle) {
             updateItem(selectedItem.id, {
                 style: { ...selectedItem.style, [field]: value }
             });
         } else {
-            updateItem(selectedItem.id, { [field]: value });
+            updateItem(selectedItem.id, { [field]: value } as Partial<TimelineItem>);
         }
     };
 

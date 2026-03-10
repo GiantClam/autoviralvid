@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getErrorMessage } from "@/lib/errors";
 import { getAgentServiceUrl } from "@/lib/runtime-env";
 
 export const GET = async (
@@ -19,7 +20,7 @@ export const GET = async (
 
         const data = await res.json();
         return NextResponse.json(data);
-    } catch (error: any) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
+    } catch (error) {
+        return NextResponse.json({ error: getErrorMessage(error) }, { status: 500 });
     }
 };

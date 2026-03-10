@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import { NextResponse } from "next/server";
+import { getErrorMessage } from "@/lib/errors";
 import { PLANS } from "@/lib/paypal";
 
 export async function GET() {
@@ -41,10 +42,10 @@ export async function GET() {
                 }
                 : null,
         });
-    } catch (error: any) {
+    } catch (error) {
         console.error("[Subscription Status] Error:", error);
         return NextResponse.json(
-            { error: "Failed to get subscription status" },
+            { error: getErrorMessage(error, "Failed to get subscription status") },
             { status: 500 }
         );
     }

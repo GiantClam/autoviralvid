@@ -1,4 +1,6 @@
 import NextAuth from "next-auth";
+import type { Session, User } from "next-auth";
+import type { JWT } from "next-auth/jwt";
 import Credentials from "next-auth/providers/credentials";
 import Google from "next-auth/providers/google";
 import { PrismaAdapter } from "@auth/prisma-adapter";
@@ -65,15 +67,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth(() => {
             maxAge: 30 * 24 * 60 * 60,
         },
         callbacks: {
-            async jwt({ token, user }: { token: any; user: any }) {
+            async jwt({ token, user }: { token: JWT; user?: User }) {
                 if (user) {
                     token.id = user.id;
                 }
                 return token;
             },
-            async session({ session, token }: { session: any; token: any }) {
-                if (session.user && token.id) {
-                    session.user.id = token.id as string;
+            async session({ session, token }: { session: Session; token: JWT }) {
+                if (session.user && typeof token.id === "string") {
+                    session.user.id = token.id;
                 }
                 return session;
             },

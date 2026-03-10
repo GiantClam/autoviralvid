@@ -15,6 +15,17 @@ export interface PlanConfig {
     features: string[];
 }
 
+interface PayPalLink {
+    rel?: string;
+    href?: string;
+}
+
+interface PayPalCreateSubscriptionResponse {
+    id: string;
+    status: string;
+    links?: PayPalLink[];
+}
+
 export const PLANS: Record<string, PlanConfig> = {
     free: {
         name: "Free",
@@ -107,8 +118,8 @@ export async function createSubscription(planKey: string, returnUrl: string, can
         throw new Error(`PayPal create subscription failed: ${res.status} ${err}`);
     }
 
-    const data = await res.json();
-    const approvalLink = data.links?.find((l: any) => l.rel === "approve")?.href;
+    const data = (await res.json()) as PayPalCreateSubscriptionResponse;
+    const approvalLink = data.links?.find((link) => link.rel === "approve")?.href;
 
     return {
         subscriptionId: data.id as string,

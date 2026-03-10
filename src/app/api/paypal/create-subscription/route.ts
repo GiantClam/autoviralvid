@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from "next/server";
+import { getErrorMessage } from "@/lib/errors";
 import { createSubscription, PLANS } from "@/lib/paypal";
 
 export async function POST(request: NextRequest) {
@@ -26,10 +27,10 @@ export async function POST(request: NextRequest) {
         );
 
         return NextResponse.json(result);
-    } catch (error: any) {
+    } catch (error) {
         console.error("[PayPal] Create subscription error:", error);
         return NextResponse.json(
-            { error: error.message || "Failed to create subscription" },
+            { error: getErrorMessage(error, "Failed to create subscription") },
             { status: 500 }
         );
     }

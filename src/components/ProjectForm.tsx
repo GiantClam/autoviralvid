@@ -3,6 +3,7 @@
 import React, { useState, useCallback, useRef } from "react";
 import { useProject } from "@/contexts/ProjectContext";
 import { useT } from "@/lib/i18n";
+import type { TranslationKey } from "@/lib/i18n/context";
 import {
   Clapperboard,
   Sparkles,
@@ -108,7 +109,7 @@ const TEMPLATE_IDS = [
   { id: "knowledge-edu", labelKey: "gallery.tplKnowledgeEdu" },
   { id: "funny-skit", labelKey: "gallery.tplFunnySkit" },
   { id: "travel-vlog", labelKey: "gallery.tplTravelVlog" },
-] as const;
+] as const satisfies ReadonlyArray<{ id: string; labelKey: TranslationKey }>;
 
 const STYLE_KEYS = [
   { value: "现代简约", labelKey: "form.styleModernMinimal" },
@@ -119,13 +120,13 @@ const STYLE_KEYS = [
   { value: "复古胶片", labelKey: "form.styleRetro" },
   { value: "高级质感", labelKey: "form.stylePremium" },
   { value: "自然纪实", labelKey: "form.styleNatural" },
-] as const;
+] as const satisfies ReadonlyArray<{ value: string; labelKey: TranslationKey }>;
 
 const ORIENTATION_KEYS = [
-  { value: "vertical", labelKey: "form.vertical" as const, ratio: "9:16" },
-  { value: "horizontal", labelKey: "form.horizontal" as const, ratio: "16:9" },
-  { value: "square", labelKey: "form.square" as const, ratio: "1:1" },
-] as const;
+  { value: "vertical", labelKey: "form.vertical", ratio: "9:16" },
+  { value: "horizontal", labelKey: "form.horizontal", ratio: "16:9" },
+  { value: "square", labelKey: "form.square", ratio: "1:1" },
+] as const satisfies ReadonlyArray<{ value: string; labelKey: TranslationKey; ratio: string }>;
 
 // ── Props ──
 
@@ -331,7 +332,7 @@ export default function ProjectForm({ onTemplateChange, initialTemplateId }: Pro
               className={inp + " appearance-none pr-8 cursor-pointer"}
             >
               {TEMPLATE_IDS.map((tpl) => (
-                <option key={tpl.id} value={tpl.id}>{t(tpl.labelKey as any)}</option>
+                <option key={tpl.id} value={tpl.id}>{t(tpl.labelKey)}</option>
               ))}
             </select>
             <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-500" />
@@ -538,7 +539,7 @@ export default function ProjectForm({ onTemplateChange, initialTemplateId }: Pro
                 className={inp + " appearance-none pr-7 cursor-pointer"}
               >
                 {STYLE_KEYS.map((s) => (
-                  <option key={s.value} value={s.value}>{t(s.labelKey as any)}</option>
+                  <option key={s.value} value={s.value}>{t(s.labelKey)}</option>
                 ))}
               </select>
               <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-500" />
@@ -588,7 +589,7 @@ export default function ProjectForm({ onTemplateChange, initialTemplateId }: Pro
                       borderWidth: 1.5,
                     }}
                   />
-                  <span className="font-semibold">{t(o.labelKey as any)}</span>
+                  <span className="font-semibold">{t(o.labelKey)}</span>
                   <span className="text-[10px] text-gray-600">{o.ratio}</span>
                 </button>
               );

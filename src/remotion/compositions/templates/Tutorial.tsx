@@ -398,23 +398,39 @@ export default function Tutorial({
   const stepTransitionFrames = Math.round(1 * fps);
 
   // Build clip sequences
-  let currentFrame = introFrames;
-  const clipSequences = clips.map((clip, idx) => {
+  const clipSequences = clips.reduce<Array<ClipData & {
+    idx: number;
+    step?: TutorialStep;
+    transitionStart: number;
+    clipStart: number;
+    clipDurationInFrames: number;
+    transFrames: number;
+  }>>((acc, clip, idx) => {
     const step = steps[idx];
     const transFrames = step ? stepTransitionFrames : 0;
     const clipDurationInFrames = Math.round(clip.duration * fps);
-    const entry = {
+    const previousEnd =
+      acc.length === 0
+        ? introFrames
+        : acc[acc.length - 1].clipStart + acc[acc.length - 1].clipDurationInFrames;
+
+    acc.push({
       ...clip,
       idx,
       step,
-      transitionStart: currentFrame,
-      clipStart: currentFrame + transFrames,
+      transitionStart: previousEnd,
+      clipStart: previousEnd + transFrames,
       clipDurationInFrames,
       transFrames,
-    };
-    currentFrame += transFrames + clipDurationInFrames;
-    return entry;
-  });
+    });
+    return acc;
+  }, []);
+
+  const outroStartFrame =
+    clipSequences.length === 0
+      ? introFrames
+      : clipSequences[clipSequences.length - 1].clipStart +
+        clipSequences[clipSequences.length - 1].clipDurationInFrames;
 
   return (
     <AbsoluteFill style={{ backgroundColor: '#0a0a0a' }}>
@@ -486,7 +502,7 @@ export default function Tutorial({
 
       {/* Outro */}
       {outroText && (
-        <Sequence from={currentFrame} durationInFrames={outroFrames}>
+        <Sequence from={outroStartFrame} durationInFrames={outroFrames}>
           <AbsoluteFill
             style={{
               backgroundColor: '#0a0a0a',

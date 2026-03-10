@@ -179,15 +179,23 @@ export default function VideoTemplate({
   const { fps } = useVideoConfig();
 
   // Calculate frame positions for each clip
-  let currentFrame = 0;
-  const clipSequences = clips.map((clip, idx) => {
-    const durationInFrames = Math.round(clip.duration * fps);
-    const startFrame = currentFrame;
-    currentFrame += durationInFrames;
-    return { ...clip, startFrame, durationInFrames, idx };
-  });
+  const clipSequences = clips.reduce<Array<ClipData & { startFrame: number; durationInFrames: number; idx: number }>>(
+    (acc, clip, idx) => {
+      const previousEnd =
+        acc.length === 0
+          ? 0
+          : acc[acc.length - 1].startFrame + acc[acc.length - 1].durationInFrames;
+      const durationInFrames = Math.round(clip.duration * fps);
+      acc.push({ ...clip, startFrame: previousEnd, durationInFrames, idx });
+      return acc;
+    },
+    [],
+  );
 
-  const totalFrames = currentFrame;
+  const totalFrames = clipSequences.reduce(
+    (sum, clip) => sum + clip.durationInFrames,
+    0,
+  );
 
   // Intro: first 2 seconds
   const introFrames = introText ? Math.round(2 * fps) : 0;

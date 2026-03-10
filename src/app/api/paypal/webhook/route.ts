@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from "next/server";
+import { getErrorMessage } from "@/lib/errors";
 import { PLANS } from "@/lib/paypal";
 
 /**
@@ -97,8 +98,11 @@ export async function POST(request: NextRequest) {
         }
 
         return NextResponse.json({ received: true });
-    } catch (error: any) {
+    } catch (error) {
         console.error("[PayPal Webhook] Error:", error);
-        return NextResponse.json({ error: "Webhook processing failed" }, { status: 500 });
+        return NextResponse.json(
+            { error: getErrorMessage(error, "Webhook processing failed") },
+            { status: 500 },
+        );
     }
 }

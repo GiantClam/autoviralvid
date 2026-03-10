@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Plus, MessageSquare, ArrowLeft, PanelLeftClose, PanelLeftOpen, HelpCircle, Play, LogOut } from 'lucide-react';
-import { listWorkflows } from '../lib/saleagent-client';
+import { listWorkflows, type WorkflowSummary } from '../lib/saleagent-client';
 import { useT } from '@/lib/i18n';
 import LanguageSwitcher from './LanguageSwitcher';
 import QuotaBar from './QuotaBar';
@@ -31,18 +31,38 @@ export function Sidebar({
     onToggleGuide
 }: SidebarProps) {
     const t = useT();
-    const [history, setHistory] = useState<any[]>([]);
+    const [history, setHistory] = useState<WorkflowSummary[]>([]);
     const [loading, setLoading] = useState(false);
     const [showUserMenu, setShowUserMenu] = useState(false);
 
     useEffect(() => {
-        if (userEmail && userEmail !== "User") {
+        let cancelled = false;
+
+        async function loadHistory() {
             setLoading(true);
-            listWorkflows(30)
-                .then(data => setHistory(data?.workflows || []))
-                .catch(err => console.error("Failed to load history", err))
-                .finally(() => setLoading(false));
+            try {
+                const data = await listWorkflows(30);
+                if (!cancelled) {
+                    setHistory(data?.workflows || []);
+                }
+            } catch (err) {
+                if (!cancelled) {
+                    console.error("Failed to load history", err);
+                }
+            } finally {
+                if (!cancelled) {
+                    setLoading(false);
+                }
+            }
         }
+
+        if (userEmail && userEmail !== "User") {
+            void loadHistory();
+        }
+
+        return () => {
+            cancelled = true;
+        };
     }, [userEmail, activeRunId]);
 
     return (

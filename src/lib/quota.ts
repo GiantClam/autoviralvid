@@ -6,6 +6,7 @@
 
 import { prisma } from "./prisma";
 import { PLANS } from "./paypal";
+import type { Prisma } from "@prisma/client";
 
 export interface QuotaInfo {
     allowed: boolean;
@@ -77,7 +78,7 @@ export async function consumeQuota(userId: string): Promise<boolean> {
  */
 export async function resetMonthlyQuota(userId: string, plan?: string): Promise<void> {
     const planConfig = plan ? PLANS[plan] : undefined;
-    const updates: Record<string, any> = {
+    const updates: Prisma.ProfileUpdateInput = {
         quota_used: 0,
         quota_reset: getNextResetDate(),
     };
