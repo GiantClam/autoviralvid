@@ -1084,7 +1084,42 @@ class SupabaseVideoTaskQueue:
                 )
                 return
 
-            if is_digital_human_multi:
+            is_digital_human_single = not is_digital_human_multi and len(tasks) == 1
+
+            if is_digital_human_single:
+                sorted_tasks = sorted(tasks, key=lambda t: t.get("clip_idx", 0))
+                source_url = sorted_tasks[0].get("video_url")
+                if not source_url:
+                    raise RuntimeError("Single-segment digital human task completed without video_url.")
+
+                final_url = source_url
+                try:
+                    from src.r2 import upload_url_to_r2
+
+                    final_url = await upload_url_to_r2(source_url, f"{run_id}_dh_final.mp4")
+                except Exception as upload_err:
+                    self.logger.warning(
+                        f"[SupabaseVideoTaskQueue] Failed to materialize single-segment final video for {run_id}: {upload_err}"
+                    )
+
+                now = _utcnow_iso()
+                self.supabase.table("autoviralvid_jobs").update({
+                    "video_url": final_url,
+                    "final_video_url": final_url,
+                    "status": "completed",
+                    "updated_at": now,
+                }).eq("run_id", run_id).execute()
+
+                self.supabase.table("autoviralvid_crew_sessions").update({
+                    "status": "completed",
+                    "result": {"video_url": final_url},
+                    "updated_at": now,
+                }).eq("run_id", run_id).execute()
+
+                self.logger.info(
+                    f"[SupabaseVideoTaskQueue] Single-segment digital human completed for {run_id}: {final_url}"
+                )
+            elif is_digital_human_multi:
                 self.logger.info(
                     f"[SupabaseVideoTaskQueue] Digital human multi-segment detected "
                     f"({len(tasks)} segments). Starting auto-stitch for {run_id}..."

@@ -126,13 +126,13 @@ class TestCheckAndTriggerStitchNotAllSucceeded:
 # ---------------------------------------------------------------------------
 
 class TestCheckAndTriggerStitchSingleSegment:
-    """TC-ST-003: 单段数字人任务应走 ready_to_stitch，不触发自动拼接"""
+    """TC-ST-003: Single-segment digital human tasks should complete directly."""
 
     @pytest.mark.asyncio
-    async def test_single_segment_goes_to_ready_to_stitch(self):
-        """单段数字人完成后应设为 ready_to_stitch"""
+    async def test_single_segment_completes_without_stitching(self):
+        """Single-segment digital human tasks should persist a final URL directly."""
         sb = MagicMock()
-        call_log = []
+        update_calls = {}
 
         tasks_data = [
             {"status": "succeeded", "video_url": "https://cdn/v1.mp4", "clip_idx": 0, "skill_name": "x"},
@@ -145,12 +145,20 @@ class TestCheckAndTriggerStitchSingleSegment:
         job_data = [{"storyboards": job_storyboards}]
 
         def table_side_effect(name):
-            call_log.append(name)
             chain = MagicMock()
             chain.select.return_value = chain
             chain.eq.return_value = chain
             chain.limit.return_value = chain
-            chain.update.return_value = chain
+
+            def capture_update(payload):
+                update_calls.setdefault(name, []).append(payload)
+                chain2 = MagicMock()
+                chain2.eq.return_value = chain2
+                chain2.execute.return_value = MagicMock(data=None)
+                return chain2
+
+            chain.update.side_effect = capture_update
+
             result = MagicMock()
             if name == "autoviralvid_video_tasks":
                 result.data = tasks_data
@@ -164,15 +172,30 @@ class TestCheckAndTriggerStitchSingleSegment:
         sb.table.side_effect = table_side_effect
         q = _make_queue(sb)
 
-        await q.check_and_trigger_stitch("run-single")
+        with patch("src.r2.upload_url_to_r2", new_callable=AsyncMock) as mock_upload:
+            mock_upload.return_value = "https://cdn/run-single_dh_final.mp4"
 
-        # 应查询 video_tasks、jobs，然后更新 crew_sessions
-        assert "autoviralvid_video_tasks" in call_log
-        assert "autoviralvid_jobs" in call_log
-        assert "autoviralvid_crew_sessions" in call_log
+            await q.check_and_trigger_stitch("run-single")
 
-        # 不应调用 stitch_video_segments（因为 len(tasks) == 1）
-        # 验证 crew_sessions 更新为 ready_to_stitch（非 stitching）
+        mock_upload.assert_awaited_once_with(
+            "https://cdn/v1.mp4",
+            "run-single_dh_final.mp4",
+        )
+
+        job_updates = update_calls.get("autoviralvid_jobs", [])
+        assert any(
+            u.get("status") == "completed"
+            and u.get("video_url") == "https://cdn/run-single_dh_final.mp4"
+            and u.get("final_video_url") == "https://cdn/run-single_dh_final.mp4"
+            for u in job_updates
+        ), f"jobs not updated with final URL: {job_updates}"
+
+        session_updates = update_calls.get("autoviralvid_crew_sessions", [])
+        assert any(
+            u.get("status") == "completed"
+            and u.get("result", {}).get("video_url") == "https://cdn/run-single_dh_final.mp4"
+            for u in session_updates
+        ), f"crew session not completed: {session_updates}"
 
 
 # ---------------------------------------------------------------------------
