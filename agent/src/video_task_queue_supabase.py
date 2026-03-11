@@ -43,7 +43,7 @@ class SupabaseVideoTaskQueue:
             # Fallback to defaults if config module not available
             self.retry_interval = retry_interval or 20.0
             self.max_concurrent = max_concurrent or 1
-            self._max_queue_retries = 10
+            self._max_queue_retries = 60
             self._max_general_retries = 3
         # Initialize Supabase client credentials.
         supabase_url = os.getenv("SUPABASE_URL")

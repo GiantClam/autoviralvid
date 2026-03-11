@@ -62,7 +62,7 @@ class VideoQueueConfig:
 
     # Retry settings
     max_queue_full_retries: int = field(
-        default_factory=lambda: int(os.getenv("VIDEO_QUEUE_MAX_QUEUE_RETRIES", "10"))
+        default_factory=lambda: int(os.getenv("VIDEO_QUEUE_MAX_QUEUE_RETRIES", "60"))
     )
     max_general_retries: int = field(
         default_factory=lambda: int(os.getenv("VIDEO_QUEUE_MAX_GENERAL_RETRIES", "3"))
