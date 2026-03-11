@@ -57,7 +57,7 @@ class VideoQueueConfig:
 
     # Global RunningHub concurrency limit (across ALL templates/workflows)
     runninghub_max_concurrent: int = field(
-        default_factory=lambda: int(os.getenv("RUNNINGHUB_MAX_CONCURRENT", "4"))
+        default_factory=lambda: int(os.getenv("RUNNINGHUB_MAX_CONCURRENT", "3"))
     )
 
     # Retry settings

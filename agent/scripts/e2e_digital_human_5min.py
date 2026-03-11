@@ -12,7 +12,7 @@ load_dotenv(".env")
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 # Queue tuning for long-audio E2E stability
-os.environ["RUNNINGHUB_MAX_CONCURRENT"] = "4"
+os.environ["RUNNINGHUB_MAX_CONCURRENT"] = "3"
 os.environ["VIDEO_QUEUE_MAX_QUEUE_RETRIES"] = "60"
 os.environ["VIDEO_QUEUE_MAX_GENERAL_RETRIES"] = "6"
 os.environ["VIDEO_QUEUE_POLL_INTERVAL"] = "10"
