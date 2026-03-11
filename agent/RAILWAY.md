@@ -4,10 +4,30 @@ This backend should be deployed as a dedicated Railway service.
 
 ## Service settings
 
-- Root Directory: `agent`
-- Dockerfile: `agent/Dockerfile`
+- Recommended:
+  - Root Directory: repository root
+  - Dockerfile path: `Dockerfile`
+- Alternative:
+  - Root Directory: `agent`
+  - Dockerfile path: `Dockerfile`
 - Health check: `/healthz`
 - Replicas: `1`
+
+The repository now includes both a repository-root Dockerfile and
+`agent/Dockerfile` so either deployment layout can work.
+
+If you deploy from the repository root, Railway should use:
+
+- [Dockerfile](d:/github/with-langgraph-fastapi/Dockerfile)
+- [railway.toml](d:/github/with-langgraph-fastapi/railway.toml)
+
+If you deploy from `agent`, Railway should use:
+
+- [agent/Dockerfile](d:/github/with-langgraph-fastapi/agent/Dockerfile)
+- [agent/railway.toml](d:/github/with-langgraph-fastapi/agent/railway.toml)
+
+Do not combine `Root Directory = agent` with `Dockerfile path = agent/Dockerfile`,
+or Railway will look for `agent/agent/Dockerfile` and fail.
 
 If you use Railway config-as-code, point the service at `agent/railway.toml`.
 
