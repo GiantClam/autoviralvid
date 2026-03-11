@@ -24,6 +24,7 @@ DEFAULT_SEGMENT_SECONDS = 45          # 默认分割时长
 SILENCE_THRESH_DB = -40               # 静音检测阈值 dBFS
 MIN_SILENCE_LEN_MS = 300              # 最小静音间隔（毫秒）
 SILENCE_SEARCH_WINDOW_MS = 4000       # 切割点前后搜索窗口（毫秒）
+MIN_LAST_SEGMENT_MS = int(float(os.getenv("AUDIO_SPLITTER_MIN_LAST_SEGMENT_SECONDS", "10")) * 1000)
 
 
 @dataclass
@@ -262,9 +263,9 @@ async def split_audio(
             target = current_ms + max_seg_ms
             # 在目标位置附近寻找静音点
             best_point = _find_best_split_point(audio, target)
-            # 确保不会产生过短的最后一段（< 5s 则并入前一段）
+            # 确保不会产生过短的最后一段（< 10s 则并入前一段）
             remaining = total_ms - best_point
-            if remaining < 5000 and len(split_points) > 0:
+            if remaining < MIN_LAST_SEGMENT_MS and len(split_points) > 0:
                 logger.debug(
                     f"[audio_splitter] Remaining {remaining}ms too short, "
                     f"skipping split at {best_point}ms"

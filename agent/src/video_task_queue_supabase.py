@@ -26,7 +26,7 @@ class SupabaseVideoTaskQueue:
     """Queue manager backed by Supabase rows."""
 
     # Global RunningHub concurrency limit (across all templates/workflows)
-    RUNNINGHUB_MAX_CONCURRENT = int(os.getenv("RUNNINGHUB_MAX_CONCURRENT", "2"))
+    RUNNINGHUB_MAX_CONCURRENT = int(os.getenv("RUNNINGHUB_MAX_CONCURRENT", "4"))
 
     def __init__(self, retry_interval: Optional[float] = None, max_concurrent: Optional[int] = None):
         """Initialize queue settings and Supabase client."""

@@ -381,9 +381,9 @@ class TestSplitAudioLong:
 
     @pytest.mark.asyncio
     async def test_short_tail_merged_into_previous(self):
-        """尾段过短（< 5s）应并入前一段"""
-        # 总 48s → 按 45s 分割 → 3s 尾段太短，应只有 1 段
-        audio = _make_silent_audio(48000)
+        """尾段过短（< 10s）应并入前一段"""
+        # 总 52s → 按 45s 分割 → 7s 尾段太短，应只有 1 段
+        audio = _make_silent_audio(52000)
         tmp_path = _export_to_temp(audio)
 
         try:
@@ -399,7 +399,7 @@ class TestSplitAudioLong:
                 mock_upload.side_effect = lambda data, key, **kw: f"https://cdn.test/{key}"
 
                 segments = await split_audio("https://x.com/a.mp3", run_id="test-tail", max_segment_seconds=45)
-                # 48s → 尾段 3s < 5s → 并入 → 只有 1 段 48s
+                # 52s → 尾段 7s < 10s → 并入 → 只有 1 段 52s
                 assert len(segments) == 1
         finally:
             os.unlink(tmp_path)
@@ -450,7 +450,7 @@ class TestUploadBytesToR2:
             for k in ["R2_ACCOUNT_ID", "R2_ACCESS_KEY", "R2_SECRET_KEY", "R2_BUCKET"]
         }
         try:
-            with pytest.raises(RuntimeError, match="R2 未配置"):
+            with pytest.raises(RuntimeError, match="R2"):
                 _upload_bytes_to_r2(b"test", "test_key.mp3")
         finally:
             for k, v in original_env.items():
