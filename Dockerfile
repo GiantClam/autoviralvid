@@ -1,10 +1,22 @@
 FROM python:3.12-slim AS builder
 
-WORKDIR /app/agent
+WORKDIR /app
+
+COPY . /src
+
+RUN if [ -f /src/agent/pyproject.toml ]; then \
+      mkdir -p /app/agent && cp -R /src/agent/. /app/agent/; \
+    elif [ -f /src/pyproject.toml ]; then \
+      mkdir -p /app/agent && cp -R /src/. /app/agent/; \
+    else \
+      echo "No agent Python project found in build context" >&2; \
+      exit 1; \
+    fi
 
 RUN pip install --no-cache-dir uv
 
-COPY agent/pyproject.toml agent/uv.lock ./
+WORKDIR /app/agent
+
 RUN uv sync --frozen --no-dev
 
 FROM python:3.12-slim AS runner
@@ -16,7 +28,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /app/agent/.venv /app/agent/.venv
-COPY agent /app/agent
+COPY --from=builder /app/agent /app/agent
 
 ENV PATH="/app/agent/.venv/bin:$PATH"
 ENV PYTHONPATH="/app/agent"
