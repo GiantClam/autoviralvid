@@ -12,133 +12,19 @@ from playwright.sync_api import sync_playwright
 FRONTEND_BASE = os.getenv("FRONTEND_BASE", "http://127.0.0.1:3001")
 RENDERER_BASE = os.getenv("RENDERER_BASE", "http://127.0.0.1:8123")
 OUTPUT_DIR = Path(os.getenv("UI_E2E_OUTPUT_DIR", "test_outputs/ui_openclaw"))
-EXPECTED_DURATION_SECONDS = 18.0
-EXPECTED_WIDTH = 1280
-EXPECTED_HEIGHT = 720
+SCENARIO = os.getenv("UI_E2E_SCENARIO", "openclaw").strip().lower()
 
-
-def wait_for_render(page, job_id: str, timeout_seconds: int = 120) -> dict:
-    deadline = time.time() + timeout_seconds
-    last_payload = None
-
-    while time.time() < deadline:
-      response = page.request.get(f"{RENDERER_BASE}/render/jobs/{job_id}")
-      if not response.ok:
-          raise RuntimeError(f"Failed to query render job {job_id}: HTTP {response.status}")
-
-      last_payload = response.json()
-      status = last_payload.get("status")
-      print(f"[render] {job_id}: {status}")
-
-      if status in {"completed", "failed"}:
-          return last_payload
-
-      time.sleep(1)
-
-    raise TimeoutError(
-        f"Render job {job_id} did not finish within {timeout_seconds}s. Last payload: {last_payload}"
-    )
-
-
-def probe_output_video(output_path: Path) -> dict:
-    ffprobe = shutil.which("ffprobe")
-    if not ffprobe:
-        raise RuntimeError("ffprobe not found in PATH")
-    if not output_path.exists():
-        raise RuntimeError(f"Expected output file does not exist: {output_path}")
-
-    result = subprocess.run(
-        [
-            ffprobe,
-            "-v",
-            "error",
-            "-select_streams",
-            "v:0",
-            "-show_entries",
-            "stream=width,height:format=duration",
-            "-of",
-            "json",
-            str(output_path),
-        ],
-        capture_output=True,
-        text=True,
-        check=True,
-    )
-    payload = json.loads(result.stdout or "{}")
-    stream = (payload.get("streams") or [{}])[0]
-    duration = float((payload.get("format") or {}).get("duration") or 0.0)
-    width = int(stream.get("width") or 0)
-    height = int(stream.get("height") or 0)
-
-    if width != EXPECTED_WIDTH or height != EXPECTED_HEIGHT:
-        raise RuntimeError(
-            f"Unexpected output resolution: {width}x{height}, expected {EXPECTED_WIDTH}x{EXPECTED_HEIGHT}"
-        )
-
-    if not (EXPECTED_DURATION_SECONDS - 1.5 <= duration <= EXPECTED_DURATION_SECONDS + 1.5):
-        raise RuntimeError(
-            f"Unexpected output duration: {duration:.2f}s, expected about {EXPECTED_DURATION_SECONDS:.2f}s"
-        )
-
-    return {"width": width, "height": height, "duration": duration}
-
-
-def verify_output_url(page, output_url: str) -> dict:
-    if output_url.startswith("file://"):
-        return {
-            "status": "skipped",
-            "reason": "local_file_output",
-        }
-
-    response = page.request.head(output_url)
-    if not response.ok:
-        raise RuntimeError(f"Output URL is not reachable: HTTP {response.status} -> {output_url}")
-
-    content_type = response.headers.get("content-type", "")
-    if "video/mp4" not in content_type.lower():
-        raise RuntimeError(f"Unexpected output content-type: {content_type}")
-
-    return {
-        "status": response.status,
-        "content_type": content_type,
-    }
-
-
-def main() -> int:
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        page = browser.new_page()
-        page.set_default_navigation_timeout(120000)
-        page.set_default_timeout(30000)
-        page.on("console", lambda msg: print(f"[browser:{msg.type}] {msg.text}"))
-
-        print(f"[ui] Opening {FRONTEND_BASE}")
-        page.goto(FRONTEND_BASE, wait_until="commit")
-        page.wait_for_selector("button")
-        page.wait_for_timeout(2000)
-        page.screenshot(path=str(OUTPUT_DIR / "01-home.png"), full_page=True)
-
-        template_cards = page.locator("button:has(h3)")
-        card_count = template_cards.count()
-        print(f"[ui] Found template cards: {card_count}")
-        if card_count == 0:
-            raise RuntimeError("No template cards found on the landing page")
-
-        template_cards.first.click()
-        page.wait_for_selector("textarea")
-        page.wait_for_timeout(1000)
-        page.screenshot(path=str(OUTPUT_DIR / "02-project-form.png"), full_page=True)
-
-        theme = (
+SCENARIOS = {
+    "openclaw": {
+        "template_matchers": [],
+        "theme": (
             "OpenClaw introduction video focused on AI-native revenue operations, "
             "recoverable task history, and production-ready workflow automation."
-        )
-        page.locator("textarea").first.fill(theme)
-        print("[ui] Filled project theme in the form")
-
-        payload = {
+        ),
+        "expected_duration": 18.0,
+        "expected_width": 1280,
+        "expected_height": 720,
+        "payload": {
             "project": {
                 "name": "OpenClaw UI Introduction",
                 "width": 1280,
@@ -217,10 +103,226 @@ def main() -> int:
                         ],
                     }
                 ],
-                "runId": f"openclaw-ui-{int(time.time())}",
                 "threadId": "openclaw-ui-e2e",
             }
+        },
+    },
+    "knowledge-edu": {
+        "template_matchers": ["Knowledge & Edu", "知识科普"],
+        "theme": "Educational explainers with crisp structure, chapter breaks, and clear key takeaways.",
+        "expected_duration": 12.0,
+        "expected_width": 1920,
+        "expected_height": 1080,
+        "payload": {
+            "project": {
+                "name": "KnowledgeEdu UI Lesson",
+                "width": 1920,
+                "height": 1080,
+                "duration": 12,
+                "fps": 30,
+                "backgroundColor": "#0b1020",
+                "tracks": [
+                    {
+                        "id": 1,
+                        "type": "overlay",
+                        "name": "Lesson",
+                        "items": [
+                            {
+                                "id": "lesson-title",
+                                "type": "text",
+                                "content": "Why AI Revenue Systems Win",
+                                "startTime": 0,
+                                "duration": 4,
+                                "trackId": 1,
+                                "name": "Lesson Title",
+                                "style": {"fontSize": 68, "color": "#4ECDC4", "x": 50, "y": 20},
+                            },
+                            {
+                                "id": "lesson-hook",
+                                "type": "text",
+                                "content": "Three repeatable advantages that compound every week.",
+                                "startTime": 1,
+                                "duration": 3,
+                                "trackId": 1,
+                                "name": "Hook",
+                                "style": {"fontSize": 32, "color": "#f8fafc", "x": 50, "y": 32},
+                            },
+                            {
+                                "id": "lesson-point-1",
+                                "type": "text",
+                                "content": "1. Faster research to outreach handoff",
+                                "startTime": 4,
+                                "duration": 2.5,
+                                "trackId": 1,
+                                "name": "Point 1",
+                                "style": {"fontSize": 42, "color": "#f8fafc", "x": 14, "y": 50},
+                            },
+                            {
+                                "id": "lesson-point-2",
+                                "type": "text",
+                                "content": "2. Recoverable task history for every campaign run",
+                                "startTime": 6.5,
+                                "duration": 2.5,
+                                "trackId": 1,
+                                "name": "Point 2",
+                                "style": {"fontSize": 42, "color": "#f8fafc", "x": 14, "y": 62},
+                            },
+                            {
+                                "id": "lesson-point-3",
+                                "type": "text",
+                                "content": "3. Production-ready output without manual stitching",
+                                "startTime": 9,
+                                "duration": 3,
+                                "trackId": 1,
+                                "name": "Point 3",
+                                "style": {"fontSize": 42, "color": "#f8fafc", "x": 14, "y": 74},
+                            },
+                        ],
+                    }
+                ],
+                "threadId": "knowledge-ui-e2e",
+            }
+        },
+    },
+}
+
+
+def wait_for_render(page, job_id: str, timeout_seconds: int = 120) -> dict:
+    deadline = time.time() + timeout_seconds
+    last_payload = None
+
+    while time.time() < deadline:
+      response = page.request.get(f"{RENDERER_BASE}/render/jobs/{job_id}")
+      if not response.ok:
+          raise RuntimeError(f"Failed to query render job {job_id}: HTTP {response.status}")
+
+      last_payload = response.json()
+      status = last_payload.get("status")
+      print(f"[render] {job_id}: {status}")
+
+      if status in {"completed", "failed"}:
+          return last_payload
+
+      time.sleep(1)
+
+    raise TimeoutError(
+        f"Render job {job_id} did not finish within {timeout_seconds}s. Last payload: {last_payload}"
+    )
+
+
+def probe_output_video(output_path: Path) -> dict:
+    ffprobe = shutil.which("ffprobe")
+    if not ffprobe:
+        raise RuntimeError("ffprobe not found in PATH")
+    if not output_path.exists():
+        raise RuntimeError(f"Expected output file does not exist: {output_path}")
+
+    result = subprocess.run(
+        [
+            ffprobe,
+            "-v",
+            "error",
+            "-select_streams",
+            "v:0",
+            "-show_entries",
+            "stream=width,height:format=duration",
+            "-of",
+            "json",
+            str(output_path),
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    payload = json.loads(result.stdout or "{}")
+    stream = (payload.get("streams") or [{}])[0]
+    duration = float((payload.get("format") or {}).get("duration") or 0.0)
+    width = int(stream.get("width") or 0)
+    height = int(stream.get("height") or 0)
+
+    expected_width = int(SCENARIOS[SCENARIO]["expected_width"])
+    expected_height = int(SCENARIOS[SCENARIO]["expected_height"])
+    expected_duration = float(SCENARIOS[SCENARIO]["expected_duration"])
+
+    if width != expected_width or height != expected_height:
+        raise RuntimeError(
+            f"Unexpected output resolution: {width}x{height}, expected {expected_width}x{expected_height}"
+        )
+
+    if not (expected_duration - 1.5 <= duration <= expected_duration + 1.5):
+        raise RuntimeError(
+            f"Unexpected output duration: {duration:.2f}s, expected about {expected_duration:.2f}s"
+        )
+
+    return {"width": width, "height": height, "duration": duration}
+
+
+def verify_output_url(page, output_url: str) -> dict:
+    if output_url.startswith("file://"):
+        return {
+            "status": "skipped",
+            "reason": "local_file_output",
         }
+
+    response = page.request.head(output_url)
+    if not response.ok:
+        raise RuntimeError(f"Output URL is not reachable: HTTP {response.status} -> {output_url}")
+
+    content_type = response.headers.get("content-type", "")
+    if "video/mp4" not in content_type.lower():
+        raise RuntimeError(f"Unexpected output content-type: {content_type}")
+
+    return {
+        "status": response.status,
+        "content_type": content_type,
+    }
+
+
+def main() -> int:
+    if SCENARIO not in SCENARIOS:
+        raise RuntimeError(f"Unsupported UI_E2E_SCENARIO: {SCENARIO}")
+
+    scenario = SCENARIOS[SCENARIO]
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
+        page.set_default_navigation_timeout(120000)
+        page.set_default_timeout(30000)
+        page.on("console", lambda msg: print(f"[browser:{msg.type}] {msg.text}"))
+
+        print(f"[ui] Opening {FRONTEND_BASE}")
+        page.goto(FRONTEND_BASE, wait_until="commit")
+        page.wait_for_selector("button")
+        page.wait_for_timeout(2000)
+        page.screenshot(path=str(OUTPUT_DIR / "01-home.png"), full_page=True)
+
+        template_cards = page.locator("button:has(h3)")
+        card_count = template_cards.count()
+        print(f"[ui] Found template cards: {card_count}")
+        if card_count == 0:
+            raise RuntimeError("No template cards found on the landing page")
+
+        selected_card = None
+        for matcher in scenario["template_matchers"]:
+            candidate = page.locator(f"button:has-text('{matcher}')").first
+            if candidate.count() > 0:
+                selected_card = candidate
+                break
+        if selected_card is None:
+            selected_card = template_cards.first
+        selected_card.click()
+        page.wait_for_selector("textarea")
+        page.wait_for_timeout(1000)
+        page.screenshot(path=str(OUTPUT_DIR / "02-project-form.png"), full_page=True)
+
+        theme = str(scenario["theme"])
+        page.locator("textarea").first.fill(theme)
+        print("[ui] Filled project theme in the form")
+
+        payload = json.loads(json.dumps(scenario["payload"]))
+        payload["project"]["runId"] = f"{SCENARIO}-ui-{int(time.time())}"
 
         print("[ui] Submitting remotion render request from browser context")
         submit_result = page.evaluate(

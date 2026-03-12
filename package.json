@@ -16,6 +16,7 @@
     "test:integration": "cross-env RUN_INTEGRATION_TESTS=1 vitest run src/lib/render/render-api.test.ts src/lib/render/remotion-full-render.test.ts src/lib/render/remotion-integration.test.ts src/lib/render/remotion-perf.test.ts",
     "test:deployed": "cross-env RUN_DEPLOYED_INTEGRATION_TESTS=1 vitest run src/integration/deployed-environment.test.ts",
     "test:ui:openclaw": "python scripts/run_ui_openclaw_e2e.py",
+    "test:ui:knowledge": "cross-env UI_E2E_SCENARIO=knowledge-edu python scripts/run_ui_openclaw_e2e.py",
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
     "install:agent": "cd agent && uv sync",

@@ -13,6 +13,7 @@ FRONTEND_PORT = int(os.getenv("UI_E2E_FRONTEND_PORT", "3001"))
 RENDERER_PORT = int(os.getenv("UI_E2E_RENDERER_PORT", "8124"))
 FRONTEND_BASE = f"http://127.0.0.1:{FRONTEND_PORT}"
 RENDERER_BASE = f"http://127.0.0.1:{RENDERER_PORT}"
+SCENARIO = os.getenv("UI_E2E_SCENARIO", "openclaw")
 
 
 def wait_for_port(port: int, timeout_seconds: int) -> None:
@@ -87,6 +88,8 @@ def main() -> int:
                 **os.environ,
                 "FRONTEND_BASE": FRONTEND_BASE,
                 "RENDERER_BASE": RENDERER_BASE,
+                "UI_E2E_SCENARIO": SCENARIO,
+                "UI_E2E_OUTPUT_DIR": os.getenv("UI_E2E_OUTPUT_DIR", f"test_outputs/ui_{SCENARIO}"),
             },
             check=False,
         )

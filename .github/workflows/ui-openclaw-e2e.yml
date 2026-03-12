@@ -1,11 +1,20 @@
-name: UI OpenClaw E2E
+name: UI Render E2E
 
 on:
   workflow_dispatch:
+    inputs:
+      scenario:
+        description: UI E2E scenario to run
+        required: true
+        default: openclaw
+        type: choice
+        options:
+          - openclaw
+          - knowledge-edu
 
 jobs:
   ui-openclaw:
-    name: UI OpenClaw Remotion E2E
+    name: UI Render Remotion E2E (${{ inputs.scenario }})
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -45,13 +54,13 @@ jobs:
           cd agent
           uv sync --frozen
 
-      - name: Run UI OpenClaw E2E
-        run: npm run test:ui:openclaw
+      - name: Run UI render E2E
+        run: npm run test:ui:${{ inputs.scenario }}
 
       - name: Upload UI screenshots
         if: always()
         uses: actions/upload-artifact@v6
         with:
-          name: ui-openclaw-screenshots
-          path: test_outputs/ui_openclaw
+          name: ui-${{ inputs.scenario }}-screenshots
+          path: test_outputs/ui_${{ inputs.scenario }}
           if-no-files-found: ignore

@@ -84,9 +84,11 @@ The following scripts can also be run using your preferred package manager:
 - `test:integration` - Runs renderer/API integration tests that require local services
 - `test:deployed` - Runs deployed-environment smoke tests against Vercel/Railway targets
 - `test:ui:openclaw` - Starts a stable local frontend/backend pair and runs the browser UI Remotion E2E for the OpenClaw intro video
+- `test:ui:knowledge` - Runs the same browser UI Remotion E2E harness against the Knowledge & Edu template scenario
 - `install:agent` - Installs Python dependencies for the agent
 
-There is also a manual GitHub Actions workflow, `UI OpenClaw E2E`, which installs Playwright plus ffmpeg and runs the same browser-driven Remotion path in CI when you want a release-grade UI render check.
+There is also a manual GitHub Actions workflow, `UI Render E2E`, which installs Playwright plus ffmpeg and runs the same browser-driven Remotion path in CI when you want a release-grade UI render check.
+The workflow accepts a `scenario` input so you can run either `openclaw` or `knowledge-edu`.
 
 ## Vercel Deployment
 
