@@ -38,7 +38,7 @@ def _mock_supabase():
 
 
 @pytest.mark.asyncio
-async def test_submit_digital_human_runs_in_background_after_response():
+async def test_submit_digital_human_persists_tasks_before_response():
     sb, jobs_table = _mock_supabase()
     background_tasks = BackgroundTasks()
     service = SimpleNamespace(submit_digital_human=AsyncMock(return_value=[{"ok": True}]))
@@ -56,11 +56,8 @@ async def test_submit_digital_human_runs_in_background_after_response():
 
         assert response == {"run_id": "run-123", "status": "generating_digital_human"}
         ensure_worker.assert_called_once_with("submit_digital_human")
-        assert len(background_tasks.tasks) == 1
-        service.submit_digital_human.assert_not_awaited()
+        assert len(background_tasks.tasks) == 0
+        service.submit_digital_human.assert_awaited_once_with("run-123")
 
-        await background_tasks()
-
-    service.submit_digital_human.assert_awaited_once_with("run-123")
     first_update = jobs_table.update.call_args_list[0].args[0]
     assert first_update["status"] == "generating_videos"

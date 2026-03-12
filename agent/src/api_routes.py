@@ -530,42 +530,42 @@ async def submit_digital_human(run_id: str, background_tasks: BackgroundTasks, u
         {"status": "generating_videos", "updated_at": datetime.utcnow().isoformat()}
     ).eq("run_id", run_id).execute()
 
-    async def _bg_submit_dh():
-        try:
-            logger.info(f"[submit_digital_human bg] Starting for run_id={run_id}")
-            svc = _get_project_service()
-            result = await svc.submit_digital_human(run_id)
-            logger.info(f"[submit_digital_human bg] Result: {result}")
+    try:
+        logger.info(f"[submit_digital_human] Persisting tasks for run_id={run_id}")
+        svc = _get_project_service()
+        result = await svc.submit_digital_human(run_id)
+        logger.info(f"[submit_digital_human] Result: {result}")
 
-            # submit_digital_human catches its own exceptions and returns
-            # [{"error": "..."}] instead of raising — detect that here.
-            all_failed = (
-                isinstance(result, list)
-                and len(result) > 0
-                and all(isinstance(r, dict) and "error" in r for r in result)
-            )
-            if all_failed:
-                error_msg = result[0].get("error", "unknown error")
-                logger.error(
-                    f"[submit_digital_human bg] All tasks failed for "
-                    f"run_id={run_id}: {error_msg}"
-                )
-                sb.table("autoviralvid_jobs").update({
-                    "status": "videos_failed",
-                    "updated_at": datetime.utcnow().isoformat(),
-                }).eq("run_id", run_id).execute()
-        except Exception as exc:
+        all_failed = (
+            isinstance(result, list)
+            and len(result) > 0
+            and all(isinstance(r, dict) and "error" in r for r in result)
+        )
+        if all_failed:
+            error_msg = result[0].get("error", "unknown error")
             logger.error(
-                f"[submit_digital_human bg] Unhandled error for "
-                f"run_id={run_id}: {exc}",
-                exc_info=True,
+                f"[submit_digital_human] All tasks failed for "
+                f"run_id={run_id}: {error_msg}"
             )
             sb.table("autoviralvid_jobs").update({
                 "status": "videos_failed",
                 "updated_at": datetime.utcnow().isoformat(),
             }).eq("run_id", run_id).execute()
+            raise HTTPException(status_code=500, detail=error_msg)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error(
+            f"[submit_digital_human] Unhandled error for "
+            f"run_id={run_id}: {exc}",
+            exc_info=True,
+        )
+        sb.table("autoviralvid_jobs").update({
+            "status": "videos_failed",
+            "updated_at": datetime.utcnow().isoformat(),
+        }).eq("run_id", run_id).execute()
+        raise HTTPException(status_code=500, detail=str(exc))
 
-    background_tasks.add_task(_bg_submit_dh)
     return {"run_id": run_id, "status": "generating_digital_human"}
 
 
