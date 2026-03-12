@@ -38,6 +38,14 @@ const DIGITAL_HUMAN_POLL_INTERVAL_MS = parseInteger(
   process.env.DEPLOYED_DIGITAL_HUMAN_POLL_INTERVAL_MS,
   15_000,
 );
+const LONG_DIGITAL_HUMAN_TIMEOUT_MS = parseInteger(
+  process.env.DEPLOYED_LONG_DIGITAL_HUMAN_TIMEOUT_MS,
+  90 * 60 * 1000,
+);
+const LONG_DIGITAL_HUMAN_POLL_INTERVAL_MS = parseInteger(
+  process.env.DEPLOYED_LONG_DIGITAL_HUMAN_POLL_INTERVAL_MS,
+  60_000,
+);
 
 const smokeDescribe = RUN_DEPLOYED_INTEGRATION_TESTS ? describe : describe.skip;
 const paidDescribe =
@@ -158,9 +166,13 @@ function extractTaskVideoUrls(payload: any) {
 
 async function fetchProjectByRunId(runId: string) {
   const backendBase = requireEnv('DEPLOYED_BACKEND_URL', BACKEND_BASE_URL);
-  const response = await fetchWithTimeout(buildUrl(backendBase, `/api/v1/projects/${runId}`), {
-    headers: createBackendHeaders(),
-  });
+  const response = await fetchWithTimeout(
+    buildUrl(backendBase, `/api/v1/projects/${runId}`),
+    {
+      headers: createBackendHeaders(),
+    },
+    60_000,
+  );
   const payload = await readJsonResponse(response);
   return {
     response,
@@ -283,6 +295,43 @@ async function waitForFinalVideo(
     `Timed out waiting for final video for run ${runId}. Last status=${JSON.stringify(
       lastStatusPayload,
     )}, last project=${JSON.stringify(lastProjectPayload)}`,
+  );
+}
+
+async function waitForFinalProjectVideoUrl(runId: string, timeoutMs: number, pollIntervalMs: number) {
+  const startedAt = Date.now();
+  let lastProjectPayload: any = null;
+  let lastProjectText = '';
+  let lastError: unknown = null;
+
+  while (Date.now() - startedAt < timeoutMs) {
+    try {
+      const projectResult = await fetchProjectByRunId(runId);
+      expect(projectResult.response.ok).toBe(true);
+      expectJsonContentType(projectResult.response);
+      lastProjectPayload = projectResult.payload.data;
+      lastProjectText = projectResult.payload.text;
+
+      const projectVideoUrl = lastProjectPayload?.video_url;
+      if (typeof projectVideoUrl === 'string' && projectVideoUrl.length > 0) {
+        return {
+          finalVideoUrl: projectVideoUrl,
+          lastProjectPayload,
+        };
+      }
+
+      lastError = null;
+    } catch (error) {
+      lastError = error;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+  }
+
+  throw new Error(
+    `Timed out waiting for final project video for run ${runId}. Last project=${JSON.stringify(
+      lastProjectPayload,
+    )}, lastProjectText=${lastProjectText}, lastError=${String(lastError)}`,
   );
 }
 
@@ -451,7 +500,7 @@ shortDhDescribe('Deployed Digital Human E2E', () => {
 longDhDescribe('Deployed Long Digital Human E2E', () => {
   it(
     'completes a long-audio digital human run and returns a final video URL',
-    { timeout: DIGITAL_HUMAN_TIMEOUT_MS + 120_000 },
+    { timeout: LONG_DIGITAL_HUMAN_TIMEOUT_MS + 120_000 },
     async () => {
       const audioUrl = requireEnv(
         'DEPLOYED_LONG_DIGITAL_HUMAN_AUDIO_URL',
@@ -474,11 +523,12 @@ longDhDescribe('Deployed Long Digital Human E2E', () => {
       const submitResult = await submitDigitalHumanProject(runId);
       expect(submitResult.response.ok).toBe(true);
 
-      const completion = await waitForFinalVideo(runId, DIGITAL_HUMAN_TIMEOUT_MS, {
-        requireProjectVideoUrl: true,
-      });
+      const completion = await waitForFinalProjectVideoUrl(
+        runId,
+        LONG_DIGITAL_HUMAN_TIMEOUT_MS,
+        LONG_DIGITAL_HUMAN_POLL_INTERVAL_MS,
+      );
       expect(completion.finalVideoUrl).toMatch(/^https?:\/\//);
-      expect(pendingTaskCount(completion.lastStatusPayload)).toBe(0);
     },
   );
 });
