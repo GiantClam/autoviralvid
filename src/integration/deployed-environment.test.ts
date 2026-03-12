@@ -180,6 +180,22 @@ async function fetchProjectByRunId(runId: string) {
   };
 }
 
+async function fetchProjectHistory(limit = 20) {
+  const backendBase = requireEnv('DEPLOYED_BACKEND_URL', BACKEND_BASE_URL);
+  const response = await fetchWithTimeout(
+    buildUrl(backendBase, `/api/v1/projects?limit=${limit}`),
+    {
+      headers: createBackendHeaders(),
+    },
+    60_000,
+  );
+  const payload = await readJsonResponse(response);
+  return {
+    response,
+    payload,
+  };
+}
+
 async function createDigitalHumanProject(options: {
   audioUrl: string;
   avatarUrl?: string;
@@ -295,6 +311,60 @@ async function waitForFinalVideo(
     `Timed out waiting for final video for run ${runId}. Last status=${JSON.stringify(
       lastStatusPayload,
     )}, last project=${JSON.stringify(lastProjectPayload)}`,
+  );
+}
+
+async function waitForRunToAppearInHistory(runId: string, timeoutMs: number) {
+  const startedAt = Date.now();
+  let lastHistoryPayload: any = null;
+
+  while (Date.now() - startedAt < timeoutMs) {
+    const historyResult = await fetchProjectHistory();
+    expect(historyResult.response.ok).toBe(true);
+    expectJsonContentType(historyResult.response);
+    lastHistoryPayload = historyResult.payload.data;
+
+    const matchedProject = (lastHistoryPayload?.projects || []).find(
+      (project: any) => project?.run_id === runId,
+    );
+    if (matchedProject) {
+      return matchedProject;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 5_000));
+  }
+
+  throw new Error(
+    `Timed out waiting for run ${runId} to appear in history. Last payload=${JSON.stringify(
+      lastHistoryPayload,
+    )}`,
+  );
+}
+
+async function waitForPersistedVideoTasks(runId: string, timeoutMs: number) {
+  const startedAt = Date.now();
+  let lastProjectPayload: any = null;
+
+  while (Date.now() - startedAt < timeoutMs) {
+    const projectResult = await fetchProjectByRunId(runId);
+    expect(projectResult.response.ok).toBe(true);
+    expectJsonContentType(projectResult.response);
+    lastProjectPayload = projectResult.payload.data;
+
+    if (
+      Array.isArray(lastProjectPayload?.video_tasks) &&
+      lastProjectPayload.video_tasks.length > 0
+    ) {
+      return lastProjectPayload;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 5_000));
+  }
+
+  throw new Error(
+    `Timed out waiting for persisted video_tasks for run ${runId}. Last project=${JSON.stringify(
+      lastProjectPayload,
+    )}`,
   );
 }
 
@@ -489,10 +559,25 @@ shortDhDescribe('Deployed Digital Human E2E', () => {
       expect(submitResult.response.ok).toBe(true);
       expectJsonContentType(submitResult.response);
 
+      const historyEntry = await waitForRunToAppearInHistory(runId, 60_000);
+      expect(historyEntry.run_id).toBe(runId);
+
+      const persistedProject = await waitForPersistedVideoTasks(runId, 60_000);
+      expect(Array.isArray(persistedProject.video_tasks)).toBe(true);
+      expect(persistedProject.video_tasks.length).toBeGreaterThan(0);
+
       const completion = await waitForFinalVideo(runId, DIGITAL_HUMAN_TIMEOUT_MS, {
         requireProjectVideoUrl: true,
       });
       expect(completion.finalVideoUrl).toMatch(/^https?:\/\//);
+      expect(
+        completion.lastProjectPayload?.video_url ||
+          completion.lastProjectPayload?.result_video_url,
+      ).toBe(completion.finalVideoUrl);
+
+      const finalHistoryEntry = await waitForRunToAppearInHistory(runId, 30_000);
+      expect(finalHistoryEntry.video_url).toBe(completion.finalVideoUrl);
+      expect(finalHistoryEntry.task_summary?.all_done).toBe(true);
     },
   );
 });
@@ -523,12 +608,23 @@ longDhDescribe('Deployed Long Digital Human E2E', () => {
       const submitResult = await submitDigitalHumanProject(runId);
       expect(submitResult.response.ok).toBe(true);
 
+      const historyEntry = await waitForRunToAppearInHistory(runId, 60_000);
+      expect(historyEntry.run_id).toBe(runId);
+
+      const persistedProject = await waitForPersistedVideoTasks(runId, 60_000);
+      expect(Array.isArray(persistedProject.video_tasks)).toBe(true);
+      expect(persistedProject.video_tasks.length).toBeGreaterThan(0);
+
       const completion = await waitForFinalProjectVideoUrl(
         runId,
         LONG_DIGITAL_HUMAN_TIMEOUT_MS,
         LONG_DIGITAL_HUMAN_POLL_INTERVAL_MS,
       );
       expect(completion.finalVideoUrl).toMatch(/^https?:\/\//);
+
+      const finalHistoryEntry = await waitForRunToAppearInHistory(runId, 30_000);
+      expect(finalHistoryEntry.video_url).toBe(completion.finalVideoUrl);
+      expect(finalHistoryEntry.task_summary?.all_done).toBe(true);
     },
   );
 });

@@ -73,5 +73,8 @@ Paid E2E tests:
 
 - create digital-human project
 - submit digital-human generation
+- verify the new run appears in `/api/v1/projects` history
+- verify `/api/v1/projects/{run_id}` exposes persisted `video_tasks`
 - poll status until completion
 - verify final video URL is returned
+- verify history list eventually shows the final `video_url`
