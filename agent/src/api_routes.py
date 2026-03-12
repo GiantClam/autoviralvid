@@ -256,9 +256,7 @@ async def list_projects(limit: int = 40, user: AuthUser = Depends(get_current_us
             sb.table("autoviralvid_jobs")
             .select(
                 "run_id, slogan, cover_url, video_url, share_slug, "
-                "status, storyboards, created_at, updated_at, "
-                "template_id, theme, product_image_url, duration, orientation, "
-                "audio_url, voice_mode, voice_text, motion_prompt"
+                "status, storyboards, created_at, updated_at"
             )
             .order("created_at", desc=True)
             .limit(limit)
