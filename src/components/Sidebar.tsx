@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
-import { Plus, MessageSquare, ArrowLeft, PanelLeftClose, PanelLeftOpen, HelpCircle, Play, LogOut } from 'lucide-react';
-import { listWorkflows, type WorkflowSummary } from '../lib/saleagent-client';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Plus, MessageSquare, ArrowLeft, PanelLeftClose, PanelLeftOpen, HelpCircle, Play, LogOut, RefreshCw, CheckCircle2, Loader2, Clock3, AlertCircle } from 'lucide-react';
+import { projectApi, type Project } from '@/lib/project-client';
 import { useT } from '@/lib/i18n';
 import LanguageSwitcher from './LanguageSwitcher';
 import QuotaBar from './QuotaBar';
@@ -31,23 +31,38 @@ export function Sidebar({
     onToggleGuide
 }: SidebarProps) {
     const t = useT();
-    const [history, setHistory] = useState<WorkflowSummary[]>([]);
+    const [history, setHistory] = useState<Project[]>([]);
     const [loading, setLoading] = useState(false);
     const [showUserMenu, setShowUserMenu] = useState(false);
 
+    const loadHistory = useCallback(async () => {
+        setLoading(true);
+        try {
+            const data = await projectApi.list(30);
+            setHistory(data.projects || []);
+        } catch (err) {
+            console.error("Failed to load project history", err);
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
     useEffect(() => {
         let cancelled = false;
+        let intervalId: ReturnType<typeof setInterval> | null = null;
 
-        async function loadHistory() {
-            setLoading(true);
+        async function refreshHistory() {
+            if (cancelled) {
+                return;
+            }
             try {
-                const data = await listWorkflows(30);
+                const data = await projectApi.list(30);
                 if (!cancelled) {
-                    setHistory(data?.workflows || []);
+                    setHistory(data.projects || []);
                 }
             } catch (err) {
                 if (!cancelled) {
-                    console.error("Failed to load history", err);
+                    console.error("Failed to load project history", err);
                 }
             } finally {
                 if (!cancelled) {
@@ -56,14 +71,73 @@ export function Sidebar({
             }
         }
 
-        if (userEmail && userEmail !== "User") {
-            void loadHistory();
-        }
+        setLoading(true);
+        void refreshHistory();
+        intervalId = setInterval(() => {
+            void refreshHistory();
+        }, 15000);
 
         return () => {
             cancelled = true;
+            if (intervalId) {
+                clearInterval(intervalId);
+            }
         };
     }, [userEmail, activeRunId]);
+
+    const getHistoryLabel = (run: Project) => {
+        if (typeof run.theme === "string" && run.theme.trim()) {
+            return run.theme;
+        }
+        if (typeof run.slogan === "string" && run.slogan.trim()) {
+            return run.slogan;
+        }
+        return run.run_id.slice(0, 12);
+    };
+
+    const getStatusBadge = (run: Project) => {
+        const taskSummary = run.task_summary;
+        if (run.video_url || run.final_video_url || run.result_video_url) {
+            return {
+                label: 'Ready',
+                icon: CheckCircle2,
+                className: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
+            };
+        }
+
+        if (taskSummary?.total) {
+            const running = (taskSummary.processing ?? 0) + (taskSummary.submitted ?? 0);
+            const queued = (taskSummary.pending ?? 0) + (taskSummary.queued ?? 0);
+            if (taskSummary.failed > 0) {
+                return {
+                    label: `Failed ${taskSummary.failed}`,
+                    icon: AlertCircle,
+                    className: 'text-red-400 bg-red-500/10 border-red-500/20',
+                };
+            }
+            if (running > 0 || queued > 0) {
+                return {
+                    label: `${taskSummary.succeeded}/${taskSummary.total}`,
+                    icon: Loader2,
+                    className: 'text-amber-400 bg-amber-500/10 border-amber-500/20',
+                };
+            }
+        }
+
+        if (run.status === 'completed') {
+            return {
+                label: 'Completed',
+                icon: CheckCircle2,
+                className: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
+            };
+        }
+
+        return {
+            label: run.status || 'Pending',
+            icon: Clock3,
+            className: 'text-gray-400 bg-white/[0.04] border-white/[0.08]',
+        };
+    };
 
     return (
         <div className={`flex flex-col h-full bg-[#0a0a12]/80 backdrop-blur-xl border-r border-white/[0.06] transition-all duration-300 ${isCollapsed ? 'w-[80px]' : 'w-[280px]'} ${className}`}>
@@ -109,9 +183,19 @@ export function Sidebar({
             {/* History list */}
             <div className="flex-1 overflow-y-auto px-2 py-2 space-y-1">
                 {!isCollapsed && (
-                    <div className="px-3 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2">
-                        <MessageSquare size={10} />
-                        {t("sidebar.historyProjects")}
+                    <div className="px-3 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-widest flex items-center justify-between gap-2">
+                        <span className="flex items-center gap-2">
+                            <MessageSquare size={10} />
+                            {t("sidebar.historyProjects")}
+                        </span>
+                        <button
+                            type="button"
+                            onClick={() => void loadHistory()}
+                            className="p-1 rounded-md text-gray-500 hover:text-gray-200 hover:bg-white/[0.04] transition-colors cursor-pointer"
+                            title={t("common.retry")}
+                        >
+                            <RefreshCw size={12} />
+                        </button>
                     </div>
                 )}
 
@@ -133,8 +217,27 @@ export function Sidebar({
                         )}
                         <MessageSquare size={16} className={activeRunId === run.run_id ? 'text-[#E11D48]' : 'text-gray-500 group-hover:text-gray-300 transition-colors'} />
                         {!isCollapsed && (
-                            <div className="flex-1 text-left truncate text-sm">
-                                {run.video_topic || run.goal || run.run_id.slice(0, 12)}
+                            <div className="flex-1 min-w-0 text-left">
+                                <div className="truncate text-sm">
+                                    {getHistoryLabel(run)}
+                                </div>
+                                <div className="mt-1 flex items-center gap-2">
+                                    {(() => {
+                                        const badge = getStatusBadge(run);
+                                        const Icon = badge.icon;
+                                        return (
+                                            <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] ${badge.className}`}>
+                                                <Icon size={10} className={badge.icon === Loader2 ? 'animate-spin' : ''} />
+                                                {badge.label}
+                                            </span>
+                                        );
+                                    })()}
+                                    {run.task_summary?.total ? (
+                                        <span className="text-[10px] text-gray-500">
+                                            {run.task_summary.succeeded}/{run.task_summary.total}
+                                        </span>
+                                    ) : null}
+                                </div>
                             </div>
                         )}
                     </button>

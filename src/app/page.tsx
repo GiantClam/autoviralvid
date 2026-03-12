@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { SessionProvider, useSession } from 'next-auth/react';
 import { ProjectProvider, useProject } from '@/contexts/ProjectContext';
 import { TemplateGallery } from '@/components/TemplateGallery';
@@ -18,9 +18,30 @@ import { Play } from 'lucide-react';
 
 type ViewState = 'gallery' | 'project';
 
-function ProjectWorkspace({ initialTemplateId }: { initialTemplateId?: string }) {
-  const { phase, project } = useProject();
+function ProjectWorkspace({
+  initialTemplateId,
+  activeRunId,
+  onActiveRunChange,
+}: {
+  initialTemplateId?: string;
+  activeRunId: string | null;
+  onActiveRunChange: (runId: string | null) => void;
+}) {
+  const { phase, project, loadProject } = useProject();
   const t = useT();
+
+  useEffect(() => {
+    if (!activeRunId) {
+      return;
+    }
+    void loadProject(activeRunId);
+  }, [activeRunId, loadProject]);
+
+  useEffect(() => {
+    if (project?.run_id) {
+      onActiveRunChange(project.run_id);
+    }
+  }, [onActiveRunChange, project?.run_id]);
 
   // Determine which panel to show on the right
   const showStoryboard = ['generating_storyboard', 'storyboard_ready', 'generating_images', 'images_ready'].includes(phase);
@@ -110,7 +131,6 @@ function ProjectWorkspace({ initialTemplateId }: { initialTemplateId?: string })
 
 function HomeContent() {
   const { data: session, status } = useSession();
-  const t = useT();
   const userEmail = session?.user?.email || '';
 
   const [view, setView] = useState<ViewState>('gallery');
@@ -210,7 +230,11 @@ function HomeContent() {
         </div>
 
         {/* Main workspace */}
-        <ProjectWorkspace initialTemplateId={selectedTemplateId} />
+          <ProjectWorkspace
+            initialTemplateId={selectedTemplateId}
+            activeRunId={activeRunId}
+            onActiveRunChange={setActiveRunId}
+          />
 
         {/* AI Assistant floating panel */}
         <AIAssistant />

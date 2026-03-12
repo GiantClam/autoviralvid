@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback, useRef } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import { useProject } from "@/contexts/ProjectContext";
 import { useT } from "@/lib/i18n";
 import type { TranslationKey } from "@/lib/i18n/context";
@@ -139,7 +139,7 @@ interface ProjectFormProps {
 
 export default function ProjectForm({ onTemplateChange, initialTemplateId }: ProjectFormProps) {
   const t = useT();
-  const { createProject, generateStoryboard, submitDigitalHuman, isLoading, phase, error } =
+  const { createProject, generateStoryboard, submitDigitalHuman, isLoading, phase, error, project } =
     useProject();
 
   const [templateId, setTemplateId] = useState<string>(initialTemplateId || TEMPLATE_IDS[0].id);
@@ -166,6 +166,36 @@ export default function ProjectForm({ onTemplateChange, initialTemplateId }: Pro
 
   const isDigitalHuman = templateId === "digital-human";
   const aspectRatio = ORIENTATION_KEYS.find((o) => o.value === orientation)?.ratio ?? "9:16";
+
+  useEffect(() => {
+    if (!project?.run_id) {
+      return;
+    }
+
+    if (typeof project.template_id === "string" && project.template_id) {
+      setTemplateId(project.template_id);
+      onTemplateChange?.(project.template_id);
+    }
+    setTheme(typeof project.theme === "string" ? project.theme : "");
+    setProductImageUrl(typeof project.product_image_url === "string" ? project.product_image_url : "");
+    setStyle(typeof project.style === "string" && project.style ? project.style : STYLE_KEYS[0].value);
+    setDuration(typeof project.duration === "number" ? project.duration : 30);
+    setOrientation(
+      typeof project.orientation === "string" && ["vertical", "horizontal", "square"].includes(project.orientation)
+        ? project.orientation
+        : "vertical",
+    );
+    setAudioUrl(typeof project.audio_url === "string" ? project.audio_url : "");
+    setVoiceMode(typeof project.voice_mode === "number" ? project.voice_mode : 0);
+    setVoiceText(typeof project.voice_text === "string" ? project.voice_text : "");
+    setMotionPrompt(
+      typeof project.motion_prompt === "string" && project.motion_prompt
+        ? project.motion_prompt
+        : "模特正在做产品展示，进行电商直播带货",
+    );
+    setImageFileName("");
+    setAudioFileName("");
+  }, [onTemplateChange, project]);
 
   // ── File upload handlers ──
   const handleImageFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -281,6 +311,7 @@ export default function ProjectForm({ onTemplateChange, initialTemplateId }: Pro
     voiceMode,
     voiceText,
     motionPrompt,
+    t,
   ]);
 
   const busy = isLoading || phase === "generating_storyboard";

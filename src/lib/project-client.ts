@@ -126,8 +126,30 @@ export interface Project {
   theme: string;
   status: string;
   storyboards?: StoryboardData | null;
+  video_url?: string | null;
+  final_video_url?: string | null;
+  video_tasks?: VideoTask[];
+  session?: {
+    status?: string;
+    context?: Record<string, unknown>;
+    result?: Record<string, unknown>;
+  } | null;
+  task_summary?: ProjectTaskSummary;
+  result_video_url?: string | null;
   created_at?: string;
+  updated_at?: string;
   [key: string]: unknown;
+}
+
+export interface ProjectTaskSummary {
+  total: number;
+  pending: number;
+  queued: number;
+  processing: number;
+  submitted: number;
+  succeeded: number;
+  failed: number;
+  all_done: boolean;
 }
 
 export interface StoryboardScene {
@@ -156,14 +178,14 @@ export interface VideoTask {
 export interface ProjectStatus {
   run_id: string;
   status: string;
+  project_status: string;
+  video_url?: string | null;
   tasks: VideoTask[];
-  summary: {
-    total: number;
-    succeeded: number;
-    pending: number;
-    failed: number;
-    all_done: boolean;
-  };
+  summary: ProjectTaskSummary;
+}
+
+export interface ProjectListResponse {
+  projects: Project[];
 }
 
 // ── API methods ──
@@ -178,7 +200,7 @@ export const projectApi = {
 
   /** List projects */
   list: (limit = 40) =>
-    apiFetch<Project[]>(`/projects?limit=${limit}`),
+    apiFetch<ProjectListResponse>(`/projects?limit=${limit}`),
 
   /** Get project details */
   get: (runId: string) =>

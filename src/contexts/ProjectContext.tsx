@@ -4,6 +4,7 @@ import React, { createContext, useContext, useState, useCallback, useRef, useEff
 import {
   projectApi,
   Project,
+  ProjectTaskSummary,
   StoryboardData,
   StoryboardScene,
   VideoTask,
@@ -88,6 +89,18 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const scenes = storyboard?.scenes || [];
 
+  const toTaskSummaryState = useCallback((summary?: Partial<ProjectTaskSummary> | null) => ({
+    total: summary?.total ?? 0,
+    succeeded: summary?.succeeded ?? 0,
+    pending:
+      (summary?.pending ?? 0) +
+      (summary?.queued ?? 0) +
+      (summary?.processing ?? 0) +
+      (summary?.submitted ?? 0),
+    failed: summary?.failed ?? 0,
+    allDone: summary?.all_done ?? false,
+  }), []);
+
   // Cleanup polling on unmount
   useEffect(() => {
     return () => {
@@ -114,13 +127,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       try {
         const status: ProjectStatus = await projectApi.getStatus(runId);
         setTasks(status.tasks);
-        setTaskSummary({
-          total: status.summary.total,
-          succeeded: status.summary.succeeded,
-          pending: status.summary.pending,
-          failed: status.summary.failed,
-          allDone: status.summary.all_done,
-        });
+        setTaskSummary(toTaskSummaryState(status.summary));
 
         // Also refresh project to get latest storyboard
         try {
@@ -131,7 +138,10 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
           }
           // Auto-advance phase based on project status
           const s = proj.status || '';
-          const videoUrl = (proj as Record<string, unknown>).video_url as string | undefined;
+          const videoUrl =
+            (proj as Record<string, unknown>).video_url as string | undefined ||
+            (proj.final_video_url as string | undefined) ||
+            (proj.result_video_url as string | undefined);
           if (s === 'storyboard_ready' && phase === 'generating_storyboard') {
             setPhase('storyboard_ready');
           } else if (s === 'images_ready' && phase === 'generating_images') {
@@ -140,7 +150,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
             // All tasks done — check if final video is ready or still stitching
             if (videoUrl || (proj.final_video_url as string)) {
               // Final video is ready (digital human auto-stitch completed)
-              setFinalVideoUrl(videoUrl || (proj.final_video_url as string) || null);
+              setFinalVideoUrl(videoUrl || null);
               setPhase('completed');
               stopPolling();
             } else if (status.summary.total > 1) {
@@ -153,7 +163,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
               stopPolling();
             }
           } else if (s === 'completed') {
-            setFinalVideoUrl(videoUrl || (proj.final_video_url as string) || null);
+            setFinalVideoUrl(videoUrl || null);
             setPhase('completed');
             stopPolling();
           }
@@ -162,7 +172,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         // silently retry
       }
     }, 4000);
-  }, [stopPolling, phase]);
+  }, [stopPolling, phase, toTaskSummaryState]);
 
   const createProject = useCallback(async (params: {
     template_id: string;
@@ -331,21 +341,29 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setStoryboard(proj.storyboards as StoryboardData);
       }
 
+      if (proj.video_tasks?.length) {
+        setTasks(proj.video_tasks);
+      }
+
+      if (proj.task_summary) {
+        setTaskSummary(toTaskSummaryState(proj.task_summary));
+      }
+
       // Load tasks
       try {
         const status = await projectApi.getStatus(runId);
         setTasks(status.tasks);
-        setTaskSummary({
-          total: status.summary.total,
-          succeeded: status.summary.succeeded,
-          pending: status.summary.pending,
-          failed: status.summary.failed,
-          allDone: status.summary.all_done,
-        });
+        setTaskSummary(toTaskSummaryState(status.summary));
 
         // Determine phase
-        if (proj.final_video_url) {
-          setFinalVideoUrl(proj.final_video_url as string);
+        const resultVideoUrl =
+          (proj.video_url as string | undefined) ||
+          (proj.final_video_url as string | undefined) ||
+          (proj.result_video_url as string | undefined) ||
+          (status.video_url ?? undefined);
+
+        if (resultVideoUrl) {
+          setFinalVideoUrl(resultVideoUrl);
           setPhase('completed');
         } else if (status.summary.all_done && status.summary.total > 0) {
           setPhase('videos_ready');
@@ -361,7 +379,16 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
           setPhase('configuring');
         }
       } catch {
-        setPhase(proj.storyboards ? 'storyboard_ready' : 'configuring');
+        const resultVideoUrl =
+          (proj.video_url as string | undefined) ||
+          (proj.final_video_url as string | undefined) ||
+          (proj.result_video_url as string | undefined);
+        if (resultVideoUrl) {
+          setFinalVideoUrl(resultVideoUrl);
+          setPhase('completed');
+        } else {
+          setPhase(proj.storyboards ? 'storyboard_ready' : 'configuring');
+        }
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load project');
@@ -369,7 +396,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     } finally {
       setIsLoading(false);
     }
-  }, [startPolling, stopPolling]);
+  }, [startPolling, stopPolling, toTaskSummaryState]);
 
   const resetProject = useCallback(() => {
     stopPolling();

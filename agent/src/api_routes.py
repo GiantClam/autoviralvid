@@ -84,6 +84,38 @@ def _ensure_queue_worker(reason: str) -> None:
         logger.warning(f"[queue_worker] Failed to ensure worker ({reason}): {exc}")
 
 
+def _compute_task_summary(tasks: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """Build a stable task summary payload for UI history and polling."""
+    counts = {
+        "total": len(tasks),
+        "pending": 0,
+        "queued": 0,
+        "processing": 0,
+        "submitted": 0,
+        "succeeded": 0,
+        "failed": 0,
+        "all_done": False,
+    }
+    for task in tasks:
+        status = str(task.get("status") or "pending")
+        if status in counts:
+            counts[status] += 1
+    counts["all_done"] = counts["total"] > 0 and counts["succeeded"] == counts["total"]
+    return counts
+
+
+def _extract_result_video_url(session_row: Optional[Dict[str, Any]]) -> Optional[str]:
+    """Return final video url from session.result when present."""
+    if not session_row:
+        return None
+    result = session_row.get("result")
+    if isinstance(result, dict):
+        video_url = result.get("video_url")
+        if isinstance(video_url, str) and video_url.strip():
+            return video_url
+    return None
+
+
 # ---------------------------------------------------------------------------
 # Router
 # ---------------------------------------------------------------------------
@@ -224,13 +256,59 @@ async def list_projects(limit: int = 40, user: AuthUser = Depends(get_current_us
             sb.table("autoviralvid_jobs")
             .select(
                 "run_id, slogan, cover_url, video_url, share_slug, "
-                "status, storyboards, created_at, updated_at"
+                "status, storyboards, created_at, updated_at, "
+                "template_id, theme, product_image_url, duration, orientation, "
+                "audio_url, voice_mode, voice_text, motion_prompt"
             )
             .order("created_at", desc=True)
             .limit(limit)
             .execute()
         )
-        return {"projects": res.data or []}
+        projects = res.data or []
+        run_ids = [p.get("run_id") for p in projects if p.get("run_id")]
+
+        task_rows: List[Dict[str, Any]] = []
+        session_rows: List[Dict[str, Any]] = []
+        if run_ids:
+            task_rows = (
+                sb.table("autoviralvid_video_tasks")
+                .select("run_id, status")
+                .in_("run_id", run_ids)
+                .execute()
+                .data
+                or []
+            )
+            session_rows = (
+                sb.table("autoviralvid_crew_sessions")
+                .select("run_id, status, result")
+                .in_("run_id", run_ids)
+                .execute()
+                .data
+                or []
+            )
+
+        tasks_by_run: Dict[str, List[Dict[str, Any]]] = {}
+        for row in task_rows:
+            run_id = row.get("run_id")
+            if run_id:
+                tasks_by_run.setdefault(run_id, []).append(row)
+
+        sessions_by_run = {
+            row.get("run_id"): row for row in session_rows if row.get("run_id")
+        }
+
+        for project in projects:
+            run_id = project.get("run_id")
+            task_summary = _compute_task_summary(tasks_by_run.get(run_id, []))
+            session = sessions_by_run.get(run_id)
+            result_video_url = _extract_result_video_url(session)
+            project["task_summary"] = task_summary
+            project["session_status"] = session.get("status") if session else None
+            project["result_video_url"] = result_video_url
+            if not project.get("video_url") and result_video_url:
+                project["video_url"] = result_video_url
+
+        return {"projects": projects}
     except Exception as exc:
         logger.error(f"[list_projects] {exc}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(exc))
@@ -268,18 +346,24 @@ async def get_project(run_id: str, user: AuthUser = Depends(get_current_user)):
             .execute()
         )
         project["video_tasks"] = tasks_res.data or []
+        project["task_summary"] = _compute_task_summary(project["video_tasks"])
 
         # Attach crew session context if available
         try:
             session_res = (
                 sb.table("autoviralvid_crew_sessions")
-                .select("status, context")
+                .select("status, context, result")
                 .eq("run_id", run_id)
                 .limit(1)
                 .execute()
             )
             if session_res.data:
                 project["session"] = session_res.data[0]
+                project["session_status"] = session_res.data[0].get("status")
+                result_video_url = _extract_result_video_url(session_res.data[0])
+                project["result_video_url"] = result_video_url
+                if not project.get("video_url") and result_video_url:
+                    project["video_url"] = result_video_url
         except Exception:
             pass
 
@@ -663,14 +747,10 @@ async def get_project_status(run_id: str, user: AuthUser = Depends(get_current_u
         tasks = tasks_res.data or []
 
         # Compute summary counts
-        total = len(tasks)
-        counts: Dict[str, int] = {}
-        for t in tasks:
-            s = t.get("status", "unknown")
-            counts[s] = counts.get(s, 0) + 1
-
-        all_succeeded = total > 0 and counts.get("succeeded", 0) == total
-        has_failed = counts.get("failed", 0) > 0
+        counts = _compute_task_summary(tasks)
+        total = counts["total"]
+        all_succeeded = counts["all_done"]
+        has_failed = counts["failed"] > 0
 
         if all_succeeded and not job.get("video_url") and job.get("status") != "completed":
             try:
@@ -718,10 +798,13 @@ async def get_project_status(run_id: str, user: AuthUser = Depends(get_current_u
 
         return {
             "run_id": run_id,
+            "status": job.get("status"),
             "project_status": job.get("status"),
             "updated_at": job.get("updated_at"),
+            "video_url": job.get("video_url"),
             "tasks_total": total,
             "tasks_summary": counts,
+            "summary": counts,
             "all_succeeded": all_succeeded,
             "has_failed": has_failed,
             "tasks": tasks,
