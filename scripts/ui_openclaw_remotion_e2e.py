@@ -84,6 +84,12 @@ def probe_output_video(output_path: Path) -> dict:
 
 
 def verify_output_url(page, output_url: str) -> dict:
+    if output_url.startswith("file://"):
+        return {
+            "status": "skipped",
+            "reason": "local_file_output",
+        }
+
     response = page.request.head(output_url)
     if not response.ok:
         raise RuntimeError(f"Output URL is not reachable: HTTP {response.status} -> {output_url}")
