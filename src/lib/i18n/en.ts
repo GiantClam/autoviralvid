@@ -227,6 +227,12 @@ const en = {
     finalVideo: "Final Video",
     finalVideoHint: "When synthesis is done, the final mp4 is restored here and in history.",
     noVideoYet: "The final video is not ready yet. This run will continue in the background.",
+    searchPlaceholder: "Search by theme, run ID, or status",
+    filterAll: "All",
+    filterRunning: "Running",
+    filterCompleted: "Completed",
+    filterFailed: "Failed",
+    noMatches: "No runs match the current filter",
   },
 
 

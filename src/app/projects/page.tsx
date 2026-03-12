@@ -14,6 +14,7 @@ import {
   PlayCircle,
   RefreshCw,
   AlertCircle,
+  Search,
 } from "lucide-react";
 import { useT } from "@/lib/i18n";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
@@ -88,6 +89,8 @@ function statusTone(project: Project, status?: ProjectStatus | null) {
   };
 }
 
+type HistoryFilter = "all" | "running" | "completed" | "failed";
+
 function HistoryContent() {
   const { status } = useSession();
   const t = useT();
@@ -98,6 +101,8 @@ function HistoryContent() {
   const [loadingList, setLoadingList] = useState(true);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<HistoryFilter>("all");
 
   const loadProjects = useCallback(async () => {
     setLoadingList(true);
@@ -166,6 +171,46 @@ function HistoryContent() {
     [selectedProject, selectedStatus],
   );
 
+  const historyStats = useMemo(() => {
+    return projects.reduce(
+      (acc, project) => {
+        const tone = statusTone(project);
+        acc.all += 1;
+        if (tone.label === "Running") acc.running += 1;
+        else if (tone.label === "Ready" || project.status === "completed") acc.completed += 1;
+        else if (tone.label === "Failed") acc.failed += 1;
+        return acc;
+      },
+      { all: 0, running: 0, completed: 0, failed: 0 },
+    );
+  }, [projects]);
+
+  const filteredProjects = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    return projects.filter((project) => {
+      const theme = parseProjectTheme(project).toLowerCase();
+      const matchesQuery =
+        !needle ||
+        theme.includes(needle) ||
+        project.run_id.toLowerCase().includes(needle) ||
+        String(project.status || "").toLowerCase().includes(needle);
+
+      if (!matchesQuery) {
+        return false;
+      }
+
+      if (filter === "all") {
+        return true;
+      }
+
+      const tone = statusTone(project);
+      if (filter === "running") return tone.label === "Running";
+      if (filter === "completed") return tone.label === "Ready" || project.status === "completed";
+      if (filter === "failed") return tone.label === "Failed";
+      return true;
+    });
+  }, [filter, projects, query]);
+
   if (status === "loading") {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#050508]">
@@ -219,17 +264,52 @@ function HistoryContent() {
             </div>
           </div>
 
+          <div className="mb-4 space-y-3">
+            <label className="flex items-center gap-2 rounded-2xl border border-white/[0.08] bg-white/[0.03] px-3 py-2.5 text-sm text-gray-400">
+              <Search className="h-4 w-4 text-gray-500" />
+              <input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder={t("historyPage.searchPlaceholder")}
+                className="w-full bg-transparent text-sm text-white outline-none placeholder:text-gray-600"
+              />
+            </label>
+
+            <div className="grid grid-cols-2 gap-2">
+              {([
+                ["all", t("historyPage.filterAll"), historyStats.all],
+                ["running", t("historyPage.filterRunning"), historyStats.running],
+                ["completed", t("historyPage.filterCompleted"), historyStats.completed],
+                ["failed", t("historyPage.filterFailed"), historyStats.failed],
+              ] as const).map(([value, label, count]) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setFilter(value)}
+                  className={`rounded-2xl border px-3 py-2 text-left text-sm transition-all ${
+                    filter === value
+                      ? "border-[#E11D48]/40 bg-[#E11D48]/12 text-white"
+                      : "border-white/[0.06] bg-white/[0.03] text-gray-400 hover:border-white/[0.12] hover:text-gray-200"
+                  }`}
+                >
+                  <div className="font-medium">{label}</div>
+                  <div className="mt-1 text-xs text-gray-500">{count}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="space-y-3">
             {loadingList ? (
               <div className="flex items-center justify-center py-10 text-gray-500">
                 <Loader2 className="h-5 w-5 animate-spin" />
               </div>
-            ) : projects.length === 0 ? (
+            ) : filteredProjects.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-white/[0.08] px-4 py-10 text-center text-sm text-gray-500">
-                {t("historyPage.empty")}
+                {projects.length === 0 ? t("historyPage.empty") : t("historyPage.noMatches")}
               </div>
             ) : (
-              projects.map((project) => {
+              filteredProjects.map((project) => {
                 const tone = statusTone(project, selectedRunId === project.run_id ? selectedStatus : null);
                 const ToneIcon = tone.icon;
                 return (
