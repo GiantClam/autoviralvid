@@ -1,5 +1,7 @@
 import json
 import os
+import shutil
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -10,6 +12,9 @@ from playwright.sync_api import sync_playwright
 FRONTEND_BASE = os.getenv("FRONTEND_BASE", "http://127.0.0.1:3001")
 RENDERER_BASE = os.getenv("RENDERER_BASE", "http://127.0.0.1:8123")
 OUTPUT_DIR = Path(os.getenv("UI_E2E_OUTPUT_DIR", "test_outputs/ui_openclaw"))
+EXPECTED_DURATION_SECONDS = 18.0
+EXPECTED_WIDTH = 1280
+EXPECTED_HEIGHT = 720
 
 
 def wait_for_render(page, job_id: str, timeout_seconds: int = 120) -> dict:
@@ -33,6 +38,49 @@ def wait_for_render(page, job_id: str, timeout_seconds: int = 120) -> dict:
     raise TimeoutError(
         f"Render job {job_id} did not finish within {timeout_seconds}s. Last payload: {last_payload}"
     )
+
+
+def probe_output_video(output_path: Path) -> dict:
+    ffprobe = shutil.which("ffprobe")
+    if not ffprobe:
+        raise RuntimeError("ffprobe not found in PATH")
+    if not output_path.exists():
+        raise RuntimeError(f"Expected output file does not exist: {output_path}")
+
+    result = subprocess.run(
+        [
+            ffprobe,
+            "-v",
+            "error",
+            "-select_streams",
+            "v:0",
+            "-show_entries",
+            "stream=width,height:format=duration",
+            "-of",
+            "json",
+            str(output_path),
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    payload = json.loads(result.stdout or "{}")
+    stream = (payload.get("streams") or [{}])[0]
+    duration = float((payload.get("format") or {}).get("duration") or 0.0)
+    width = int(stream.get("width") or 0)
+    height = int(stream.get("height") or 0)
+
+    if width != EXPECTED_WIDTH or height != EXPECTED_HEIGHT:
+        raise RuntimeError(
+            f"Unexpected output resolution: {width}x{height}, expected {EXPECTED_WIDTH}x{EXPECTED_HEIGHT}"
+        )
+
+    if not (EXPECTED_DURATION_SECONDS - 1.5 <= duration <= EXPECTED_DURATION_SECONDS + 1.5):
+        raise RuntimeError(
+            f"Unexpected output duration: {duration:.2f}s, expected about {EXPECTED_DURATION_SECONDS:.2f}s"
+        )
+
+    return {"width": width, "height": height, "duration": duration}
 
 
 def main() -> int:
@@ -192,6 +240,10 @@ def main() -> int:
 
         if not final_status.get("output_url"):
             raise RuntimeError(f"Render job completed without output_url: {final_status}")
+
+        output_path = Path(str(final_status.get("output_path") or ""))
+        probe = probe_output_video(output_path)
+        print(json.dumps({"probe": probe}, indent=2))
 
         page.screenshot(path=str(OUTPUT_DIR / "03-render-submitted.png"), full_page=True)
         print(f"[ui] Render completed: {final_status['output_url']}")
