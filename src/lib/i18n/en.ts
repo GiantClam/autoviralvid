@@ -210,6 +210,26 @@ const en = {
     signOut: "Sign Out",
   },
 
+  historyPage: {
+    title: "Video History",
+    subtitle: "Review finished videos, inspect async progress, and reopen past runs.",
+    refresh: "Refresh",
+    empty: "No video runs yet",
+    detail: "Run Detail",
+    continueProject: "Open in Studio",
+    openVideo: "Open Video",
+    status: "Project Status",
+    tasks: "tasks",
+    createdAt: "Created",
+    sessionStatus: "Session",
+    taskBreakdown: "Async Task Breakdown",
+    asyncStatusHint: "Persisted segment tasks continue running even after the page is closed.",
+    finalVideo: "Final Video",
+    finalVideoHint: "When synthesis is done, the final mp4 is restored here and in history.",
+    noVideoYet: "The final video is not ready yet. This run will continue in the background.",
+  },
+
+
   // ── Workspace ──
   workspace: {
     idleTitle: "Fill in the config on the left to start",

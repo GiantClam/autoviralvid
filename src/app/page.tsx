@@ -1,7 +1,9 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { Suspense, useEffect, useState, useCallback } from 'react';
 import { SessionProvider, useSession } from 'next-auth/react';
+import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { ProjectProvider, useProject } from '@/contexts/ProjectContext';
 import { TemplateGallery } from '@/components/TemplateGallery';
 import { Sidebar } from '@/components/Sidebar';
@@ -132,6 +134,9 @@ function ProjectWorkspace({
 function HomeContent() {
   const { data: session, status } = useSession();
   const userEmail = session?.user?.email || '';
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const routeRunId = searchParams.get('runId');
 
   const [view, setView] = useState<ViewState>('gallery');
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
@@ -139,19 +144,23 @@ function HomeContent() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const handleSelectTemplate = useCallback((templateId: string) => {
+    router.replace('/');
     setSelectedTemplateId(templateId);
     setView('project');
-  }, []);
+    setActiveRunId(null);
+  }, [router]);
 
   const handleNewProject = useCallback(() => {
+    router.replace('/');
     setActiveRunId(null);
     setView('gallery');
-  }, []);
+  }, [router]);
 
   const handleSelectRun = useCallback((runId: string) => {
+    router.replace(`/?runId=${encodeURIComponent(runId)}`);
     setActiveRunId(runId);
     setView('project');
-  }, []);
+  }, [router]);
 
   // Dev mode: skip auth gate when NEXTAUTH_SECRET is not configured
   const isDevMode = !process.env.NEXT_PUBLIC_AUTH_ENABLED;
@@ -168,7 +177,10 @@ function HomeContent() {
     return <LandingPage />;
   }
 
-  if (view === 'gallery') {
+  const resolvedView: ViewState = routeRunId ? 'project' : view;
+  const resolvedActiveRunId = routeRunId || activeRunId;
+
+  if (resolvedView === 'gallery') {
     return (
       <div className="flex flex-col h-screen bg-[#050508]">
         <div className="h-16 border-b border-white/[0.06] flex items-center px-4 md:px-8 justify-between bg-black/40 backdrop-blur-xl relative z-20">
@@ -182,6 +194,12 @@ function HomeContent() {
             </div>
           </div>
           <div className="flex items-center gap-4">
+            <Link
+              href="/projects"
+              className="hidden rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-sm text-gray-300 transition-colors hover:bg-white/[0.06] md:inline-flex"
+            >
+              History
+            </Link>
             <LanguageSwitcher />
             <div className="text-sm text-gray-400 hidden sm:flex items-center gap-2">
               <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#E11D48] to-purple-600 flex items-center justify-center text-xs font-bold">
@@ -203,7 +221,7 @@ function HomeContent() {
       <div className="flex flex-col md:flex-row h-screen w-full bg-[#050508] overflow-hidden font-sans text-gray-100">
         {/* Sidebar — hidden on mobile, shown on md+ */}
         <Sidebar
-          activeRunId={activeRunId}
+          activeRunId={resolvedActiveRunId}
           onSelectRun={handleSelectRun}
           onNewProject={handleNewProject}
           onBack={() => setView('gallery')}
@@ -232,7 +250,7 @@ function HomeContent() {
         {/* Main workspace */}
           <ProjectWorkspace
             initialTemplateId={selectedTemplateId}
-            activeRunId={activeRunId}
+            activeRunId={resolvedActiveRunId}
             onActiveRunChange={setActiveRunId}
           />
 
@@ -246,7 +264,13 @@ function HomeContent() {
 export default function Home() {
   return (
     <SessionProvider>
-      <HomeContent />
+      <Suspense fallback={
+        <div className="flex items-center justify-center h-screen bg-[#060610]">
+          <div className="w-8 h-8 border-2 border-[#E11D48] border-t-transparent rounded-full animate-spin" />
+        </div>
+      }>
+        <HomeContent />
+      </Suspense>
     </SessionProvider>
   );
 }

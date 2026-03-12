@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { Plus, MessageSquare, ArrowLeft, PanelLeftClose, PanelLeftOpen, HelpCircle, Play, LogOut, RefreshCw, CheckCircle2, Loader2, Clock3, AlertCircle } from 'lucide-react';
 import { projectApi, type Project } from '@/lib/project-client';
 import { useT } from '@/lib/i18n';
@@ -188,14 +189,23 @@ export function Sidebar({
                             <MessageSquare size={10} />
                             {t("sidebar.historyProjects")}
                         </span>
-                        <button
-                            type="button"
-                            onClick={() => void loadHistory()}
-                            className="p-1 rounded-md text-gray-500 hover:text-gray-200 hover:bg-white/[0.04] transition-colors cursor-pointer"
-                            title={t("common.retry")}
-                        >
-                            <RefreshCw size={12} />
-                        </button>
+                        <div className="flex items-center gap-1">
+                            <Link
+                                href="/projects"
+                                className="p-1 rounded-md text-gray-500 hover:text-gray-200 hover:bg-white/[0.04] transition-colors"
+                                title={t("historyPage.title")}
+                            >
+                                <Play size={12} />
+                            </Link>
+                            <button
+                                type="button"
+                                onClick={() => void loadHistory()}
+                                className="p-1 rounded-md text-gray-500 hover:text-gray-200 hover:bg-white/[0.04] transition-colors cursor-pointer"
+                                title={t("common.retry")}
+                            >
+                                <RefreshCw size={12} />
+                            </button>
+                        </div>
                     </div>
                 )}
 
