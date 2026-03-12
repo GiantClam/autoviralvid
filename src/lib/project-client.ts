@@ -7,6 +7,10 @@
  */
 
 function getApiBase() {
+  if (typeof window !== 'undefined') {
+    return '/api/projects';
+  }
+
   const configured =
     process.env.NEXT_PUBLIC_API_BASE ||
     process.env.NEXT_PUBLIC_AGENT_URL;
@@ -29,6 +33,10 @@ let _cachedToken: string | null = null;
 let _tokenExpiresAt = 0; // ms since epoch
 
 async function getApiToken(): Promise<string | null> {
+  if (process.env.NEXT_PUBLIC_DISABLE_API_TOKEN === '1') {
+    return null;
+  }
+
   // Return cached token if still fresh (with 60s buffer)
   if (_cachedToken && Date.now() < _tokenExpiresAt - 60_000) {
     return _cachedToken;
@@ -64,7 +72,10 @@ export function clearApiToken() {
 // Core fetch wrapper
 // ---------------------------------------------------------------------------
 async function apiFetch<T = unknown>(path: string, init?: RequestInit): Promise<T> {
-  const url = `${getApiBase()}/api/v1${path}`;
+  const base = getApiBase();
+  const url = base.startsWith('http')
+    ? `${base}/api/v1${path}`
+    : `${base}${path}`;
 
   // Build auth header
   const token = await getApiToken();

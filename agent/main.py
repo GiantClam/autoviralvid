@@ -659,6 +659,33 @@ def _escape_drawtext_value(value: str) -> str:
     return escaped
 
 
+def _resolve_drawtext_fontfile() -> Optional[str]:
+    configured = (os.getenv("FFMPEG_FONT_FILE") or "").strip()
+    candidates: List[Path] = []
+    if configured:
+        candidates.append(Path(configured))
+
+    if os.name == "nt":
+        candidates.extend(
+            [
+                Path("C:/Windows/Fonts/segoeui.ttf"),
+                Path("C:/Windows/Fonts/arial.ttf"),
+            ]
+        )
+    else:
+        candidates.extend(
+            [
+                Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
+                Path("/usr/share/fonts/dejavu/DejaVuSans.ttf"),
+            ]
+        )
+
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate.as_posix().replace(":", r"\:")
+    return None
+
+
 def _ffmpeg_color(color: str) -> str:
     raw = (color or "").strip()
     if not raw:
@@ -759,6 +786,7 @@ def _build_ffmpeg_command(payload: RenderJobRequest, output_path: Path) -> List[
         [layer for layer in comp.layers if layer.type == "text" and layer.text],
         key=lambda x: (x.trackId, x.startFrame, x.id),
     )
+    fontfile = _resolve_drawtext_fontfile()
     text_index = 0
     for layer in text_layers:
         text_value = str(layer.text or "").strip()
@@ -776,7 +804,9 @@ def _build_ffmpeg_command(payload: RenderJobRequest, output_path: Path) -> List[
         escaped_text = _escape_drawtext_value(text_value)
         next_label = f"vt{text_index}_{overlay_index}"
         drawtext = (
-            f"[{current_video}]drawtext=text='{escaped_text}':fontcolor={font_color}:"
+            f"[{current_video}]drawtext="
+            + (f"fontfile='{fontfile}':" if fontfile else "")
+            + f"text='{escaped_text}':fontcolor={font_color}:"
             f"fontsize={font_size}:x={x_expr}:y={y_expr}:"
             f"enable='between(t,{start_s:.3f},{end_s:.3f})'"
         )

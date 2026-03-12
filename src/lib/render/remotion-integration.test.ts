@@ -3,6 +3,36 @@ import { describe, it, expect } from 'vitest';
 const API_BASE = process.env.API_BASE || 'http://localhost:3001';
 const RENDERER_URL = process.env.REMOTION_RENDERER_URL || 'http://localhost:8123';
 
+async function waitForRendererJob(
+  jobId: string,
+  maxAttempts = 90,
+  delayMs = 1000,
+): Promise<Record<string, unknown>> {
+  let lastStatus: Record<string, unknown> | null = null;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const statusResponse = await fetch(`${RENDERER_URL}/render/jobs/${jobId}`);
+    expect(statusResponse.ok).toBe(true);
+
+    const payload = (await statusResponse.json()) as Record<string, unknown>;
+    lastStatus = payload;
+    const status = String(payload.status || '');
+    console.log(`Renderer job ${jobId} status [${attempt + 1}/${maxAttempts}]:`, status);
+
+    if (status === 'completed' || status === 'failed') {
+      return payload;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+  }
+
+  if (!lastStatus) {
+    throw new Error(`Renderer job ${jobId} returned no status payload`);
+  }
+
+  throw new Error(`Renderer job ${jobId} did not finish within ${maxAttempts * delayMs}ms`);
+}
+
 describe('Remotion Integration Tests', () => {
   describe('End-to-End Render Pipeline', () => {
     it('should forward render job to remote renderer when configured', async () => {
@@ -260,6 +290,136 @@ describe('Remotion Integration Tests', () => {
       expect(data.summary.durationInFrames).toBe(900);
       expect(data.summary.durationSeconds).toBe(30);
     });
+
+    it('should generate an OpenClaw introduction video through the Remotion entrypoint', async () => {
+      const response = await fetch(`${API_BASE}/api/render/jobs`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          project: {
+            name: 'OpenClaw Introduction',
+            width: 1280,
+            height: 720,
+            duration: 18,
+            fps: 30,
+            backgroundColor: '#08111f',
+            tracks: [
+              {
+                id: 1,
+                type: 'overlay',
+                name: 'Narrative',
+                items: [
+                  {
+                    id: 'openclaw-title',
+                    type: 'text',
+                    content: 'OpenClaw',
+                    startTime: 0,
+                    duration: 4,
+                    trackId: 1,
+                    name: 'Title',
+                    style: {
+                      fontSize: 72,
+                      color: '#f8fafc',
+                      x: 50,
+                      y: 28,
+                    },
+                  },
+                  {
+                    id: 'openclaw-subtitle',
+                    type: 'text',
+                    content: 'Build AI-native revenue systems without manual handoffs.',
+                    startTime: 1,
+                    duration: 4,
+                    trackId: 1,
+                    name: 'Subtitle',
+                    style: {
+                      fontSize: 30,
+                      color: '#38bdf8',
+                      x: 50,
+                      y: 42,
+                    },
+                  },
+                  {
+                    id: 'openclaw-capability-1',
+                    type: 'text',
+                    content: 'OpenClaw researches accounts, drafts outreach, and keeps campaigns moving.',
+                    startTime: 5,
+                    duration: 5,
+                    trackId: 1,
+                    name: 'Capability 1',
+                    style: {
+                      fontSize: 34,
+                      color: '#e2e8f0',
+                      x: 50,
+                      y: 55,
+                      backgroundColor: '#0f172a',
+                    },
+                  },
+                  {
+                    id: 'openclaw-capability-2',
+                    type: 'text',
+                    content: 'Every run stays recoverable, so teams can reopen history and ship faster.',
+                    startTime: 10,
+                    duration: 4,
+                    trackId: 1,
+                    name: 'Capability 2',
+                    style: {
+                      fontSize: 34,
+                      color: '#e2e8f0',
+                      x: 50,
+                      y: 55,
+                      backgroundColor: '#0f172a',
+                    },
+                  },
+                  {
+                    id: 'openclaw-cta',
+                    type: 'text',
+                    content: 'OpenClaw turns prompts into production-ready revenue workflows.',
+                    startTime: 14,
+                    duration: 4,
+                    trackId: 1,
+                    name: 'CTA',
+                    style: {
+                      fontSize: 36,
+                      color: '#f8fafc',
+                      x: 50,
+                      y: 72,
+                    },
+                  },
+                ],
+              },
+            ],
+            runId: `openclaw-intro-${Date.now()}`,
+            threadId: 'openclaw-marketing',
+          },
+        }),
+      });
+
+      expect(response.ok).toBe(true);
+      const data = await response.json();
+
+      console.log('OpenClaw intro response:', JSON.stringify(data, null, 2));
+
+      expect(data.status).toBe('accepted');
+      expect(['dry_run', 'remote']).toContain(data.mode);
+      expect(data.summary.fps).toBe(30);
+      expect(data.summary.durationInFrames).toBe(540);
+      expect(data.summary.durationSeconds).toBe(18);
+      expect(data.summary.layerCount).toBe(5);
+      expect(data.summary.audioTrackCount).toBe(0);
+
+      if (data.mode === 'remote') {
+        expect(data.job_id).toBeDefined();
+        expect(data.job_id).not.toMatch(/^dryrun_/);
+
+        const jobStatus = await waitForRendererJob(data.job_id, 120, 1000);
+        expect(jobStatus).toBeTruthy();
+        expect(jobStatus.status).toBe('completed');
+        expect(jobStatus.output_path).toBeDefined();
+      } else {
+        console.log('OpenClaw intro ran in dry-run mode because REMOTION_RENDERER_URL is not configured.');
+      }
+    }, 150000);
   });
 
   describe('Template Compositions', () => {

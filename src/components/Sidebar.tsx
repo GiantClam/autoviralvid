@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Plus, MessageSquare, ArrowLeft, PanelLeftClose, PanelLeftOpen, HelpCircle, Play, LogOut, RefreshCw, CheckCircle2, Loader2, Clock3, AlertCircle } from 'lucide-react';
 import { projectApi, type Project } from '@/lib/project-client';
+import { getErrorMessage } from '@/lib/errors';
 import { useT } from '@/lib/i18n';
 import LanguageSwitcher from './LanguageSwitcher';
 import QuotaBar from './QuotaBar';
@@ -17,6 +18,14 @@ interface SidebarProps {
     isCollapsed?: boolean;
     toggleCollapse?: () => void;
     onToggleGuide?: () => void;
+}
+
+function isIgnorableHistoryError(error: unknown) {
+    const message = getErrorMessage(error).toLowerCase();
+    return (
+        process.env.NODE_ENV !== 'production' &&
+        (message.includes('supabase is not configured') || message.includes('api 503'))
+    );
 }
 
 export function Sidebar({
@@ -42,7 +51,10 @@ export function Sidebar({
             const data = await projectApi.list(30);
             setHistory(data.projects || []);
         } catch (err) {
-            console.error("Failed to load project history", err);
+            setHistory([]);
+            if (!isIgnorableHistoryError(err)) {
+                console.error("Failed to load project history", err);
+            }
         } finally {
             setLoading(false);
         }
@@ -63,7 +75,10 @@ export function Sidebar({
                 }
             } catch (err) {
                 if (!cancelled) {
-                    console.error("Failed to load project history", err);
+                    setHistory([]);
+                    if (!isIgnorableHistoryError(err)) {
+                        console.error("Failed to load project history", err);
+                    }
                 }
             } finally {
                 if (!cancelled) {

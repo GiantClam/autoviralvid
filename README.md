@@ -76,13 +76,17 @@ The following scripts can also be run using your preferred package manager:
 - `dev:debug` - Starts development servers with debug logging enabled
 - `dev:ui` - Starts only the Next.js UI server
 - `dev:agent` - Starts only the Python backend server
+- `dev:agent:render` - Starts a stable non-reload Python renderer on port `8124` for UI render E2E
 - `build` - Builds the Next.js application for production
 - `start` - Starts the production server
 - `lint` - Runs ESLint for code linting
 - `test` - Runs offline-safe frontend unit tests
 - `test:integration` - Runs renderer/API integration tests that require local services
 - `test:deployed` - Runs deployed-environment smoke tests against Vercel/Railway targets
+- `test:ui:openclaw` - Starts a stable local frontend/backend pair and runs the browser UI Remotion E2E for the OpenClaw intro video
 - `install:agent` - Installs Python dependencies for the agent
+
+There is also a manual GitHub Actions workflow, `UI OpenClaw E2E`, which installs Playwright plus ffmpeg and runs the same browser-driven Remotion path in CI when you want a release-grade UI render check.
 
 ## Vercel Deployment
 
@@ -157,6 +161,19 @@ If you see "I'm having trouble connecting to my tools", make sure:
 1. The Python backend is running on port 8123
 2. Your backend environment variables are set correctly
 3. Both servers started successfully
+
+### UI Remotion E2E
+To validate the browser-driven Remotion path end to end, run:
+
+```bash
+npm run test:ui:openclaw
+```
+
+This command:
+- starts a stable renderer backend on `http://127.0.0.1:8124`
+- starts a local Next.js frontend on `http://127.0.0.1:3001`
+- runs the browser automation in `scripts/ui_openclaw_remotion_e2e.py`
+- saves screenshots under `test_outputs/ui_openclaw/`
 
 ### Python Dependencies
 If you encounter Python import errors:

@@ -44,7 +44,7 @@ async function forwardToRemoteRenderer(
   jobRequest: RenderJobRequest,
   rendererBaseUrl: string,
 ) {
-  const base = rendererBaseUrl.replace(/\/+$/, "");
+  const base = rendererBaseUrl.trim().replace(/\/+$/, "");
   const target = `${base}/render/jobs`;
   const response = await fetch(target, {
     method: "POST",
@@ -99,7 +99,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const remoteRenderer = process.env.REMOTION_RENDERER_URL;
+    const remoteRenderer = process.env.REMOTION_RENDERER_URL?.trim();
     if (!remoteRenderer) {
       return NextResponse.json(createDryRunResponse(jobRequest));
     }

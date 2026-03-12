@@ -1,0 +1,57 @@
+name: UI OpenClaw E2E
+
+on:
+  workflow_dispatch:
+
+jobs:
+  ui-openclaw:
+    name: UI OpenClaw Remotion E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install ffmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+      - name: Install uv
+        run: pip install uv
+
+      - name: Install Python browser tooling
+        run: |
+          pip install playwright
+          python -m playwright install --with-deps chromium
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Install backend dependencies
+        run: |
+          cd agent
+          uv sync --frozen
+
+      - name: Run UI OpenClaw E2E
+        run: npm run test:ui:openclaw
+
+      - name: Upload UI screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-openclaw-screenshots
+          path: test_outputs/ui_openclaw
+          if-no-files-found: ignore
