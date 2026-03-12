@@ -107,6 +107,83 @@ SCENARIOS = {
             }
         },
     },
+    "product-ad": {
+        "template_matchers": ["Product Ad", "商品广告"],
+        "theme": "Short-form ecommerce promo with fast pacing, clear value props, and a direct buy-now CTA.",
+        "expected_duration": 15.0,
+        "expected_width": 1080,
+        "expected_height": 1920,
+        "payload": {
+            "project": {
+                "name": "ProductAd UI Promo",
+                "width": 1080,
+                "height": 1920,
+                "duration": 15,
+                "fps": 30,
+                "backgroundColor": "#140b05",
+                "tracks": [
+                    {
+                        "id": 1,
+                        "type": "overlay",
+                        "name": "Promo",
+                        "items": [
+                            {
+                                "id": "product-title",
+                                "type": "text",
+                                "content": "Launch Faster",
+                                "startTime": 0,
+                                "duration": 3,
+                                "trackId": 1,
+                                "name": "Title",
+                                "style": {"fontSize": 86, "color": "#fff7ed", "x": 50, "y": 18},
+                            },
+                            {
+                                "id": "product-subtitle",
+                                "type": "text",
+                                "content": "AI-built promo videos ready for campaigns that need to convert now.",
+                                "startTime": 1,
+                                "duration": 3,
+                                "trackId": 1,
+                                "name": "Subtitle",
+                                "style": {"fontSize": 34, "color": "#fdba74", "x": 50, "y": 29},
+                            },
+                            {
+                                "id": "product-point-1",
+                                "type": "text",
+                                "content": "Storyboards, avatars, and final renders from one production workflow.",
+                                "startTime": 4,
+                                "duration": 4,
+                                "trackId": 1,
+                                "name": "Value 1",
+                                "style": {"fontSize": 42, "color": "#f8fafc", "x": 50, "y": 46},
+                            },
+                            {
+                                "id": "product-point-2",
+                                "type": "text",
+                                "content": "Recover every run later from task history without losing the final cut.",
+                                "startTime": 8,
+                                "duration": 4,
+                                "trackId": 1,
+                                "name": "Value 2",
+                                "style": {"fontSize": 40, "color": "#f8fafc", "x": 50, "y": 60},
+                            },
+                            {
+                                "id": "product-cta",
+                                "type": "text",
+                                "content": "Ship the next promo today.",
+                                "startTime": 12,
+                                "duration": 3,
+                                "trackId": 1,
+                                "name": "CTA",
+                                "style": {"fontSize": 52, "color": "#fff7ed", "x": 50, "y": 78},
+                            },
+                        ],
+                    }
+                ],
+                "threadId": "product-ad-ui-e2e",
+            }
+        },
+    },
     "knowledge-edu": {
         "template_matchers": ["Knowledge & Edu", "知识科普"],
         "theme": "Educational explainers with crisp structure, chapter breaks, and clear key takeaways.",
