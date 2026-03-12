@@ -5,6 +5,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+from urllib.request import Request, urlopen
 
 from playwright.sync_api import sync_playwright
 
@@ -13,6 +14,12 @@ FRONTEND_BASE = os.getenv("FRONTEND_BASE", "http://127.0.0.1:3001")
 RENDERER_BASE = os.getenv("RENDERER_BASE", "http://127.0.0.1:8123")
 OUTPUT_DIR = Path(os.getenv("UI_E2E_OUTPUT_DIR", "test_outputs/ui_openclaw"))
 SCENARIO = os.getenv("UI_E2E_SCENARIO", "openclaw").strip().lower()
+
+FIXTURE_URLS = {
+    "test_dh_image_2026.png": "https://s.autoviralvid.com/test_dh_image_2026.png",
+    "test_dh_audio_20s_20260310.mp3": "https://s.autoviralvid.com/uploads/test_dh_audio_20s_20260310.mp3",
+}
+
 
 SCENARIOS = {
     "openclaw": {
@@ -24,6 +31,8 @@ SCENARIOS = {
         "expected_duration": 18.0,
         "expected_width": 1280,
         "expected_height": 720,
+        "expected_layer_count": 5,
+        "expected_audio_track_count": 0,
         "payload": {
             "project": {
                 "name": "OpenClaw UI Introduction",
@@ -113,6 +122,8 @@ SCENARIOS = {
         "expected_duration": 15.0,
         "expected_width": 1080,
         "expected_height": 1920,
+        "expected_layer_count": 5,
+        "expected_audio_track_count": 0,
         "payload": {
             "project": {
                 "name": "ProductAd UI Promo",
@@ -184,12 +195,106 @@ SCENARIOS = {
             }
         },
     },
+    "travel-vlog-media": {
+        "template_matchers": ["Travel Vlog", "旅行 Vlog", "旅行Vlog"],
+        "theme": "Travel recap with a hero still image, ambient soundtrack, and concise journey captions.",
+        "expected_duration": 20.0,
+        "expected_width": 1080,
+        "expected_height": 1920,
+        "expected_layer_count": 4,
+        "expected_audio_track_count": 1,
+        "payload": {
+            "project": {
+                "name": "TravelVlog Media UI Story",
+                "width": 1080,
+                "height": 1920,
+                "duration": 20,
+                "fps": 30,
+                "backgroundColor": "#05131d",
+                "tracks": [
+                    {
+                        "id": 1,
+                        "type": "video",
+                        "name": "Hero Media",
+                        "items": [
+                            {
+                                "id": "travel-hero",
+                                "type": "image",
+                                "content": "fixture://test_dh_image_2026.png",
+                                "startTime": 0,
+                                "duration": 20,
+                                "trackId": 1,
+                                "name": "Hero Image",
+                            }
+                        ],
+                    },
+                    {
+                        "id": 2,
+                        "type": "audio",
+                        "name": "Narration Bed",
+                        "items": [
+                            {
+                                "id": "travel-bgm",
+                                "type": "audio",
+                                "content": "fixture://test_dh_audio_20s_20260310.mp3",
+                                "startTime": 0,
+                                "duration": 20,
+                                "trackId": 2,
+                                "name": "Ambient Track",
+                                "style": {"opacity": 0.7},
+                            }
+                        ],
+                    },
+                    {
+                        "id": 3,
+                        "type": "overlay",
+                        "name": "Captions",
+                        "items": [
+                            {
+                                "id": "travel-title",
+                                "type": "text",
+                                "content": "Weekend Reset",
+                                "startTime": 0,
+                                "duration": 4,
+                                "trackId": 3,
+                                "name": "Title",
+                                "style": {"fontSize": 82, "color": "#f8fafc", "x": 50, "y": 16},
+                            },
+                            {
+                                "id": "travel-caption-1",
+                                "type": "text",
+                                "content": "One still frame, one soundtrack, one clear story beat at a time.",
+                                "startTime": 5,
+                                "duration": 7,
+                                "trackId": 3,
+                                "name": "Caption 1",
+                                "style": {"fontSize": 36, "color": "#e2e8f0", "x": 50, "y": 72},
+                            },
+                            {
+                                "id": "travel-caption-2",
+                                "type": "text",
+                                "content": "Media layers render cleanly through the same UI flow.",
+                                "startTime": 13,
+                                "duration": 7,
+                                "trackId": 3,
+                                "name": "Caption 2",
+                                "style": {"fontSize": 38, "color": "#bae6fd", "x": 50, "y": 82},
+                            },
+                        ],
+                    },
+                ],
+                "threadId": "travel-vlog-media-ui-e2e",
+            }
+        },
+    },
     "knowledge-edu": {
         "template_matchers": ["Knowledge & Edu", "知识科普"],
         "theme": "Educational explainers with crisp structure, chapter breaks, and clear key takeaways.",
         "expected_duration": 12.0,
         "expected_width": 1920,
         "expected_height": 1080,
+        "expected_layer_count": 5,
+        "expected_audio_track_count": 0,
         "payload": {
             "project": {
                 "name": "KnowledgeEdu UI Lesson",
@@ -269,18 +374,18 @@ def wait_for_render(page, job_id: str, timeout_seconds: int = 120) -> dict:
     last_payload = None
 
     while time.time() < deadline:
-      response = page.request.get(f"{RENDERER_BASE}/render/jobs/{job_id}")
-      if not response.ok:
-          raise RuntimeError(f"Failed to query render job {job_id}: HTTP {response.status}")
+        response = page.request.get(f"{RENDERER_BASE}/render/jobs/{job_id}")
+        if not response.ok:
+            raise RuntimeError(f"Failed to query render job {job_id}: HTTP {response.status}")
 
-      last_payload = response.json()
-      status = last_payload.get("status")
-      print(f"[render] {job_id}: {status}")
+        last_payload = response.json()
+        status = last_payload.get("status")
+        print(f"[render] {job_id}: {status}")
 
-      if status in {"completed", "failed"}:
-          return last_payload
+        if status in {"completed", "failed"}:
+            return last_payload
 
-      time.sleep(1)
+        time.sleep(1)
 
     raise TimeoutError(
         f"Render job {job_id} did not finish within {timeout_seconds}s. Last payload: {last_payload}"
@@ -299,10 +404,8 @@ def probe_output_video(output_path: Path) -> dict:
             ffprobe,
             "-v",
             "error",
-            "-select_streams",
-            "v:0",
             "-show_entries",
-            "stream=width,height:format=duration",
+            "stream=codec_type,width,height:format=duration",
             "-of",
             "json",
             str(output_path),
@@ -312,14 +415,17 @@ def probe_output_video(output_path: Path) -> dict:
         check=True,
     )
     payload = json.loads(result.stdout or "{}")
-    stream = (payload.get("streams") or [{}])[0]
+    streams = payload.get("streams") or []
+    video_stream = next((stream for stream in streams if stream.get("codec_type") == "video"), {})
+    audio_stream_count = sum(1 for stream in streams if stream.get("codec_type") == "audio")
     duration = float((payload.get("format") or {}).get("duration") or 0.0)
-    width = int(stream.get("width") or 0)
-    height = int(stream.get("height") or 0)
+    width = int(video_stream.get("width") or 0)
+    height = int(video_stream.get("height") or 0)
 
     expected_width = int(SCENARIOS[SCENARIO]["expected_width"])
     expected_height = int(SCENARIOS[SCENARIO]["expected_height"])
     expected_duration = float(SCENARIOS[SCENARIO]["expected_duration"])
+    expected_audio_track_count = int(SCENARIOS[SCENARIO].get("expected_audio_track_count", 0))
 
     if width != expected_width or height != expected_height:
         raise RuntimeError(
@@ -331,7 +437,17 @@ def probe_output_video(output_path: Path) -> dict:
             f"Unexpected output duration: {duration:.2f}s, expected about {expected_duration:.2f}s"
         )
 
-    return {"width": width, "height": height, "duration": duration}
+    if audio_stream_count < expected_audio_track_count:
+        raise RuntimeError(
+            f"Unexpected audio stream count: {audio_stream_count}, expected at least {expected_audio_track_count}"
+        )
+
+    return {
+        "width": width,
+        "height": height,
+        "duration": duration,
+        "audio_stream_count": audio_stream_count,
+    }
 
 
 def verify_output_url(page, output_url: str) -> dict:
@@ -353,6 +469,40 @@ def verify_output_url(page, output_url: str) -> dict:
         "status": response.status,
         "content_type": content_type,
     }
+
+
+def _materialize_fixture(name: str) -> str:
+    source_url = FIXTURE_URLS.get(name)
+    if not source_url:
+        raise RuntimeError(f"Unknown fixture reference: {name}")
+
+    fixtures_dir = OUTPUT_DIR.parent / "_fixtures"
+    fixtures_dir.mkdir(parents=True, exist_ok=True)
+    local_path = fixtures_dir / name
+    if not local_path.exists() or local_path.stat().st_size == 0:
+        request = Request(
+            source_url,
+            headers={
+                "User-Agent": (
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/132.0.0.0 Safari/537.36"
+                )
+            },
+        )
+        with urlopen(request) as response, local_path.open("wb") as handle:
+            handle.write(response.read())
+    return str(local_path.resolve())
+
+
+def _replace_fixture_refs(node):
+    if isinstance(node, dict):
+        return {key: _replace_fixture_refs(value) for key, value in node.items()}
+    if isinstance(node, list):
+        return [_replace_fixture_refs(value) for value in node]
+    if isinstance(node, str) and node.startswith("fixture://"):
+        return _materialize_fixture(node.removeprefix("fixture://"))
+    return node
 
 
 def main() -> int:
@@ -398,7 +548,7 @@ def main() -> int:
         page.locator("textarea").first.fill(theme)
         print("[ui] Filled project theme in the form")
 
-        payload = json.loads(json.dumps(scenario["payload"]))
+        payload = _replace_fixture_refs(json.loads(json.dumps(scenario["payload"])))
         payload["project"]["runId"] = f"{SCENARIO}-ui-{int(time.time())}"
 
         print("[ui] Submitting remotion render request from browser context")
@@ -427,6 +577,21 @@ def main() -> int:
 
         if body.get("mode") != "remote":
             raise RuntimeError(f"Expected remote mode, got: {body.get('mode')}")
+
+        summary = body.get("summary") or {}
+        expected_layer_count = scenario.get("expected_layer_count")
+        expected_audio_track_count = scenario.get("expected_audio_track_count")
+        if expected_layer_count is not None and summary.get("layerCount") != expected_layer_count:
+            raise RuntimeError(
+                f"Unexpected layerCount: {summary.get('layerCount')}, expected {expected_layer_count}"
+            )
+        if (
+            expected_audio_track_count is not None
+            and summary.get("audioTrackCount") != expected_audio_track_count
+        ):
+            raise RuntimeError(
+                f"Unexpected audioTrackCount: {summary.get('audioTrackCount')}, expected {expected_audio_track_count}"
+            )
 
         job_id = body.get("job_id")
         if not job_id:
