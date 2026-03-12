@@ -1,6 +1,6 @@
 import React, { useRef } from 'react';
 import { useEditor } from '../../contexts/EditorContext';
-import { Upload, Video, Music, Image as ImageIcon } from 'lucide-react';
+import { Upload, Video, Music } from 'lucide-react';
 import { Asset, ItemType } from '../../lib/types';
 
 const AssetLibrary: React.FC = () => {
@@ -55,6 +55,7 @@ const AssetLibrary: React.FC = () => {
                             className="group relative aspect-square bg-white/[0.03] rounded-lg overflow-hidden border border-transparent hover:border-[#E11D48] cursor-grab"
                         >
                             {(asset.type === ItemType.IMAGE || asset.thumbnail) && (asset.thumbnail || asset.url) ? (
+                                // eslint-disable-next-line @next/next/no-img-element
                                 <img src={asset.thumbnail || asset.url} alt={asset.name} className="w-full h-full object-cover" />
                             ) : (
                                 <div className="w-full h-full flex items-center justify-center text-gray-500">

@@ -15,7 +15,6 @@ const EditorPanel: React.FC = () => {
         stitchAll,
         isSyncing,
         videoTasks,
-        clipStatuses,
         finalVideoUrl,
     } = useEditor();
     const [isSubmittingRender, setIsSubmittingRender] = useState(false);

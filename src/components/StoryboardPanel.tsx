@@ -2,13 +2,12 @@
 
 import React, { useState, useCallback } from "react";
 import {
-  Image,
+  Image as ImageIcon,
   RefreshCw,
   Edit3,
   Sparkles,
   Play,
   Loader2,
-  Trash2,
   Check,
   X,
 } from "lucide-react";
@@ -81,6 +80,7 @@ function SceneCard({
 
       <div className="relative aspect-video w-full bg-[#0a0a12] overflow-hidden">
         {scene.image_url ? (
+          // eslint-disable-next-line @next/next/no-img-element
           <img
             src={scene.image_url}
             alt={`Scene ${index + 1}`}
@@ -99,7 +99,7 @@ function SceneCard({
             ) : (
               <>
                 <div className="w-16 h-16 rounded-2xl bg-white/[0.03] border border-white/[0.06] flex items-center justify-center">
-                  <Image className="h-8 w-8 text-gray-600" />
+                  <ImageIcon className="h-8 w-8 text-gray-600" />
                 </div>
                 <span className="text-xs text-gray-500">暂无图片</span>
               </>
@@ -386,7 +386,7 @@ export default function StoryboardPanel() {
                 {isLoading ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
-                  <Image className="h-4 w-4" />
+                  <ImageIcon className="h-4 w-4" />
                 )}
                 生成图片
               </button>

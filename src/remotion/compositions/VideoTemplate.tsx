@@ -204,7 +204,7 @@ export default function VideoTemplate({
 
   const TransitionWrapper = transition === 'fade' ? FadeTransition :
     transition === 'slide' ? SlideTransition :
-    ({ children, durationInFrames }: { children: React.ReactNode; durationInFrames: number }) => (
+    ({ children }: { children: React.ReactNode }) => (
       <AbsoluteFill>{children}</AbsoluteFill>
     );
 

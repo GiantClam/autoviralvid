@@ -11,7 +11,7 @@ import os
 import uuid
 import json
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import List, Optional, Dict, Any
 
 from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
@@ -82,6 +82,10 @@ def _ensure_queue_worker(reason: str) -> None:
         logger.debug(f"[queue_worker] {reason}: {snapshot}")
     except Exception as exc:
         logger.warning(f"[queue_worker] Failed to ensure worker ({reason}): {exc}")
+
+
+def _utc_now_iso() -> str:
+    return datetime.now(UTC).isoformat()
 
 
 def _compute_task_summary(tasks: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -396,7 +400,7 @@ async def generate_storyboard(run_id: str, background_tasks: BackgroundTasks, us
 
     # Update status immediately
     sb.table("autoviralvid_jobs").update(
-        {"status": "generating_storyboard", "updated_at": datetime.utcnow().isoformat()}
+        {"status": "generating_storyboard", "updated_at": _utc_now_iso()}
     ).eq("run_id", run_id).execute()
 
     async def _bg_generate_storyboard():
@@ -406,7 +410,7 @@ async def generate_storyboard(run_id: str, background_tasks: BackgroundTasks, us
         except Exception as exc:
             logger.error(f"[generate_storyboard bg] {exc}", exc_info=True)
             sb.table("autoviralvid_jobs").update(
-                {"status": "storyboard_failed", "updated_at": datetime.utcnow().isoformat()}
+                {"status": "storyboard_failed", "updated_at": _utc_now_iso()}
             ).eq("run_id", run_id).execute()
 
     background_tasks.add_task(_bg_generate_storyboard)
@@ -453,7 +457,7 @@ async def update_scene(run_id: str, scene_idx: int, body: UpdateSceneRequest, us
         storyboards[scene_idx] = scene
 
         sb.table("autoviralvid_jobs").update(
-            {"storyboards": storyboards, "updated_at": datetime.utcnow().isoformat()}
+            {"storyboards": storyboards, "updated_at": _utc_now_iso()}
         ).eq("run_id", run_id).execute()
 
         return {"run_id": run_id, "scene_idx": scene_idx, "scene": scene}
@@ -485,7 +489,7 @@ async def generate_images(run_id: str, background_tasks: BackgroundTasks, user: 
         raise HTTPException(status_code=404, detail=f"Project {run_id} not found")
 
     sb.table("autoviralvid_jobs").update(
-        {"status": "generating_images", "updated_at": datetime.utcnow().isoformat()}
+        {"status": "generating_images", "updated_at": _utc_now_iso()}
     ).eq("run_id", run_id).execute()
 
     async def _bg_generate_images():
@@ -495,7 +499,7 @@ async def generate_images(run_id: str, background_tasks: BackgroundTasks, user: 
         except Exception as exc:
             logger.error(f"[generate_images bg] {exc}", exc_info=True)
             sb.table("autoviralvid_jobs").update(
-                {"status": "images_failed", "updated_at": datetime.utcnow().isoformat()}
+                {"status": "images_failed", "updated_at": _utc_now_iso()}
             ).eq("run_id", run_id).execute()
 
     background_tasks.add_task(_bg_generate_images)
@@ -564,7 +568,7 @@ async def submit_videos(run_id: str, background_tasks: BackgroundTasks, user: Au
         raise HTTPException(status_code=404, detail=f"Project {run_id} not found")
 
     sb.table("autoviralvid_jobs").update(
-        {"status": "generating_videos", "updated_at": datetime.utcnow().isoformat()}
+        {"status": "generating_videos", "updated_at": _utc_now_iso()}
     ).eq("run_id", run_id).execute()
 
     async def _bg_submit_videos():
@@ -574,7 +578,7 @@ async def submit_videos(run_id: str, background_tasks: BackgroundTasks, user: Au
         except Exception as exc:
             logger.error(f"[submit_videos bg] {exc}", exc_info=True)
             sb.table("autoviralvid_jobs").update(
-                {"status": "videos_failed", "updated_at": datetime.utcnow().isoformat()}
+                {"status": "videos_failed", "updated_at": _utc_now_iso()}
             ).eq("run_id", run_id).execute()
 
     background_tasks.add_task(_bg_submit_videos)
@@ -609,7 +613,7 @@ async def submit_digital_human(run_id: str, background_tasks: BackgroundTasks, u
     _ensure_queue_worker("submit_digital_human")
 
     sb.table("autoviralvid_jobs").update(
-        {"status": "generating_videos", "updated_at": datetime.utcnow().isoformat()}
+        {"status": "generating_videos", "updated_at": _utc_now_iso()}
     ).eq("run_id", run_id).execute()
 
     try:
@@ -631,7 +635,7 @@ async def submit_digital_human(run_id: str, background_tasks: BackgroundTasks, u
             )
             sb.table("autoviralvid_jobs").update({
                 "status": "videos_failed",
-                "updated_at": datetime.utcnow().isoformat(),
+                "updated_at": _utc_now_iso(),
             }).eq("run_id", run_id).execute()
             raise HTTPException(status_code=500, detail=error_msg)
     except HTTPException:
@@ -644,7 +648,7 @@ async def submit_digital_human(run_id: str, background_tasks: BackgroundTasks, u
         )
         sb.table("autoviralvid_jobs").update({
             "status": "videos_failed",
-            "updated_at": datetime.utcnow().isoformat(),
+            "updated_at": _utc_now_iso(),
         }).eq("run_id", run_id).execute()
         raise HTTPException(status_code=500, detail=str(exc))
 
@@ -688,7 +692,7 @@ async def regenerate_video(
             "video_url": None,
             "error": None,
             "retry_count": 0,
-            "updated_at": datetime.utcnow().isoformat(),
+            "updated_at": _utc_now_iso(),
         }
         if body.new_prompt is not None:
             update_payload["prompt"] = body.new_prompt
@@ -836,7 +840,7 @@ async def render_final(run_id: str, background_tasks: BackgroundTasks, user: Aut
         raise HTTPException(status_code=404, detail=f"Project {run_id} not found")
 
     sb.table("autoviralvid_jobs").update(
-        {"status": "rendering", "updated_at": datetime.utcnow().isoformat()}
+        {"status": "rendering", "updated_at": _utc_now_iso()}
     ).eq("run_id", run_id).execute()
 
     async def _bg_render():
@@ -846,7 +850,7 @@ async def render_final(run_id: str, background_tasks: BackgroundTasks, user: Aut
         except Exception as exc:
             logger.error(f"[render_final bg] {exc}", exc_info=True)
             sb.table("autoviralvid_jobs").update(
-                {"status": "render_failed", "updated_at": datetime.utcnow().isoformat()}
+                {"status": "render_failed", "updated_at": _utc_now_iso()}
             ).eq("run_id", run_id).execute()
 
     background_tasks.add_task(_bg_render)

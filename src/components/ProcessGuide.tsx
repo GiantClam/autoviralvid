@@ -1,5 +1,5 @@
 import React from 'react';
-import { MousePointer2, MessageSquare, Wand2, Download, X, HelpCircle } from 'lucide-react';
+import { MousePointer2, MessageSquare, Wand2, Download, X } from 'lucide-react';
 
 export interface ProcessGuideProps {
     onClose?: () => void;
@@ -25,7 +25,11 @@ export function ProcessGuide({ onClose, className = '' }: ProcessGuideProps) {
                         </div>
                     ))}
                 </div>
-                {onClose && <button onClick={onClose} className="p-1.5 hover:bg-white/10 rounded-full text-gray-500 hover:text-white">✕</button>}
+                {onClose && (
+                    <button onClick={onClose} className="p-1.5 hover:bg-white/10 rounded-full text-gray-500 hover:text-white">
+                        <X className="w-4 h-4" />
+                    </button>
+                )}
             </div>
         </div>
     );

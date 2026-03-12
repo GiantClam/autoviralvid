@@ -1,7 +1,7 @@
 import React, { useRef, useState, useCallback } from 'react';
 import { useEditor, ClipStatus } from '../../contexts/EditorContext';
 import { ItemType, TimelineItem } from '../../lib/types';
-import { Film, Type, Music, Image as ImageIcon, RefreshCw, Trash2, Loader2, CheckCircle2, AlertCircle, Clock, GripVertical } from 'lucide-react';
+import { Film, Type, RefreshCw, Trash2, Loader2, CheckCircle2, AlertCircle, Clock, GripVertical } from 'lucide-react';
 
 const SCALE = 50;
 

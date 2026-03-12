@@ -61,6 +61,7 @@ const Player: React.FC = () => {
                             muted
                         />
                     ) : activeImage ? (
+                        // eslint-disable-next-line @next/next/no-img-element
                         <img
                             src={activeImage.content}
                             className="absolute w-full h-full object-cover"

@@ -9,7 +9,7 @@ import shutil
 import subprocess
 from pathlib import Path
 from threading import Lock
-from datetime import datetime
+from datetime import UTC, datetime
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request, BackgroundTasks, HTTPException, Depends
@@ -39,6 +39,10 @@ SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv(
 supabase = (
     create_client(SUPABASE_URL, SUPABASE_KEY) if SUPABASE_URL and SUPABASE_KEY else None
 )
+
+
+def _utc_now_iso() -> str:
+    return datetime.now(UTC).isoformat()
 
 
 # Lifespan event handler
@@ -231,7 +235,7 @@ async def webhook_runninghub(request: Request):
                         {
                             "status": "succeeded",
                             "video_url": cdn_url,
-                            "updated_at": datetime.utcnow().isoformat(),
+                            "updated_at": _utc_now_iso(),
                         }
                     ).eq("provider_task_id", task_id).execute()
                     logger.info(
@@ -494,7 +498,7 @@ async def regenerate_clip(
             "video_url": None,
             "error": None,
             "retry_count": 0,
-            "updated_at": datetime.utcnow().isoformat(),
+            "updated_at": _utc_now_iso(),
         }
         if body.new_prompt:
             update["prompt"] = body.new_prompt
@@ -831,7 +835,7 @@ def _build_ffmpeg_command(payload: RenderJobRequest, output_path: Path) -> List[
 
 async def _run_render_job(job_id: str, payload: RenderJobRequest):
     try:
-        started_at = datetime.utcnow().isoformat()
+        started_at = _utc_now_iso()
         _set_render_job(job_id, status="running", started_at=started_at)
 
         ffmpeg_path = shutil.which("ffmpeg")
@@ -839,7 +843,7 @@ async def _run_render_job(job_id: str, payload: RenderJobRequest):
             _set_render_job(
                 job_id,
                 status="failed",
-                finished_at=datetime.utcnow().isoformat(),
+                finished_at=_utc_now_iso(),
                 error="ffmpeg not found in PATH",
             )
             return
@@ -874,7 +878,7 @@ async def _run_render_job(job_id: str, payload: RenderJobRequest):
             _set_render_job(
                 job_id,
                 status="failed",
-                finished_at=datetime.utcnow().isoformat(),
+                finished_at=_utc_now_iso(),
                 error=f"ffmpeg failed (code={result.returncode}). Check {log_file}",
                 ffmpeg_stderr_tail=stderr_text[-1200:],
             )
@@ -893,7 +897,7 @@ async def _run_render_job(job_id: str, payload: RenderJobRequest):
         _set_render_job(
             job_id,
             status="completed",
-            finished_at=datetime.utcnow().isoformat(),
+            finished_at=_utc_now_iso(),
             output_path=str(output_file),
             output_url=uploaded_url,
             log_path=str(log_file),
@@ -902,7 +906,7 @@ async def _run_render_job(job_id: str, payload: RenderJobRequest):
         _set_render_job(
             job_id,
             status="failed",
-            finished_at=datetime.utcnow().isoformat(),
+            finished_at=_utc_now_iso(),
             error=f"renderer job exception: {job_error}",
         )
 
@@ -942,7 +946,7 @@ async def create_render_job(
         )
 
     job_id = f"render_{uuid.uuid4().hex[:12]}"
-    created_at = datetime.utcnow().isoformat()
+    created_at = _utc_now_iso()
     _set_render_job(
         job_id,
         status="queued",

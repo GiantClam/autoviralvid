@@ -9,7 +9,7 @@
 """
 
 import pytest
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 
 class TestStuckTaskCleanup:
@@ -18,7 +18,7 @@ class TestStuckTaskCleanup:
     def _make_task(self, status="submitted", updated_at=None, exec_params=None):
         """创建一个模拟任务记录."""
         if updated_at is None:
-            updated_at = datetime.utcnow().isoformat()
+            updated_at = datetime.now(UTC).replace(tzinfo=None).isoformat()
         task = {
             "id": "task-123",
             "run_id": "run-abc",
@@ -33,7 +33,7 @@ class TestStuckTaskCleanup:
 
     def test_stuck_task_detection(self):
         """TC-STUCK-01: 超过 30 分钟的任务应被识别为 stuck."""
-        now = datetime.utcnow()
+        now = datetime.now(UTC).replace(tzinfo=None)
         old_time = (now - timedelta(minutes=35)).isoformat()
         task = self._make_task(updated_at=old_time)
 
@@ -44,7 +44,7 @@ class TestStuckTaskCleanup:
 
     def test_fresh_task_not_stuck(self):
         """TC-STUCK-02: 未超时的任务不应被识别为 stuck."""
-        now = datetime.utcnow()
+        now = datetime.now(UTC).replace(tzinfo=None)
         recent_time = (now - timedelta(minutes=5)).isoformat()
         task = self._make_task(updated_at=recent_time)
 
@@ -67,7 +67,7 @@ class TestStuckTaskCleanup:
 
     def test_boundary_exactly_30_minutes(self):
         """TC-STUCK-05: 恰好 30 分钟的任务不应被视为 stuck（需 >30 min）."""
-        now = datetime.utcnow()
+        now = datetime.now(UTC).replace(tzinfo=None)
         boundary_time = (now - timedelta(minutes=30)).isoformat()
         task = self._make_task(updated_at=boundary_time)
 
@@ -80,7 +80,7 @@ class TestStuckTaskCleanup:
 
     def test_task_with_z_suffix_parsed_correctly(self):
         """TC-STUCK-06: 带 Z 后缀的 ISO 时间戳应被正确解析."""
-        now = datetime.utcnow()
+        now = datetime.now(UTC).replace(tzinfo=None)
         old_time = (now - timedelta(minutes=40)).isoformat() + "Z"
         task = self._make_task(updated_at=old_time)
 

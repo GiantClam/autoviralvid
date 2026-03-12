@@ -21,7 +21,7 @@ from fastapi import HTTPException
 # Helpers
 # ---------------------------------------------------------------------------
 
-TEST_SECRET = "test-secret-for-unit-tests"
+TEST_SECRET = "test-secret-for-unit-tests-32chars"
 
 
 def _make_token(sub: str = "user-123", email: str = "test@example.com",
@@ -76,7 +76,7 @@ class TestVerifyToken:
         import src.auth as auth_mod
         importlib.reload(auth_mod)
 
-        token = _make_token(secret="wrong-secret")
+        token = _make_token(secret="wrong-secret-for-negative-test-case")
         with pytest.raises(HTTPException) as exc_info:
             auth_mod._verify_token(token)
         assert exc_info.value.status_code == 401

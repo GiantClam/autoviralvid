@@ -21,7 +21,7 @@ export function TemplateGallery({ onSelect }: TemplateGalleryProps) {
     const [activeCategory, setActiveCategory] = useState<'all' | 'ecommerce' | 'content' | 'general'>('all');
     const [search, setSearch] = useState('');
 
-    const TEMPLATES = [
+    const templates = useMemo(() => [
         { id: 'product-ad', title: t("gallery.tplProductAd"), description: t("gallery.tplProductAdDesc"), icon: Zap, tag: t("gallery.tagHot"), tagType: 'hot' as const, gradient: 'from-orange-500 to-rose-600', category: 'ecommerce' as const },
         { id: 'beauty-review', title: t("gallery.tplBeautyReview"), description: t("gallery.tplBeautyReviewDesc"), icon: Palette, tag: t("gallery.tagEcommerce"), tagType: 'default' as const, gradient: 'from-pink-500 to-fuchsia-600', category: 'ecommerce' as const },
         { id: 'fashion-style', title: t("gallery.tplFashionStyle"), description: t("gallery.tplFashionStyleDesc"), icon: Shirt, tag: t("gallery.tagEcommerce"), tagType: 'default' as const, gradient: 'from-violet-500 to-purple-600', category: 'ecommerce' as const },
@@ -34,7 +34,7 @@ export function TemplateGallery({ onSelect }: TemplateGalleryProps) {
         { id: 'funny-skit', title: t("gallery.tplFunnySkit"), description: t("gallery.tplFunnySkitDesc"), icon: Laugh, tag: t("gallery.tagContent"), tagType: 'default' as const, gradient: 'from-lime-500 to-green-600', category: 'content' as const },
         { id: 'travel-vlog', title: t("gallery.tplTravelVlog"), description: t("gallery.tplTravelVlogDesc"), icon: Plane, tag: t("gallery.tagContent"), tagType: 'default' as const, gradient: 'from-rose-500 to-orange-600', category: 'content' as const },
         { id: 'tutorial', title: t("gallery.tplTutorial"), description: t("gallery.tplTutorialDesc"), icon: GraduationCap, tag: t("gallery.tagContent"), tagType: 'default' as const, gradient: 'from-blue-500 to-emerald-600', category: 'content' as const },
-    ];
+    ], [t]);
 
     const CATEGORIES: { key: 'ecommerce' | 'content' | 'general'; label: string; icon: React.ElementType; description: string }[] = [
         { key: 'ecommerce', label: t("gallery.catEcommerce"), icon: ShoppingBag, description: "Product showcases & reviews" },
@@ -57,7 +57,7 @@ export function TemplateGallery({ onSelect }: TemplateGalleryProps) {
 
     const visibleTemplates = useMemo(() => {
         const q = search.trim().toLowerCase();
-        return TEMPLATES.filter((tpl) => {
+        return templates.filter((tpl) => {
             const byCategory = activeCategory === 'all' || tpl.category === activeCategory;
             const bySearch =
                 q.length === 0 ||
@@ -66,7 +66,7 @@ export function TemplateGallery({ onSelect }: TemplateGalleryProps) {
                 tpl.tag.toLowerCase().includes(q);
             return byCategory && bySearch;
         });
-    }, [TEMPLATES, activeCategory, search]);
+    }, [activeCategory, search, templates]);
 
     return (
         <div className="flex-1 overflow-y-auto bg-[#050508] text-white relative">

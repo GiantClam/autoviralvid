@@ -2,7 +2,7 @@
 
 import React, { useMemo, useState } from 'react';
 import { Player } from '@remotion/player';
-import { Maximize2, Minimize2, Volume2, VolumeX, Download, Play, Pause } from 'lucide-react';
+import { Maximize2, Minimize2, Volume2, VolumeX, Download, Play } from 'lucide-react';
 import { useProject } from '@/contexts/ProjectContext';
 import VideoTemplate, {
   type VideoTemplateProps,

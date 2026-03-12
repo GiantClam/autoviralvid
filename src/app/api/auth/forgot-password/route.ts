@@ -33,8 +33,6 @@ export async function POST(req: NextRequest) {
 
         // Generate a reset token (valid 1 hour)
         const token = randomBytes(32).toString("hex");
-        const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
-
         // Store the token — uses a simple field on the user record.
         // In production you'd want a separate password_resets table.
         await prisma.user.update({
