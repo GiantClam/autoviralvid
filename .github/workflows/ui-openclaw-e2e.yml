@@ -9,8 +9,10 @@ on:
         default: openclaw
         type: choice
         options:
+          - all
           - openclaw
           - product-ad
+          - brand-story-video
           - travel-vlog-media
           - knowledge-edu
 
@@ -59,10 +61,20 @@ jobs:
       - name: Run UI render E2E
         run: npm run test:ui:${{ inputs.scenario }}
 
+      - name: Compute artifact path
+        if: always()
+        shell: bash
+        run: |
+          if [ "${{ inputs.scenario }}" = "all" ]; then
+            echo "UI_ARTIFACT_PATH=test_outputs/ui_all" >> "$GITHUB_ENV"
+          else
+            echo "UI_ARTIFACT_PATH=test_outputs/ui_${{ inputs.scenario }}" >> "$GITHUB_ENV"
+          fi
+
       - name: Upload UI screenshots
         if: always()
         uses: actions/upload-artifact@v6
         with:
           name: ui-${{ inputs.scenario }}-screenshots
-          path: test_outputs/ui_${{ inputs.scenario }}
+          path: ${{ env.UI_ARTIFACT_PATH }}
           if-no-files-found: ignore

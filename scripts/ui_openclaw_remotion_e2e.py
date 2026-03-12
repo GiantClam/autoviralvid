@@ -18,6 +18,7 @@ SCENARIO = os.getenv("UI_E2E_SCENARIO", "openclaw").strip().lower()
 FIXTURE_URLS = {
     "test_dh_image_2026.png": "https://s.autoviralvid.com/test_dh_image_2026.png",
     "test_dh_audio_20s_20260310.mp3": "https://s.autoviralvid.com/uploads/test_dh_audio_20s_20260310.mp3",
+    "openclaw_intro_fixture.mp4": "https://s.autoviralvid.com/renders/openclaw-ui-1773321290/OpenClaw_UI_Introduction_render_5b05897bdc0c.mp4",
 }
 
 
@@ -192,6 +193,77 @@ SCENARIOS = {
                     }
                 ],
                 "threadId": "product-ad-ui-e2e",
+            }
+        },
+    },
+    "brand-story-video": {
+        "template_matchers": ["Brand Story", "品牌故事"],
+        "theme": "Brand story reel anchored by a hero video clip and concise positioning overlays.",
+        "expected_duration": 16.0,
+        "expected_width": 1920,
+        "expected_height": 1080,
+        "expected_layer_count": 3,
+        "expected_audio_track_count": 0,
+        "payload": {
+            "project": {
+                "name": "BrandStory Video UI Reel",
+                "width": 1920,
+                "height": 1080,
+                "duration": 16,
+                "fps": 30,
+                "backgroundColor": "#060914",
+                "tracks": [
+                    {
+                        "id": 1,
+                        "type": "video",
+                        "name": "Hero Clip",
+                        "items": [
+                            {
+                                "id": "brand-hero-video",
+                                "type": "video",
+                                "content": "fixture://openclaw_intro_fixture.mp4",
+                                "startTime": 0,
+                                "duration": 16,
+                                "trackId": 1,
+                                "name": "Hero Video",
+                            }
+                        ],
+                    },
+                    {
+                        "id": 2,
+                        "type": "overlay",
+                        "name": "Positioning",
+                        "items": [
+                            {
+                                "id": "brand-story-title",
+                                "type": "text",
+                                "content": "Operational Storytelling",
+                                "startTime": 0,
+                                "duration": 5,
+                                "trackId": 2,
+                                "name": "Title",
+                                "style": {"fontSize": 76, "color": "#f8fafc", "x": 50, "y": 16},
+                            },
+                            {
+                                "id": "brand-story-caption",
+                                "type": "text",
+                                "content": "One video layer, one clear message, one polished export from the same UI flow.",
+                                "startTime": 6,
+                                "duration": 7,
+                                "trackId": 2,
+                                "name": "Caption",
+                                "style": {
+                                    "fontSize": 34,
+                                    "color": "#dbeafe",
+                                    "x": 50,
+                                    "y": 82,
+                                    "backgroundColor": "#111827",
+                                },
+                            },
+                        ],
+                    },
+                ],
+                "threadId": "brand-story-video-ui-e2e",
             }
         },
     },

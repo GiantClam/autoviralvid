@@ -14,6 +14,13 @@ RENDERER_PORT = int(os.getenv("UI_E2E_RENDERER_PORT", "8124"))
 FRONTEND_BASE = f"http://127.0.0.1:{FRONTEND_PORT}"
 RENDERER_BASE = f"http://127.0.0.1:{RENDERER_PORT}"
 SCENARIO = os.getenv("UI_E2E_SCENARIO", "openclaw")
+ALL_SCENARIOS = [
+    "openclaw",
+    "product-ad",
+    "brand-story-video",
+    "travel-vlog-media",
+    "knowledge-edu",
+]
 
 
 def wait_for_port(port: int, timeout_seconds: int) -> None:
@@ -81,19 +88,27 @@ def main() -> int:
         wait_for_port(FRONTEND_PORT, 60)
         time.sleep(3)
 
-        result = subprocess.run(
-            [sys.executable, str(ROOT / "scripts" / "ui_openclaw_remotion_e2e.py")],
-            cwd=str(ROOT),
-            env={
-                **os.environ,
-                "FRONTEND_BASE": FRONTEND_BASE,
-                "RENDERER_BASE": RENDERER_BASE,
-                "UI_E2E_SCENARIO": SCENARIO,
-                "UI_E2E_OUTPUT_DIR": os.getenv("UI_E2E_OUTPUT_DIR", f"test_outputs/ui_{SCENARIO}"),
-            },
-            check=False,
-        )
-        return result.returncode
+        scenarios = ALL_SCENARIOS if SCENARIO == "all" else [SCENARIO]
+        for scenario_name in scenarios:
+            output_dir = os.getenv(
+                "UI_E2E_OUTPUT_DIR",
+                f"test_outputs/ui_{scenario_name}" if SCENARIO != "all" else f"test_outputs/ui_all/{scenario_name}",
+            )
+            result = subprocess.run(
+                [sys.executable, str(ROOT / "scripts" / "ui_openclaw_remotion_e2e.py")],
+                cwd=str(ROOT),
+                env={
+                    **os.environ,
+                    "FRONTEND_BASE": FRONTEND_BASE,
+                    "RENDERER_BASE": RENDERER_BASE,
+                    "UI_E2E_SCENARIO": scenario_name,
+                    "UI_E2E_OUTPUT_DIR": output_dir,
+                },
+                check=False,
+            )
+            if result.returncode != 0:
+                return result.returncode
+        return 0
     finally:
         stop_process(frontend)
         stop_process(backend)
