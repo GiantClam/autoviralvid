@@ -83,6 +83,21 @@ def probe_output_video(output_path: Path) -> dict:
     return {"width": width, "height": height, "duration": duration}
 
 
+def verify_output_url(page, output_url: str) -> dict:
+    response = page.request.head(output_url)
+    if not response.ok:
+        raise RuntimeError(f"Output URL is not reachable: HTTP {response.status} -> {output_url}")
+
+    content_type = response.headers.get("content-type", "")
+    if "video/mp4" not in content_type.lower():
+        raise RuntimeError(f"Unexpected output content-type: {content_type}")
+
+    return {
+        "status": response.status,
+        "content_type": content_type,
+    }
+
+
 def main() -> int:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -243,7 +258,9 @@ def main() -> int:
 
         output_path = Path(str(final_status.get("output_path") or ""))
         probe = probe_output_video(output_path)
+        url_check = verify_output_url(page, str(final_status["output_url"]))
         print(json.dumps({"probe": probe}, indent=2))
+        print(json.dumps({"output_url_check": url_check}, indent=2))
 
         page.screenshot(path=str(OUTPUT_DIR / "03-render-submitted.png"), full_page=True)
         print(f"[ui] Render completed: {final_status['output_url']}")
