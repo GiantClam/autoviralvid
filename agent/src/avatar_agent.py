@@ -1,6 +1,4 @@
-import os
 import logging
-import asyncio
 from typing import Dict, Any, Optional
 from src.generators.base import BaseGenerator
 
@@ -11,7 +9,6 @@ class AvatarAgent:
     Agent specialized in Digital Human (Avatar) synthesis.
     """
     def __init__(self, provider: Optional[BaseGenerator] = None):
-        # In a real environment, we'd have a specific Avatar generator
         self.provider = provider
 
     async def synthesize(self, video_url: str, audio_url: str, **kwargs) -> Dict[str, Any]:
@@ -19,15 +16,25 @@ class AvatarAgent:
         Merges a video of a person with a specific audio track to create a digital human performance.
         """
         logger.info(f"[AvatarAgent] Synthesizing avatar performance for video: {video_url}")
-        
-        # Placeholder for actual synthesis API call
-        # For now, we simulate a fast success or return a mock result
-        await asyncio.sleep(2)
-        
+
+        if not self.provider:
+            raise RuntimeError(
+                "Avatar synthesis provider is not configured. Mock behavior is disabled."
+            )
+
+        result = await self.provider.generate(
+            video_url=video_url,
+            audio_url=audio_url,
+            **kwargs,
+        )
+
+        if result.get("status") != "success" or not result.get("url"):
+            raise RuntimeError(f"Avatar synthesis failed: {result}")
+
         return {
             "status": "success",
-            "avatar_video_url": video_url, # Mock: just return original for now
-            "message": "Avatar synthesis completed"
+            "avatar_video_url": result["url"],
+            "message": "Avatar synthesis completed",
         }
 
 async def avatar_node(state: Dict[str, Any]):

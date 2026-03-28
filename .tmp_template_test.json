@@ -1,0 +1,13 @@
+﻿{
+  "title": "模板自动命中测试",
+  "theme": {"palette": "auto", "style": "auto"},
+  "slides": [
+    {"slide_type": "cover", "layout_grid": "hero_1", "title": "2026年Dify产品技术架构与核心能力深度剖析", "blocks": [{"block_type": "title", "card_id": "t1", "content": "2026年Dify产品技术架构与核心能力深度剖析"}]},
+    {"slide_type": "content", "layout_grid": "split_2", "title": "分层架构设计：从数据层到编排层", "blocks": [{"block_type": "title", "card_id": "t2", "content": "分层架构设计"}, {"block_type": "list", "card_id": "l2", "content": "智能编排;标准化RAG;基础底座"}, {"block_type": "image", "card_id": "i2", "content": {"title": "architecture"}}]},
+    {"slide_type": "content", "layout_grid": "asymmetric_2", "title": "核心硬件：AIoT智能家居与人车家全生态闭环", "blocks": [{"block_type": "title", "card_id": "t3", "content": "AIoT生态闭环"}, {"block_type": "list", "card_id": "l3", "content": "人车家互联;跨端协同;生态闭环"}, {"block_type": "kpi", "card_id": "k3", "content": "连接设备", "data": {"number": 861, "unit": "M", "trend": 18}}]},
+    {"slide_type": "content", "layout_grid": "grid_4", "title": "可视化画布：像搭积木一样构建AI逻辑", "blocks": [{"block_type": "title", "card_id": "t4", "content": "可视化画布"}, {"block_type": "list", "card_id": "l4", "content": "原子组件;逻辑编排;生产可靠"}, {"block_type": "image", "card_id": "i4", "content": {"title": "workflow"}}]},
+    {"slide_type": "content", "layout_grid": "timeline", "title": "全链路LLMOps：覆盖开发、调试至监控的生命周期", "blocks": [{"block_type": "title", "card_id": "t5", "content": "全链路LLMOps"}, {"block_type": "list", "card_id": "l5", "content": "敏捷开发;可观测监控;闭环优化;生态集成"}, {"block_type": "chart", "card_id": "c5", "content": "监控图", "data": {"labels": ["Q1", "Q2", "Q3"], "datasets": [{"label": "trace", "data": [52, 68, 85]}]}}]},
+    {"slide_type": "content", "layout_grid": "grid_3", "title": "住宿策略：兼顾舒适度与交通便捷性的商圈推荐", "blocks": [{"block_type": "title", "card_id": "t6", "content": "住宿策略"}, {"block_type": "list", "card_id": "l6", "content": "紧邻地铁;商务潮流;性价比"}, {"block_type": "image", "card_id": "i6", "content": {"title": "hotel"}}]},
+    {"slide_type": "summary", "layout_grid": "hero_1", "title": "总结", "blocks": [{"block_type": "title", "card_id": "t7", "content": "总结"}, {"block_type": "list", "card_id": "l7", "content": "价值跃迁;机制先行;持续优化"}]}
+  ]
+}

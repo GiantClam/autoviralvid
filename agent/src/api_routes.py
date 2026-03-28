@@ -11,7 +11,7 @@ import os
 import uuid
 import json
 import logging
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from typing import List, Optional, Dict, Any
 
 from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
@@ -85,7 +85,7 @@ def _ensure_queue_worker(reason: str) -> None:
 
 
 def _utc_now_iso() -> str:
-    return datetime.now(UTC).isoformat()
+    return datetime.now(timezone.utc).isoformat()
 
 
 def _compute_task_summary(tasks: List[Dict[str, Any]]) -> Dict[str, Any]:

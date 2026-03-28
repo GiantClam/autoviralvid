@@ -1,0 +1,349 @@
+{
+  "layout_defaults": {
+    "hero_1": "hero_tech_cover",
+    "split_2": "split_media_dark",
+    "asymmetric_2": "split_media_dark",
+    "grid_3": "dashboard_dark",
+    "grid_4": "neural_blueprint_light",
+    "bento_5": "bento_mosaic_dark",
+    "bento_6": "dashboard_dark",
+    "timeline": "ops_lifecycle_light"
+  },
+  "subtype_overrides": {
+    "split_media_dark": {
+      "content": "comparison",
+      "data": "comparison"
+    },
+    "bento_2x2_dark": {
+      "content": "table"
+    },
+    "dashboard_dark": {
+      "content": "data"
+    },
+    "architecture_dark_panel": {
+      "content": "comparison"
+    },
+    "neural_blueprint_light": {
+      "content": "content"
+    },
+    "ops_lifecycle_light": {
+      "content": "table"
+    },
+    "consulting_warm_light": {
+      "content": "comparison"
+    },
+    "ecosystem_orange_dark": {
+      "content": "data"
+    }
+  },
+  "keyword_rules": [
+    {
+      "template": "architecture_dark_panel",
+      "keywords": ["architecture", "orchestration", "sandbox", "dsl", "workflow engine", "编排", "架构"]
+    },
+    {
+      "template": "neural_blueprint_light",
+      "keywords": ["canvas", "blueprint", "workflow", "node editor", "画布", "蓝图"]
+    },
+    {
+      "template": "ops_lifecycle_light",
+      "keywords": ["llmops", "observability", "opentelemetry", "langsmith", "langfuse", "监控", "可观测"]
+    },
+    {
+      "template": "ecosystem_orange_dark",
+      "keywords": ["iot", "ecosystem", "hardware", "platform", "生态", "硬件"]
+    },
+    {
+      "template": "consulting_warm_light",
+      "keywords": ["consulting", "recommendation", "business", "strategy", "建议", "策略"]
+    },
+    {
+      "template": "bento_mosaic_dark",
+      "keywords": ["showcase", "mosaic", "portfolio", "展示", "拼贴"]
+    }
+  ],
+  "contract_profiles": {
+    "default": {
+      "required_block_types": ["title"],
+      "required_one_of_groups": [["body", "list", "quote", "icon_text", "workflow"]],
+      "min_text_blocks": 2,
+      "min_visual_blocks": 0,
+      "visual_anchor_types": ["image", "chart", "kpi", "workflow", "diagram"],
+      "require_emphasis_signal": true,
+      "forbid_duplicate_text": true
+    },
+    "cover_meta_required": {
+      "required_block_types": ["title"],
+      "required_one_of_groups": [["subtitle", "body", "quote"]],
+      "min_text_blocks": 1,
+      "min_visual_blocks": 0,
+      "visual_anchor_types": ["image", "diagram"],
+      "require_emphasis_signal": false,
+      "forbid_duplicate_text": false
+    },
+    "visual_anchor_required": {
+      "required_block_types": ["title"],
+      "required_one_of_groups": [["body", "list", "workflow"]],
+      "min_text_blocks": 2,
+      "min_visual_blocks": 1,
+      "visual_anchor_types": ["image", "chart", "kpi", "workflow", "diagram"],
+      "require_emphasis_signal": true,
+      "forbid_duplicate_text": true
+    },
+    "chart_or_kpi_required": {
+      "required_block_types": ["title"],
+      "required_one_of_groups": [["body", "list"], ["chart", "kpi"]],
+      "min_text_blocks": 2,
+      "min_visual_blocks": 1,
+      "visual_anchor_types": ["chart", "kpi", "table"],
+      "require_emphasis_signal": true,
+      "forbid_duplicate_text": true
+    },
+    "hierarchy_blocks_required": {
+      "required_block_types": ["title"],
+      "required_one_of_groups": [["body", "list"], ["workflow", "diagram", "icon_text"]],
+      "min_text_blocks": 2,
+      "min_visual_blocks": 1,
+      "visual_anchor_types": ["workflow", "diagram", "image"],
+      "require_emphasis_signal": true,
+      "forbid_duplicate_text": true
+    },
+    "kpi_or_diagram_required": {
+      "required_block_types": ["title"],
+      "required_one_of_groups": [["body", "list"], ["kpi", "diagram", "chart"]],
+      "min_text_blocks": 2,
+      "min_visual_blocks": 1,
+      "visual_anchor_types": ["kpi", "diagram", "chart", "image"],
+      "require_emphasis_signal": true,
+      "forbid_duplicate_text": true
+    },
+    "image_or_list_required": {
+      "required_block_types": ["title"],
+      "required_one_of_groups": [["body", "list"], ["image", "list"]],
+      "min_text_blocks": 2,
+      "min_visual_blocks": 0,
+      "visual_anchor_types": ["image", "chart", "kpi", "workflow"],
+      "require_emphasis_signal": true,
+      "forbid_duplicate_text": true
+    }
+  },
+  "quality_profiles": {
+    "default": {
+      "min_typography_levels": 2,
+      "min_content_blocks": 2,
+      "blank_area_max_ratio": 0.45,
+      "chart_min_font_size": 9,
+      "require_emphasis_signal": true,
+      "forbid_duplicate_text": true,
+      "forbid_title_echo": true,
+      "require_image_url": true,
+      "layout_max_type_ratio": 0.45,
+      "layout_max_adjacent_repeat": 1,
+      "layout_min_slide_count": 6,
+      "layout_min_variety_long_deck": 4,
+      "layout_long_deck_threshold": 10,
+      "enforce_terminal_slide_types": false
+    },
+    "high_density_consulting": {
+      "min_typography_levels": 2,
+      "min_content_blocks": 3,
+      "blank_area_max_ratio": 0.35,
+      "chart_min_font_size": 10,
+      "require_emphasis_signal": true,
+      "forbid_duplicate_text": true,
+      "forbid_title_echo": true,
+      "require_image_url": true,
+      "layout_max_type_ratio": 0.4,
+      "layout_max_adjacent_repeat": 1,
+      "layout_min_slide_count": 6,
+      "layout_min_variety_long_deck": 5,
+      "layout_long_deck_threshold": 9,
+      "enforce_terminal_slide_types": true
+    },
+    "lenient_draft": {
+      "min_typography_levels": 1,
+      "min_content_blocks": 1,
+      "blank_area_max_ratio": 0.6,
+      "chart_min_font_size": 8,
+      "require_emphasis_signal": false,
+      "forbid_duplicate_text": false,
+      "forbid_title_echo": false,
+      "require_image_url": false,
+      "layout_max_type_ratio": 0.6,
+      "layout_max_adjacent_repeat": 2,
+      "layout_min_slide_count": 8,
+      "layout_min_variety_long_deck": 3,
+      "layout_long_deck_threshold": 12,
+      "enforce_terminal_slide_types": false
+    }
+  },
+  "templates": {
+    "hero_dark": {
+      "skill_profile": "cover-default",
+      "hardness_profile": "balanced",
+      "schema_profile": "ppt-template/v2-hero",
+      "contract_profile": "default",
+      "quality_profile": "default",
+      "capabilities": {
+        "supported_slide_types": ["cover", "summary", "divider", "toc"],
+        "supported_layouts": ["hero_1"],
+        "supported_block_types": ["title", "subtitle", "body", "quote", "list"],
+        "density_range": { "min": "sparse", "max": "balanced", "recommended": "sparse" },
+        "visual_anchor_capacity": 0,
+        "data_block_capacity": 0
+      }
+    },
+    "hero_tech_cover": {
+      "skill_profile": "cover-storytelling",
+      "hardness_profile": "strict",
+      "schema_profile": "ppt-template/v2-hero-tech",
+      "contract_profile": "cover_meta_required",
+      "quality_profile": "default",
+      "capabilities": {
+        "supported_slide_types": ["cover", "summary", "divider"],
+        "supported_layouts": ["hero_1"],
+        "supported_block_types": ["title", "subtitle", "body", "quote", "image"],
+        "density_range": { "min": "sparse", "max": "balanced", "recommended": "balanced" },
+        "visual_anchor_capacity": 1,
+        "data_block_capacity": 0
+      }
+    },
+    "bento_2x2_dark": {
+      "skill_profile": "bento-general",
+      "hardness_profile": "balanced",
+      "schema_profile": "ppt-template/v2-bento",
+      "contract_profile": "default",
+      "quality_profile": "high_density_consulting",
+      "capabilities": {
+        "supported_slide_types": ["content", "data", "comparison"],
+        "supported_layouts": ["grid_3", "grid_4", "bento_5", "bento_6"],
+        "supported_block_types": ["title", "body", "list", "kpi", "chart", "image", "icon_text", "table"],
+        "density_range": { "min": "balanced", "max": "dense", "recommended": "dense" },
+        "visual_anchor_capacity": 2,
+        "data_block_capacity": 2
+      }
+    },
+    "bento_mosaic_dark": {
+      "skill_profile": "bento-showcase",
+      "hardness_profile": "strict",
+      "schema_profile": "ppt-template/v2-bento-mosaic",
+      "contract_profile": "visual_anchor_required",
+      "quality_profile": "high_density_consulting",
+      "capabilities": {
+        "supported_slide_types": ["content", "showcase"],
+        "supported_layouts": ["bento_5", "bento_6", "grid_4"],
+        "supported_block_types": ["title", "body", "list", "image", "kpi", "icon_text"],
+        "density_range": { "min": "balanced", "max": "dense", "recommended": "dense" },
+        "visual_anchor_capacity": 3,
+        "data_block_capacity": 1
+      }
+    },
+    "split_media_dark": {
+      "skill_profile": "comparison-general",
+      "hardness_profile": "balanced",
+      "schema_profile": "ppt-template/v2-split-media",
+      "contract_profile": "default",
+      "quality_profile": "default",
+      "capabilities": {
+        "supported_slide_types": ["content", "comparison", "data"],
+        "supported_layouts": ["split_2", "asymmetric_2"],
+        "supported_block_types": ["title", "body", "list", "quote", "image", "kpi", "chart", "workflow"],
+        "density_range": { "min": "balanced", "max": "dense", "recommended": "balanced" },
+        "visual_anchor_capacity": 1,
+        "data_block_capacity": 1
+      }
+    },
+    "dashboard_dark": {
+      "skill_profile": "dashboard-data",
+      "hardness_profile": "balanced",
+      "schema_profile": "ppt-template/v2-dashboard",
+      "contract_profile": "chart_or_kpi_required",
+      "quality_profile": "high_density_consulting",
+      "capabilities": {
+        "supported_slide_types": ["content", "data", "comparison"],
+        "supported_layouts": ["grid_3", "grid_4", "split_2", "bento_6"],
+        "supported_block_types": ["title", "body", "list", "chart", "kpi", "table", "image", "workflow"],
+        "density_range": { "min": "balanced", "max": "dense", "recommended": "dense" },
+        "visual_anchor_capacity": 2,
+        "data_block_capacity": 3
+      }
+    },
+    "architecture_dark_panel": {
+      "skill_profile": "architecture-explainer",
+      "hardness_profile": "strict",
+      "schema_profile": "ppt-template/v2-architecture-panel",
+      "contract_profile": "hierarchy_blocks_required",
+      "quality_profile": "high_density_consulting",
+      "capabilities": {
+        "supported_slide_types": ["content", "comparison", "workflow"],
+        "supported_layouts": ["split_2", "asymmetric_2", "grid_3"],
+        "supported_block_types": ["title", "body", "list", "workflow", "diagram", "icon_text", "image"],
+        "density_range": { "min": "balanced", "max": "dense", "recommended": "balanced" },
+        "visual_anchor_capacity": 2,
+        "data_block_capacity": 1
+      }
+    },
+    "ecosystem_orange_dark": {
+      "skill_profile": "ecosystem-diagram",
+      "hardness_profile": "strict",
+      "schema_profile": "ppt-template/v2-ecosystem-orange",
+      "contract_profile": "kpi_or_diagram_required",
+      "quality_profile": "high_density_consulting",
+      "capabilities": {
+        "supported_slide_types": ["content", "data", "comparison"],
+        "supported_layouts": ["grid_3", "grid_4", "split_2"],
+        "supported_block_types": ["title", "body", "list", "kpi", "diagram", "chart", "image"],
+        "density_range": { "min": "balanced", "max": "dense", "recommended": "balanced" },
+        "visual_anchor_capacity": 2,
+        "data_block_capacity": 2
+      }
+    },
+    "neural_blueprint_light": {
+      "skill_profile": "workflow-blueprint",
+      "hardness_profile": "strict",
+      "schema_profile": "ppt-template/v2-neural-blueprint",
+      "contract_profile": "visual_anchor_required",
+      "quality_profile": "high_density_consulting",
+      "capabilities": {
+        "supported_slide_types": ["content", "workflow", "comparison"],
+        "supported_layouts": ["grid_4", "split_2", "asymmetric_2"],
+        "supported_block_types": ["title", "body", "list", "workflow", "diagram", "image", "kpi"],
+        "density_range": { "min": "balanced", "max": "dense", "recommended": "dense" },
+        "visual_anchor_capacity": 2,
+        "data_block_capacity": 1,
+        "requires_image_asset": true
+      }
+    },
+    "ops_lifecycle_light": {
+      "skill_profile": "ops-lifecycle",
+      "hardness_profile": "strict",
+      "schema_profile": "ppt-template/v2-ops-lifecycle",
+      "contract_profile": "chart_or_kpi_required",
+      "quality_profile": "high_density_consulting",
+      "capabilities": {
+        "supported_slide_types": ["content", "data", "timeline"],
+        "supported_layouts": ["timeline", "grid_3", "split_2"],
+        "supported_block_types": ["title", "body", "list", "chart", "kpi", "table", "workflow", "image"],
+        "density_range": { "min": "balanced", "max": "dense", "recommended": "dense" },
+        "visual_anchor_capacity": 2,
+        "data_block_capacity": 3
+      }
+    },
+    "consulting_warm_light": {
+      "skill_profile": "consulting-recommendation",
+      "hardness_profile": "strict",
+      "schema_profile": "ppt-template/v2-consulting-warm",
+      "contract_profile": "image_or_list_required",
+      "quality_profile": "high_density_consulting",
+      "capabilities": {
+        "supported_slide_types": ["content", "comparison", "summary"],
+        "supported_layouts": ["split_2", "grid_3", "asymmetric_2"],
+        "supported_block_types": ["title", "body", "list", "quote", "kpi", "chart", "image", "table"],
+        "density_range": { "min": "balanced", "max": "dense", "recommended": "dense" },
+        "visual_anchor_capacity": 1,
+        "data_block_capacity": 2,
+        "requires_image_asset": true
+      }
+    }
+  }
+}

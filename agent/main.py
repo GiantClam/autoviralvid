@@ -9,7 +9,7 @@ import shutil
 import subprocess
 from pathlib import Path
 from threading import Lock
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request, BackgroundTasks, HTTPException, Depends
@@ -27,11 +27,11 @@ from typing import Dict, Any, Optional, List, Literal
 _ = load_dotenv()
 _ = load_dotenv("../.env.local", override=False)
 
-# 统一日志配置
+# 缁熶竴鏃ュ織閰嶇疆
 logger = logging.getLogger("workflow")
 logger.setLevel(logging.INFO)
 
-# Supabase 客户端
+# Supabase 瀹㈡埛绔?
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv(
     "SUPABASE_SERVICE_KEY"
@@ -42,7 +42,7 @@ supabase = (
 
 
 def _utc_now_iso() -> str:
-    return datetime.now(UTC).isoformat()
+    return datetime.now(timezone.utc).isoformat()
 
 
 # Lifespan event handler
@@ -74,7 +74,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="AutoViralVid API",
     description=(
-        "Backend API for AutoViralVid — AI-powered short video creation platform.\n\n"
+        "Backend API for AutoViralVid 鈥?AI-powered short video creation platform.\n\n"
         "## Key Features\n"
         "- **Project Management**: Create and manage video projects with templates\n"
         "- **AI Storyboard Generation**: Generate storyboards from themes using LLMs\n"
@@ -91,7 +91,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS — only allow configured frontend origins (no wildcard in production)
+# CORS 鈥?only allow configured frontend origins (no wildcard in production)
 _cors_raw = os.getenv("CORS_ORIGIN", "http://localhost:3000")
 _cors_origins = [o.strip() for o in _cors_raw.split(",") if o.strip()]
 if not _cors_origins:
@@ -106,16 +106,31 @@ app.add_middleware(
     expose_headers=["X-Request-Id", "X-RateLimit-Limit", "X-RateLimit-Remaining"],
 )
 
-# Rate limiting — default 120 requests/minute per IP
+# Rate limiting 鈥?default 120 requests/minute per IP
 _rate_limit_rpm = int(os.getenv("RATE_LIMIT_RPM", "120"))
 app.add_middleware(RateLimitMiddleware, rpm=_rate_limit_rpm)
 
 # Register v1 REST API routes (form-driven workflow)
 app.include_router(api_v1_router)
 
+# Register PPT routes (Feature A: PPT generation + Feature B: PPT/PDF video)
+from src.ppt_routes import router as ppt_router
+
+app.include_router(ppt_router)
+
+# Register Premium routes (鍟嗕笟绾ц棰戠粍浠?
+from src.premium_routes import router as premium_router
+
+app.include_router(premium_router)
+
+# Register V7 routes (concurrent workflow + MiniMax unified output)
+from src.v7_routes import router as v7_router
+
+app.include_router(v7_router)
+
 
 # ---------------------------------------------------------------------------
-# Global exception handlers — return consistent JSON error envelopes
+# Global exception handlers 鈥?return consistent JSON error envelopes
 # ---------------------------------------------------------------------------
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
@@ -146,7 +161,7 @@ async def http_exception_handler(_request: Request, exc: HTTPException):
 
 @app.exception_handler(Exception)
 async def generic_exception_handler(_request: Request, exc: Exception):
-    """Catch-all for unhandled server errors — never leak tracebacks."""
+    """Catch-all for unhandled server errors 鈥?never leak tracebacks."""
     logger.error(f"[unhandled] {exc}", exc_info=True)
     return JSONResponse(
         status_code=500,
@@ -1030,3 +1045,4 @@ def main():
 warnings.filterwarnings("ignore", category=UserWarning, module="pydantic")
 if __name__ == "__main__":
     main()
+

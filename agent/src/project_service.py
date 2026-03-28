@@ -629,12 +629,12 @@ class ProjectService:
             logger.exception(f"[submit_videos] Failed: {exc}")
             return [{"error": str(exc)}]
 
-    # 鈹€鈹€ 4b. submit_digital_human 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+    # -- 4b. submit_digital_human -------------------------------------------
 
     async def submit_digital_human(self, run_id: str) -> List[Dict[str, Any]]:
         """Submit digital human video generation task(s).
 
-        Digital human flow skips storyboard/image generation 鈥?the user directly
+        Digital human flow skips storyboard/image generation - the user directly
         provides a person image and audio. For short audio (<= 45s), a single
         task is created. For long audio (up to 30 min), the audio is
         automatically split into segments at silence points, with each segment

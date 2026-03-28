@@ -119,6 +119,45 @@ class RunningHubConfig:
 
 
 @dataclass
+class PPTPipelineConfig:
+    """Configuration for PPT export/retry/render consistency behavior."""
+
+    export_channel: str = field(
+        default_factory=lambda: os.getenv("PPT_EXPORT_CHANNEL", "local")
+    )
+    generator_mode: str = field(
+        default_factory=lambda: os.getenv("PPT_GENERATOR_MODE", "official")
+    )
+    allow_legacy_mode: bool = field(
+        default_factory=lambda: str(os.getenv("PPT_ALLOW_LEGACY_MODE", "false")).strip().lower() not in {"0", "false", "no", "off"}
+    )
+    enable_legacy_fallback: bool = field(
+        default_factory=lambda: str(os.getenv("PPT_ENABLE_LEGACY_FALLBACK", "false")).strip().lower() not in {"0", "false", "no", "off"}
+    )
+    visual_priority: bool = field(
+        default_factory=lambda: str(os.getenv("PPT_VISUAL_PRIORITY", "true")).strip().lower() not in {"0", "false", "no", "off"}
+    )
+    visual_preset: str = field(
+        default_factory=lambda: os.getenv("PPT_VISUAL_PRESET", "tech_cinematic")
+    )
+    visual_density: str = field(
+        default_factory=lambda: os.getenv("PPT_VISUAL_DENSITY", "balanced")
+    )
+    retry_enabled: bool = field(
+        default_factory=lambda: str(os.getenv("PPT_RETRY_ENABLED", "true")).strip().lower() not in {"0", "false", "no", "off"}
+    )
+    partial_retry_enabled: bool = field(
+        default_factory=lambda: str(os.getenv("PPT_PARTIAL_RETRY_ENABLED", "true")).strip().lower() not in {"0", "false", "no", "off"}
+    )
+    retry_max_attempts: int = field(
+        default_factory=lambda: int(os.getenv("PPT_RETRY_MAX_ATTEMPTS", "3"))
+    )
+    video_base_mode: str = field(
+        default_factory=lambda: os.getenv("PPT_VIDEO_BASE_MODE", "ppt_image_slideshow")
+    )
+
+
+@dataclass
 class AppConfig:
     """Main application configuration."""
 
@@ -126,6 +165,7 @@ class AppConfig:
     video_queue: VideoQueueConfig = field(default_factory=VideoQueueConfig)
     workflow: WorkflowConfig = field(default_factory=WorkflowConfig)
     runninghub: RunningHubConfig = field(default_factory=RunningHubConfig)
+    ppt_pipeline: PPTPipelineConfig = field(default_factory=PPTPipelineConfig)
 
     def validate(self) -> list[str]:
         """
@@ -158,6 +198,15 @@ class AppConfig:
 
         if self.workflow.default_clip_duration <= 0:
             errors.append("WORKFLOW_CLIP_DURATION must be positive")
+
+        if self.ppt_pipeline.retry_max_attempts < 1:
+            errors.append("PPT_RETRY_MAX_ATTEMPTS must be >= 1")
+        if str(self.ppt_pipeline.export_channel).strip().lower() not in {"local", "remote", "auto"}:
+            errors.append("PPT_EXPORT_CHANNEL must be local, remote, or auto")
+        if self.ppt_pipeline.generator_mode not in {"official", "legacy"}:
+            errors.append("PPT_GENERATOR_MODE must be official or legacy")
+        if self.ppt_pipeline.visual_density not in {"sparse", "balanced", "dense"}:
+            errors.append("PPT_VISUAL_DENSITY must be sparse, balanced, or dense")
 
         return errors
 

@@ -91,12 +91,7 @@ class SkillsRegistry:
         except ImportError as e:
             logger.warning(f"Failed to import RunningHubAdapter: {e}")
 
-        try:
-            from .adapters.mock import MockAdapter
-            self._adapter_classes["seedance"] = MockAdapter
-            self._adapter_classes["mock"] = MockAdapter
-        except ImportError as e:
-            logger.warning(f"Failed to import MockAdapter: {e}")
+        # Mock-like adapters are intentionally disabled in all environments.
 
         logger.debug(f"Registered {len(self._adapter_classes)} adapter classes")
 
@@ -115,6 +110,9 @@ class SkillsRegistry:
             for row in result.data or []:
                 try:
                     skill = Skill.from_db_row(row)
+                    if skill.provider in {SkillProvider.MOCK, SkillProvider.SEEDANCE}:
+                        logger.info(f"Skipping mock-like DB skill: {skill.name}")
+                        continue
                     self._skills_cache[skill.name] = skill
                     logger.debug(f"Loaded skill: {skill.name} ({skill.category.value})")
                 except Exception as e:
@@ -194,7 +192,7 @@ class SkillsRegistry:
             self._skills_cache.setdefault("runninghub_qwen_storyboard_t2i", Skill(
                 id="legacy_runninghub_qwen_storyboard",
                 name="runninghub_qwen_storyboard_t2i",
-                display_name="RunningHub Qwen 分镜出图",
+                display_name="RunningHub Qwen Storyboard Images",
                 category=SkillCategory.T2I,
                 provider=SkillProvider.RUNNINGHUB,
                 workflow_id=qwen_storyboard_workflow_id,
@@ -223,7 +221,7 @@ class SkillsRegistry:
             self._skills_cache.setdefault("runninghub_qwen_fl_i2v", Skill(
                 id="legacy_runninghub_qwen_fl",
                 name="runninghub_qwen_fl_i2v",
-                display_name="RunningHub Qwen 首尾帧视频",
+                display_name="RunningHub Qwen First/Last Frame Video",
                 category=SkillCategory.I2V,
                 provider=SkillProvider.RUNNINGHUB,
                 workflow_id=qwen_fl_workflow_id,
@@ -252,67 +250,6 @@ class SkillsRegistry:
                 pipeline="qwen_product",
             ))
             logger.debug("Registered legacy skill: runninghub_qwen_fl_i2v")
-
-        # Seedance 2.0 I2V (mock until API is available)
-        self._skills_cache.setdefault("seedance_i2v", Skill(
-            id="mock_seedance_i2v",
-            name="seedance_i2v",
-            display_name="Seedance 2.0 Video",
-            category=SkillCategory.I2V,
-            provider=SkillProvider.SEEDANCE,
-            workflow_id="seedance_mock_v2",
-            capabilities=SkillCapabilities(
-                max_duration=10,
-                min_duration=5,
-                orientations=["landscape", "portrait", "square"],
-                supports_image_ref=True,
-                supports_audio=False,
-            ),
-            priority=5,  # Higher priority than RunningHub (lower number)
-            description="Seedance 2.0 视频生成 (mock - API未开放)",
-            tags=["video", "seedance", "mock", "i2v"],
-        ))
-        logger.debug("Registered mock skill: seedance_i2v")
-
-        # BGM Audio Generation (mock)
-        self._skills_cache.setdefault("mock_bgm_audio", Skill(
-            id="mock_bgm_audio",
-            name="mock_bgm_audio",
-            display_name="BGM Audio Generator",
-            category=SkillCategory.AUDIO,
-            provider=SkillProvider.MOCK,
-            capabilities=SkillCapabilities(
-                max_duration=120,
-                min_duration=10,
-                supports_image_ref=False,
-                supports_audio=True,
-                output_formats=["mp3", "wav"],
-            ),
-            priority=50,
-            description="背景音乐生成 (mock)",
-            tags=["audio", "bgm", "mock"],
-        ))
-        logger.debug("Registered mock skill: mock_bgm_audio")
-
-        # Intro/Outro Generator (mock)
-        self._skills_cache.setdefault("mock_intro_outro", Skill(
-            id="mock_intro_outro",
-            name="mock_intro_outro",
-            display_name="Intro/Outro Generator",
-            category=SkillCategory.T2V,
-            provider=SkillProvider.MOCK,
-            capabilities=SkillCapabilities(
-                max_duration=5,
-                min_duration=2,
-                supports_image_ref=False,
-                supports_audio=False,
-            ),
-            priority=50,
-            description="片头/片尾生成 (mock)",
-            tags=["video", "intro", "outro", "mock"],
-        ))
-        logger.debug("Registered mock skill: mock_intro_outro")
-
     def _load_pipelines_from_yaml(self) -> None:
         """
         Load pipeline and skill definitions from skills.yaml.
@@ -333,7 +270,7 @@ class SkillsRegistry:
             logger.warning(f"Failed to load skills.yaml: {e}")
             return
 
-        # ── Load skills from YAML ──
+        # Load skills from YAML
         for skill_def in config.get("skills", []):
             name = skill_def.get("name")
             if not name or name in self._skills_cache:
@@ -349,6 +286,10 @@ class SkillsRegistry:
                     if p.value == provider_str:
                         provider = p
                         break
+
+                if provider in {SkillProvider.MOCK, SkillProvider.SEEDANCE}:
+                    logger.info(f"Skipping mock-like YAML skill: {name}")
+                    continue
 
                 # Map category string to enum
                 category_str = skill_def.get("category", "i2v")
@@ -388,7 +329,7 @@ class SkillsRegistry:
             except Exception as e:
                 logger.warning(f"Failed to load skill '{name}' from YAML: {e}")
 
-        # ── Load pipelines from YAML ──
+        # Load pipelines from YAML
         for pipe_def in config.get("pipelines", []):
             name = pipe_def.get("name")
             if not name or name in self._pipelines_cache:
@@ -439,10 +380,9 @@ class SkillsRegistry:
                 name="sora2",
                 display_name="Sora2 Pipeline (Qwen Image + Sora2 Video)",
                 description=(
-                    "完整的 Sora2 视频生成管线。"
-                    "使用 Qwen 模型生成分镜头场景图片，再通过 Sora2 模型将图片转为视频。"
-                    "两个 skill 必须配套使用，因为 Sora2 对输入图片有特殊要求"
-                    "（无人脸、特定分辨率等）。"
+                    "End-to-end Sora2 generation pipeline. "
+                    "Uses Qwen for image/storyboard generation and Sora2 for video generation. "
+                    "Both skills are intended to be used together."
                 ),
                 t2i_skill_name="runninghub_qwen_t2i",
                 i2v_skill_name="runninghub_sora2_i2v",
@@ -459,10 +399,9 @@ class SkillsRegistry:
                 name="qwen_product",
                 display_name="Qwen Product Showcase Pipeline",
                 description=(
-                    "产品展示视频管线。"
-                    "使用 Qwen+NextScene 一次性生成多张分镜头图片和描述，"
-                    "再将相邻图片两两配对为首尾帧，配合分镜描述提示词生成视频片段。"
-                    "适合美妆/消费品等产品广告场景。"
+                    "Product showcase pipeline. "
+                    "Uses Qwen+NextScene to generate storyboard images and prompts, "
+                    "then composes adjacent images into first/last-frame video clips."
                 ),
                 t2i_skill_name="runninghub_qwen_storyboard_t2i",
                 i2v_skill_name="runninghub_qwen_fl_i2v",
@@ -548,7 +487,7 @@ class SkillsRegistry:
         """
         Get a skill from a named pipeline by category.
         
-        Used to resolve companion skills — e.g., when an I2V skill from pipeline
+        Used to resolve companion skills - e.g., when an I2V skill from pipeline
         'sora2' is selected, this finds the co-dependent T2I skill in the same pipeline.
         """
         for s in self._skills_cache.values():
@@ -581,6 +520,9 @@ class SkillsRegistry:
 
     def register_skill(self, skill: Skill) -> None:
         """Register or update a skill in the cache."""
+        if skill.provider in {SkillProvider.MOCK, SkillProvider.SEEDANCE}:
+            logger.warning(f"Rejecting mock-like skill registration: {skill.name}")
+            return
         self._skills_cache[skill.name] = skill
         logger.info(f"Registered skill: {skill.name}")
 
@@ -590,11 +532,19 @@ class SkillsRegistry:
         adapter_class: Type[BaseSkillAdapter]
     ) -> None:
         """Register an adapter class for a provider."""
+        if provider in {SkillProvider.MOCK, SkillProvider.SEEDANCE}:
+            logger.warning(
+                f"Rejecting mock-like adapter registration for provider: {provider.value}"
+            )
+            return
         self._adapter_classes[provider.value] = adapter_class
         logger.info(f"Registered adapter class for provider: {provider.value}")
 
     async def persist_skill(self, skill: Skill) -> None:
         """Save or update a skill in the database."""
+        if skill.provider in {SkillProvider.MOCK, SkillProvider.SEEDANCE}:
+            logger.warning(f"Rejecting persist for mock-like skill: {skill.name}")
+            return
         if not self.supabase:
             logger.warning("Cannot persist skill: no Supabase client")
             return
@@ -711,3 +661,4 @@ def reset_skills_registry() -> None:
     """Reset the global registry (for testing)."""
     global _skills_registry
     _skills_registry = None
+

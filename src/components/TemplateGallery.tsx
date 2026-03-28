@@ -5,7 +5,7 @@ import {
     Sparkles, Zap, Star,
     Palette, Shirt, UtensilsCrossed, Cpu, Sofa,
     BookOpen, Laugh, Plane, Video, GraduationCap,
-    ShoppingBag, Megaphone, Film, ArrowRight,
+    ShoppingBag, Megaphone, Film, ArrowRight, Presentation,
     Wand2, Search, X,
 } from 'lucide-react';
 import { useT } from '@/lib/i18n';
@@ -30,6 +30,7 @@ export function TemplateGallery({ onSelect }: TemplateGalleryProps) {
         { id: 'home-living', title: t("gallery.tplHomeLiving"), description: t("gallery.tplHomeLivingDesc"), icon: Sofa, tag: t("gallery.tagEcommerce"), tagType: 'default' as const, gradient: 'from-emerald-500 to-teal-600', category: 'ecommerce' as const },
         { id: 'brand-story', title: t("gallery.tplBrandStory"), description: t("gallery.tplBrandStoryDesc"), icon: Star, tag: t("gallery.tagPro"), tagType: 'pro' as const, gradient: 'from-blue-500 to-indigo-600', category: 'general' as const },
         { id: 'digital-human', title: t("gallery.tplDigitalHuman"), description: t("gallery.tplDigitalHumanDesc"), icon: Video, tag: t("gallery.tagDigitalHuman"), tagType: 'digital-human' as const, gradient: 'from-rose-500 to-purple-600', category: 'general' as const },
+        { id: 'ppt-v7', title: 'PPT & Video V7', description: 'Dual-agent PPT generation with TTS and export pipeline.', icon: Presentation, tag: 'PPT V7', tagType: 'pro' as const, gradient: 'from-cyan-500 to-indigo-600', category: 'general' as const },
         { id: 'knowledge-edu', title: t("gallery.tplKnowledgeEdu"), description: t("gallery.tplKnowledgeEduDesc"), icon: BookOpen, tag: t("gallery.tagContent"), tagType: 'default' as const, gradient: 'from-sky-500 to-blue-600', category: 'content' as const },
         { id: 'funny-skit', title: t("gallery.tplFunnySkit"), description: t("gallery.tplFunnySkitDesc"), icon: Laugh, tag: t("gallery.tagContent"), tagType: 'default' as const, gradient: 'from-lime-500 to-green-600', category: 'content' as const },
         { id: 'travel-vlog', title: t("gallery.tplTravelVlog"), description: t("gallery.tplTravelVlogDesc"), icon: Plane, tag: t("gallery.tagContent"), tagType: 'default' as const, gradient: 'from-rose-500 to-orange-600', category: 'content' as const },

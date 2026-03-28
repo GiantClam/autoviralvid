@@ -1,0 +1,1 @@
+{"slides":[{"id":"s1","order":0,"title":"Hello","elements":[{"id":"e1","type":"text","left":100,"top":100,"width":1720,"height":80,"content":"<b>Hello World</b>","style":{"fontSize":40,"color":"#333333","bold":true}}],"background":{"type":"solid","color":"#ffffff"},"narration":"Test","duration":5}],"config":{"width":1920,"height":1080,"fps":30}}

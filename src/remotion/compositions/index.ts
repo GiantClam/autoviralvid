@@ -3,3 +3,5 @@ export type { VideoTemplateProps, ClipData, SubtitleData, TransitionType, Templa
 export * from './templates';
 export { default as Tutorial } from './templates/Tutorial';
 export type { TutorialTemplateProps, TutorialStep, TutorialAnnotation } from './templates/Tutorial';
+export { default as SlidePresentation } from './SlidePresentation';
+export type { SlidePresentationProps } from './SlidePresentation';

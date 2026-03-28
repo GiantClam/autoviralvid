@@ -91,6 +91,10 @@ The following scripts can also be run using your preferred package manager:
 - `test:ui:all` - Runs the full browser UI Remotion E2E suite across all maintained scenarios
 - `install:agent` - Installs Python dependencies for the agent
 
+PPT-specific maintenance commands:
+- `bash scripts/vendor/sync_minimax_skills.sh` - refresh vendored MiniMax official `pptx-plugin` + `pptx-generator` snapshot
+- `bash scripts/tests/test_minimax_vendor_sync.sh` - verify the vendor snapshot is present and pinned
+
 There is also a manual GitHub Actions workflow, `UI Render E2E`, which installs Playwright plus ffmpeg and runs the same browser-driven Remotion path in CI when you want a release-grade UI render check.
 The workflow accepts a `scenario` input so you can run `all`, `openclaw`, `product-ad`, `brand-story-video`, `travel-vlog-media`, or `knowledge-edu`.
 
@@ -161,6 +165,34 @@ Feel free to submit issues and enhancement requests! This starter is designed to
 This project is licensed under the MIT License - see the LICENSE file for details.
 
 ## Troubleshooting
+
+### Encoding Hygiene (No More Garbled Text)
+
+If you work on Windows + PowerShell, run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/enable_utf8_terminal.ps1
+```
+
+To persist UTF-8 settings in your PowerShell profile:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/enable_utf8_terminal.ps1 -Persist
+```
+
+Before pushing, run:
+
+```bash
+npm run test:encoding-hygiene
+```
+
+Optional local pre-commit hook:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/install_git_hooks.ps1
+```
+
+CI also enforces UTF-8 and mojibake checks in `.github/workflows/ci.yml`.
 
 ### Agent Connection Issues
 If you see "I'm having trouble connecting to my tools", make sure:
