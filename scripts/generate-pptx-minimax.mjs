@@ -25,8 +25,10 @@ import { fromOfficialOutput } from "./minimax/official_skill_adapter.mjs";
 import { resolveOfficialPlan } from "./minimax/official_orchestrator.mjs";
 import { buildDarkTheme, normalizeTemplateFamily } from "./minimax/design-tokens.mjs";
 import { addSvgOverlay, buildSlideSvg } from "./minimax/svg-slide.mjs";
+import { renderSvgSlideToPptx, resolveSlideSvgMarkup } from "./minimax/svg-slide-renderer.mjs";
 import { getTemplateProfiles } from "./minimax/templates/template-profiles.mjs";
 import {
+  assessTemplateCapabilityForSlide,
   resolveSubtypeByTemplate as resolveSubtypeByTemplateRegistry,
   resolveTemplateFamilyForSlide,
 } from "./minimax/templates/template-registry.mjs";
@@ -36,6 +38,7 @@ import {
   renderTemplateContent,
   renderTemplateCover,
 } from "./minimax/templates/template-renderers.mjs";
+import { getTemplateField, getTemplatePreferredLayout } from "./minimax/templates/template-catalog.mjs";
 
 const { values } = parseArgs({
   options: {
@@ -64,7 +67,7 @@ const { values } = parseArgs({
 });
 
 if (!values.input || !values.output) {
-  console.error("Usage: node generate-pptx-minimax.mjs --input <json_file> --output <pptx_file> [--style <variant>] [--palette <key>] [--render-output <json_file>] [--generator-mode official|legacy] [--visual-priority] [--visual-preset <name>] [--constraint-hardness minimal|balanced]");
+  console.error("Usage: node generate-pptx-minimax.mjs --input <json_file> --output <pptx_file> [--style <variant>] [--palette <key>] [--render-output <json_file>] [--generator-mode official|legacy] [--visual-priority] [--visual-preset <name>] [--constraint-hardness minimal|balanced|strict]");
   process.exit(1);
 }
 
@@ -93,6 +96,7 @@ const deckId = String(values["deck-id"] || payload.deck_id || "").trim();
 const idempotencyKey = String(values["idempotency-key"] || payload.idempotency_key || "").trim();
 const retryScope = normalizeKey(values["retry-scope"] || payload.retry_scope || "deck") || "deck";
 const retryHint = String(values["retry-hint"] || payload.retry_hint || "").trim();
+const designSpec = payload?.design_spec && typeof payload.design_spec === "object" ? payload.design_spec : {};
 
 function parseCsv(rawValue) {
   return String(rawValue || "")
@@ -103,11 +107,11 @@ function parseCsv(rawValue) {
 
 const targetSlideIds = parseCsv(values["target-slide-ids"] || payload.target_slide_ids || "");
 const targetBlockIds = parseCsv(values["target-block-ids"] || payload.target_block_ids || "");
-const originalStyle = asBool(values["original-style"], payload.original_style, true);
+const originalStyle = asBool(values["original-style"], payload.original_style, false);
 const requestedDisableLocalStyleRewrite = asBool(
   values["disable-local-style-rewrite"],
   payload.disable_local_style_rewrite,
-  originalStyle,
+  false,
 );
 
 const MOJIBAKE_TOKENS = ["鈥", "锛", "鍙", "鐨", "銆", "闄"];
@@ -151,21 +155,24 @@ const requestedTemplateFamily = String(values["template-family"] || parsedInput.
 const visualPriority = asBool(
   values["visual-priority"],
   payload.visual_priority,
-  generatorMode === "official" && !disableLocalStyleRewrite,
+  true,
 );
 const normalizedSvgModeRaw = normalizeKey(requestedSvgMode || "auto");
 const normalizedSvgMode = (
-  normalizedSvgModeRaw === "force" || normalizedSvgModeRaw === "on"
+  normalizedSvgModeRaw === "force"
     ? "force"
-    : normalizedSvgModeRaw === "off"
-      ? "off"
-      : "auto"
+    : normalizedSvgModeRaw === "on"
+      ? "on"
+      : normalizedSvgModeRaw === "off"
+        ? "off"
+        : "auto"
 );
 const svgModeEnabled = normalizedSvgMode !== "off";
 
 function normalizeConstraintHardness(input) {
   const normalized = normalizeKey(input || "");
-  if (normalized === "balanced" || normalized === "strict") return "balanced";
+  if (normalized === "strict") return "strict";
+  if (normalized === "balanced") return "balanced";
   return "minimal";
 }
 
@@ -313,6 +320,19 @@ const VISUAL_PRESETS = {
   },
 };
 
+const BACKDROP_VARIANTS = [
+  "high-contrast",
+  "color-block",
+  "soft-gradient",
+  "minimal-grid",
+  "corner-accent",
+  "side-panel",
+  "bottom-wave",
+  "dot-grid",
+  "diagonal-split",
+];
+let backdropRenderCounter = 0;
+
 function normalizeVisualPreset(input, topicText = "") {
   const normalized = normalizeKey(input || "");
   if (normalized && normalized !== "auto" && VISUAL_PRESETS[normalized]) return normalized;
@@ -329,11 +349,12 @@ function resolveSlideTemplateFamily(sourceSlide) {
     pick(sourceSlide || {}, ["page_type", "pageType", "slide_type", "slideType", "subtype"], ""),
   ) || "content";
   const layoutGrid = normalizeKey(String(sourceSlide?.layout_grid || sourceSlide?.layout || "")) || "split_2";
-  const lockTemplate = asBool(sourceSlide?.template_lock, false);
   const perSlideTemplate = String(
     pick(sourceSlide || {}, ["template_family", "template_id"], ""),
   ).trim();
-  const requestedTemplate = lockTemplate && perSlideTemplate ? perSlideTemplate : requestedTemplateFamily;
+  const requestedTemplate = perSlideTemplate && normalizeKey(perSlideTemplate) !== "auto"
+    ? perSlideTemplate
+    : requestedTemplateFamily;
   return resolveTemplateFamilyForSlide({
     sourceSlide,
     requestedTemplateFamily: requestedTemplate,
@@ -344,8 +365,33 @@ function resolveSlideTemplateFamily(sourceSlide) {
   });
 }
 
+function resolveRenderPath(sourceSlide) {
+  const normalized = normalizeKey(String(sourceSlide?.render_path || ""));
+  if (normalized === "svg") return "svg";
+  if (normalized === "png_fallback") return "png_fallback";
+  return "pptxgenjs";
+}
+
 function maybeAddSvgLayer(slide, sourceSlide, theme, fallbackLayout = "split_2") {
-  if (!svgModeEnabled) return false;
+  if (!slide) return false;
+  const renderPath = resolveRenderPath(sourceSlide || {});
+  const svgMarkup = resolveSlideSvgMarkup(sourceSlide || {});
+  if (svgModeEnabled && renderPath === "svg" && svgMarkup) {
+    const nativeResult = renderSvgSlideToPptx({
+      slide,
+      pptx: pptxgen,
+      sourceSlide,
+      theme,
+      designSpec,
+    });
+    if (nativeResult?.applied) {
+      if (sourceSlide && typeof sourceSlide === "object") {
+        sourceSlide.__svg_render_mode = nativeResult.mode || "custgeom";
+      }
+      return true;
+    }
+  }
+  if (!svgModeEnabled && renderPath !== "png_fallback") return false;
   const explicitSvgFlag = asBool(
     sourceSlide?.svg_overlay,
     sourceSlide?.force_svg_overlay,
@@ -354,7 +400,8 @@ function maybeAddSvgLayer(slide, sourceSlide, theme, fallbackLayout = "split_2")
   );
   const blocks = Array.isArray(sourceSlide?.blocks) ? sourceSlide.blocks : [];
   const hasSvgBlock = blocks.some((block) => blockType(block) === "svg");
-  const shouldInject = normalizedSvgMode === "force" || explicitSvgFlag || hasSvgBlock;
+  const shouldInject =
+    normalizedSvgMode === "force" || explicitSvgFlag || hasSvgBlock || renderPath === "svg" || renderPath === "png_fallback";
   if (!shouldInject) return false;
   const svgSource = {
     ...(sourceSlide || {}),
@@ -362,8 +409,14 @@ function maybeAddSvgLayer(slide, sourceSlide, theme, fallbackLayout = "split_2")
     narration: pick(sourceSlide || {}, ["narration", "speaker_notes", "speakerNotes"], ""),
     layout_grid: pick(sourceSlide || {}, ["layout_grid", "layout"], fallbackLayout),
   };
-  const svg = buildSlideSvg(svgSource, theme);
-  return addSvgOverlay(slide, svg);
+  const svg = svgMarkup || buildSlideSvg(svgSource, theme);
+  const ok = addSvgOverlay(slide, svg, { x: 0, y: 0, w: 10, h: 5.625 }, {
+    preferPng: renderPath === "png_fallback",
+  });
+  if (ok && sourceSlide && typeof sourceSlide === "object") {
+    sourceSlide.__svg_render_mode = renderPath === "png_fallback" ? "overlay_png_fallback" : "overlay_svg";
+  }
+  return ok;
 }
 
 function resolveVisualConfig(topicText = "") {
@@ -373,6 +426,7 @@ function resolveVisualConfig(topicText = "") {
   const densityMaxBullets = density === "sparse" ? 4 : density === "dense" ? 7 : preset.maxBullets;
   let maxBullets = densityMaxBullets;
   if (constraintHardness === "minimal") maxBullets = Math.max(6, maxBullets);
+  else if (constraintHardness === "strict") maxBullets = Math.min(4, maxBullets);
   else maxBullets = Math.min(5, maxBullets);
   return {
     enabled: Boolean(visualPriority),
@@ -380,7 +434,9 @@ function resolveVisualConfig(topicText = "") {
     styleOverride: preset.style,
     paletteOverride: preset.palette,
     enforcePreset: false,
-    showDecorations: !(constraintHardness === "minimal" || density === "sparse"),
+    showDecorations: !(
+      constraintHardness === "minimal" || constraintHardness === "strict" || density === "sparse"
+    ),
     maxBullets: Math.max(4, Math.min(7, maxBullets)),
     backdrop: preset.backdrop,
     density: density || "balanced",
@@ -522,6 +578,16 @@ function blockType(block) {
   return String(block?.block_type || block?.type || "").toLowerCase().trim();
 }
 
+function normalizeSubtype(value) {
+  const key = normalizeKey(value || "");
+  if (key === "data") return "data_visualization";
+  if (key === "mixed") return "mixed_media";
+  if (key === "image_showcase" || key === "showcase") return "image_showcase";
+  if (key === "data_visualization") return "data_visualization";
+  if (key === "mixed_media") return "mixed_media";
+  return key || "content";
+}
+
 function blockText(block) {
   const content = block?.content;
   if (typeof content === "string") return content.trim();
@@ -539,6 +605,55 @@ function blockText(block) {
       const value = String(data[key] || "").trim();
       if (value) return value;
     }
+  }
+  return "";
+}
+
+function normalizeImageDataForPptx(rawInput) {
+  const raw = String(rawInput || "").trim();
+  const base64Match = raw.match(/^data:(image\/[a-zA-Z0-9+.-]+);base64,(.+)$/i);
+  if (base64Match) return `${base64Match[1]};base64,${base64Match[2]}`;
+  const dataUriMatch = raw.match(/^data:(image\/[a-zA-Z0-9+.-]+)(;[^,]*)?,([\s\S]+)$/i);
+  if (dataUriMatch) {
+    const mime = String(dataUriMatch[1] || "image/png").toLowerCase();
+    const meta = String(dataUriMatch[2] || "").toLowerCase();
+    const payload = String(dataUriMatch[3] || "");
+    if (meta.includes(";base64")) return `${mime};base64,${payload}`;
+    try {
+      const decoded = decodeURIComponent(payload);
+      return `${mime};base64,${Buffer.from(decoded, "utf-8").toString("base64")}`;
+    } catch {
+      try {
+        return `${mime};base64,${Buffer.from(payload, "utf-8").toString("base64")}`;
+      } catch {
+        return "";
+      }
+    }
+  }
+  if (/^image\/[a-zA-Z0-9+.-]+;base64,/.test(raw)) return raw;
+  return "";
+}
+
+function pickSlideImageData(slide) {
+  const blocks = Array.isArray(slide?.blocks) ? slide.blocks : [];
+  const imageBlock = blocks.find((block) => blockType(block) === "image");
+  if (!imageBlock || typeof imageBlock !== "object") return "";
+  const content = imageBlock.content && typeof imageBlock.content === "object" ? imageBlock.content : {};
+  const data = imageBlock.data && typeof imageBlock.data === "object" ? imageBlock.data : {};
+  const candidates = [
+    content.url,
+    content.src,
+    content.imageUrl,
+    data.url,
+    data.src,
+    data.imageUrl,
+    imageBlock.url,
+    imageBlock.src,
+    imageBlock.imageUrl,
+  ];
+  for (const candidate of candidates) {
+    const normalized = normalizeImageDataForPptx(candidate);
+    if (normalized) return normalized;
   }
   return "";
 }
@@ -586,6 +701,14 @@ function collectBullets(slide, fallbackText = "") {
   const lines = [];
   const sentenceSplit = /[。！？；;.!?]/;
   const bulletPrefix = /^[\s\-*+•·●○◆▶✓]+\s*/;
+  const compactLine = (value) => {
+    const text = String(value || "").replace(/\s+/g, " ").trim();
+    if (!text) return "";
+    const hasCjk = /[\u4e00-\u9fff]/.test(text);
+    const maxLen = hasCjk ? 34 : 72;
+    if (text.length <= maxLen) return text;
+    return `${text.slice(0, Math.max(1, maxLen - 1))}…`;
+  };
   const appendLines = (rawText) => {
     const plain = htmlToMultilineText(rawText);
     if (!plain) return;
@@ -595,14 +718,14 @@ function collectBullets(slide, fallbackText = "") {
       .filter(Boolean);
     if (lineChunks.length > 1) {
       for (const line of lineChunks) {
-        if (line.length >= 4) lines.push(line);
+        if (line.length >= 4) lines.push(compactLine(line));
       }
       return;
     }
     for (const line of plain.split(sentenceSplit)) {
       const t = line.replace(bulletPrefix, "").trim();
       if (t.length < 4) continue;
-      lines.push(t);
+      lines.push(compactLine(t));
     }
   };
 
@@ -620,19 +743,19 @@ function collectBullets(slide, fallbackText = "") {
     const fbLines = String(fallbackText).split(/\r?\n/).map((line) => line.replace(bulletPrefix, "").trim()).filter(Boolean);
     if (fbLines.length > 1) {
       for (const line of fbLines) {
-        if (line.length >= 4) lines.push(line);
+        if (line.length >= 4) lines.push(compactLine(line));
       }
     } else {
       for (const line of String(fallbackText).split(sentenceSplit)) {
         const t = line.replace(bulletPrefix, "").trim();
-        if (t.length >= 4) lines.push(t);
+        if (t.length >= 4) lines.push(compactLine(t));
       }
     }
   } else if (lines.length > 0 && lines.length < 4 && fallbackText) {
     for (const line of String(fallbackText).split(sentenceSplit)) {
       const t = line.replace(bulletPrefix, "").trim();
-      if (t.length >= 6) lines.push(t);
-      if (lines.length >= 8) break;
+      if (t.length >= 6) lines.push(compactLine(t));
+      if (lines.length >= 6) break;
     }
   }
 
@@ -644,7 +767,7 @@ function collectBullets(slide, fallbackText = "") {
     if (seen.has(key)) continue;
     seen.add(key);
     dedup.push(item);
-    if (dedup.length >= 8) break;
+    if (dedup.length >= 6) break;
   }
   return dedup;
 }
@@ -662,28 +785,42 @@ function buildSubtypeCandidates(slide, index, total) {
   const hasTable =
     elements.some((el) => String(el?.type || "").toLowerCase() === "table")
     || blocks.some((block) => blockType(block) === "table");
+  const hasImage =
+    elements.some((el) => String(el?.type || "").toLowerCase() === "image")
+    || blocks.some((block) => blockType(block) === "image");
   const hasChart =
     elements.some((el) => String(el?.type || "").toLowerCase() === "chart")
     || blocks.some((block) => ["chart", "kpi"].includes(blockType(block)));
+  const hasWorkflow = blocks.some((block) => ["workflow", "diagram"].includes(blockType(block)));
   const candidates = [];
 
   const push = (value) => {
-    const key = normalizeKey(value || "");
-    if (!["content", "comparison", "timeline", "data", "table", "section"].includes(key)) return;
+    const key = normalizeSubtype(value || "");
+    if (!["content", "comparison", "timeline", "data_visualization", "table", "section", "mixed_media", "image_showcase"].includes(key)) return;
     if (!candidates.includes(key)) candidates.push(key);
   };
 
-  const normalizedInferred = inferred === "mixed" ? "content" : inferred;
+  const normalizedInferred = normalizeSubtype(inferred);
   if (normalizedInferred && normalizedInferred !== "content") push(normalizedInferred);
   if (hasTable) push("table");
-  if (hasChart || hasNumericSignal(bullets)) push("data");
+  if (hasChart || hasNumericSignal(bullets)) push("data_visualization");
+  if (hasImage && hasChart) push("mixed_media");
+  if (hasImage && /(\u5c55\u793a|\u6848\u4f8b|showcase|gallery|before|after)/.test(title)) push("image_showcase");
+  if (hasImage) push("mixed_media");
+  if (hasWorkflow) push("mixed_media");
   if (/(\u5bf9\u6bd4|\u6bd4\u8f83|vs|versus|\u4f18\u52bf|\u5dee\u5f02)/.test(title)) push("comparison");
   if (/(\u8def\u7ebf|\u91cc\u7a0b\u7891|roadmap|timeline|\u9636\u6bb5|\u6b65\u9aa4|\u5b9e\u65bd)/.test(title)) push("timeline");
   if (/(\u7ae0\u8282|\u90e8\u5206|part|section)/.test(title)) push("section");
   if (/(\u6848\u4f8b|\u65b9\u6848|\u573a\u666f|\u5ba2\u6237)/.test(title)) push("comparison");
-  if (index === total - 1 && hasNumericSignal(bullets)) push("data");
+  if (index === total - 1 && hasNumericSignal(bullets)) push("data_visualization");
   if (normalizedInferred === "content") push("content");
   push("content");
+  if (candidates.length === 1 && candidates[0] === "content") {
+    // Keep minimum visual diversity when source signal is weak.
+    const rotation = ["comparison", "mixed_media", "data_visualization", "table", "content"];
+    push(rotation[index % rotation.length]);
+    push(rotation[(index + 2) % rotation.length]);
+  }
   return candidates.length ? candidates : ["content"];
 }
 
@@ -692,11 +829,13 @@ function planDeckSubtypes(deckSlides) {
   if (total <= 0) return [];
 
   const typeCounts = new Map();
-  const maxTypeRatio = total >= 8 ? 0.45 : 0.5;
+  const maxTypeRatio = total >= 8 ? 0.35 : 0.45;
+  const maxTop2Ratio = total >= 8 ? 0.65 : 0.75;
   const maxPerType = Math.max(2, Math.floor(total * maxTypeRatio));
   const maxAdjacentRepeat = 1;
   let prevType = "";
   let runLength = 0;
+  const selectedTypes = [];
 
   return deckSlides.map((slide, idx) => {
     const candidates = buildSubtypeCandidates(slide, idx, total);
@@ -707,7 +846,21 @@ function planDeckSubtypes(deckSlides) {
       const exceedsRatio = used >= maxPerType && candidates.length > 1;
       const exceedsAdjacent =
         candidate === prevType && runLength >= maxAdjacentRepeat && candidates.length > 1;
-      if (exceedsRatio || exceedsAdjacent) continue;
+      const top2Projected = (() => {
+        const projected = new Map(typeCounts);
+        projected.set(candidate, used + 1);
+        const counts = [...projected.values()].sort((a, b) => b - a);
+        const top2 = (counts[0] || 0) + (counts[1] || 0);
+        const nextTotal = idx + 1;
+        return top2 > Math.max(2, Math.floor(nextTotal * maxTop2Ratio)) && candidates.length > 1;
+      })();
+      const ababPattern =
+        selectedTypes.length >= 3
+        && selectedTypes[selectedTypes.length - 3] === selectedTypes[selectedTypes.length - 1]
+        && selectedTypes[selectedTypes.length - 2] === candidate
+        && selectedTypes[selectedTypes.length - 2] !== selectedTypes[selectedTypes.length - 1]
+        && candidates.length > 1;
+      if (exceedsRatio || exceedsAdjacent || top2Projected || ababPattern) continue;
       selected = candidate;
       break;
     }
@@ -719,6 +872,7 @@ function planDeckSubtypes(deckSlides) {
       prevType = selected;
       runLength = 1;
     }
+    selectedTypes.push(selected);
     return selected;
   });
 }
@@ -746,11 +900,11 @@ function extractChartSeries(slide) {
 }
 
 function inferSubtype(slide) {
-  return inferSubtypeHeuristic(slide);
+  return normalizeSubtype(inferSubtypeHeuristic(slide));
 }
 
 function resolveSubtypeByTemplate(subtype, templateFamily) {
-  return resolveSubtypeByTemplateRegistry(subtype, templateFamily);
+  return normalizeSubtype(resolveSubtypeByTemplateRegistry(normalizeSubtype(subtype), templateFamily));
 }
 
 function selectStyle(styleInput, styleHint, topicText, preserveOriginal = false) {
@@ -817,6 +971,12 @@ function addPageBadge(slide, index, theme, style) {
 
 function addVisualBackdrop(slide, theme, visualConfig, mode = "content") {
   if (!visualConfig?.enabled) return;
+  const baseBackdrop = normalizeKey(visualConfig.backdrop || "minimal-grid") || "minimal-grid";
+  const rotation = [baseBackdrop, ...BACKDROP_VARIANTS.filter((item) => item !== baseBackdrop)];
+  const selectedBackdrop = mode === "cover"
+    ? baseBackdrop
+    : rotation[backdropRenderCounter % Math.max(1, rotation.length)];
+  if (mode !== "cover") backdropRenderCounter += 1;
   if (!visualConfig?.showDecorations) {
     if (mode === "cover") {
       slide.addShape("line", {
@@ -838,7 +998,7 @@ function addVisualBackdrop(slide, theme, visualConfig, mode = "content") {
     return;
   }
   const transparencyBase = mode === "cover" ? 78 : 86;
-  if (visualConfig.backdrop === "high-contrast") {
+  if (selectedBackdrop === "high-contrast") {
     const topRight = clampRectToSlide(7.08, 0.14, 2.74, 1.2, DECOR_INSET);
     const bottomLeft = clampRectToSlide(0.18, 4.18, 2.46, 1.2, DECOR_INSET);
     slide.addShape("roundRect", {
@@ -855,7 +1015,7 @@ function addVisualBackdrop(slide, theme, visualConfig, mode = "content") {
     });
     return;
   }
-  if (visualConfig.backdrop === "color-block") {
+  if (selectedBackdrop === "color-block") {
     const topRight = clampRectToSlide(7.3, 0.18, 2.45, 1.15, DECOR_INSET);
     slide.addShape("rect", {
       x: 0,
@@ -873,7 +1033,7 @@ function addVisualBackdrop(slide, theme, visualConfig, mode = "content") {
     });
     return;
   }
-  if (visualConfig.backdrop === "soft-gradient") {
+  if (selectedBackdrop === "soft-gradient") {
     const topRight = clampRectToSlide(7.38, 0.22, 2.46, 1.12, DECOR_INSET);
     const bottomLeft = clampRectToSlide(0.18, 4.24, 2.2, 1.1, DECOR_INSET);
     slide.addShape("roundRect", {
@@ -886,6 +1046,84 @@ function addVisualBackdrop(slide, theme, visualConfig, mode = "content") {
       ...bottomLeft,
       rectRadius: 0.3,
       fill: { color: theme.accentSoft || theme.accent, transparency: 92 },
+      line: { color: theme.accentSoft || theme.accent, pt: 0 },
+    });
+    return;
+  }
+  if (selectedBackdrop === "corner-accent") {
+    slide.addShape("roundRect", {
+      ...clampRectToSlide(7.3, 0.18, 2.46, 1.06, DECOR_INSET),
+      rectRadius: 0.28,
+      fill: { color: theme.accentStrong || theme.accent, transparency: transparencyBase + 4 },
+      line: { color: theme.accentStrong || theme.accent, pt: 0 },
+    });
+    slide.addShape("line", {
+      x: 0.42,
+      y: 4.86,
+      w: 3.12,
+      h: 0,
+      line: { color: theme.light, pt: 0.65, transparency: 50 },
+    });
+    return;
+  }
+  if (selectedBackdrop === "side-panel") {
+    slide.addShape("rect", {
+      x: 0,
+      y: 0.86,
+      w: 1.42,
+      h: 4.76,
+      fill: { color: theme.accentSoft || theme.accent, transparency: 88 },
+      line: { color: theme.accentSoft || theme.accent, pt: 0 },
+    });
+    slide.addShape("line", {
+      x: 1.42,
+      y: 0.86,
+      w: 0,
+      h: 4.76,
+      line: { color: theme.light, pt: 0.52, transparency: 56 },
+    });
+    return;
+  }
+  if (selectedBackdrop === "bottom-wave") {
+    slide.addShape("roundRect", {
+      ...clampRectToSlide(0, 4.74, 10, 0.94, 0),
+      rectRadius: 0.45,
+      fill: { color: theme.accentSoft || theme.accent, transparency: 88 },
+      line: { color: theme.accentSoft || theme.accent, pt: 0 },
+    });
+    return;
+  }
+  if (selectedBackdrop === "dot-grid") {
+    const startX = 7.6;
+    const startY = 0.96;
+    for (let row = 0; row < 5; row += 1) {
+      for (let col = 0; col < 4; col += 1) {
+        slide.addShape("ellipse", {
+          x: startX + col * 0.3,
+          y: startY + row * 0.28,
+          w: 0.05,
+          h: 0.05,
+          fill: { color: theme.light, transparency: 48 },
+          line: { color: theme.light, pt: 0 },
+        });
+      }
+    }
+    return;
+  }
+  if (selectedBackdrop === "diagonal-split") {
+    slide.addShape("line", {
+      x: 0,
+      y: 5.26,
+      w: 10,
+      h: -4.6,
+      line: { color: theme.light, pt: 0.72, transparency: 52 },
+    });
+    slide.addShape("rect", {
+      x: 6.5,
+      y: 0,
+      w: 3.5,
+      h: 5.62,
+      fill: { color: theme.accentSoft || theme.accent, transparency: 93 },
       line: { color: theme.accentSoft || theme.accent, pt: 0 },
     });
     return;
@@ -943,13 +1181,76 @@ function addKpiChip(slide, text, x, y, theme, style) {
   return w;
 }
 
+function toBoundedInt(value, fallback, minValue, maxValue) {
+  const raw = Number(value);
+  const safe = Number.isFinite(raw) ? Math.round(raw) : fallback;
+  return Math.max(minValue, Math.min(maxValue, safe));
+}
+
+function resolveSlideTextConstraints(sourceSlide = {}, slideSubtype = "content", fallbackMaxItems = 5) {
+  const raw =
+    sourceSlide && typeof sourceSlide === "object" && sourceSlide.text_constraints && typeof sourceSlide.text_constraints === "object"
+      ? sourceSlide.text_constraints
+      : {};
+  const subtype = normalizeKey(slideSubtype || "content") || "content";
+  const layout = normalizeKey(sourceSlide?.layout_grid || sourceSlide?.layout || "");
+  const compactLayout = layout === "split_2" || layout === "asymmetric_2";
+  const timelineLayout = subtype === "timeline" || layout === "timeline";
+  const summaryLike = subtype === "summary" || subtype === "toc" || subtype === "divider";
+  const defaultBulletMaxItems = summaryLike ? 5 : compactLayout ? 4 : 5;
+  const defaultBulletMaxChars = timelineLayout ? 24 : compactLayout ? 26 : 30;
+  return {
+    bullet_max_items: toBoundedInt(raw.bullet_max_items, Math.max(3, fallbackMaxItems || defaultBulletMaxItems), 2, 8),
+    bullet_max_chars_cjk: toBoundedInt(raw.bullet_max_chars_cjk, defaultBulletMaxChars, 14, 72),
+    min_body_font_pt: toBoundedInt(raw.min_body_font_pt, 11, 9, 24),
+    min_title_font_pt: toBoundedInt(raw.min_title_font_pt, summaryLike ? 24 : 20, 16, 42),
+    subtitle_max_lines: toBoundedInt(raw.subtitle_max_lines, 2, 1, 4),
+    subtitle_max_chars_cjk: toBoundedInt(raw.subtitle_max_chars_cjk, 80, 24, 160),
+    subtitle_min_font_pt: toBoundedInt(raw.subtitle_min_font_pt, 13, 10, 24),
+    bullet_auto_split: raw.bullet_auto_split !== false,
+  };
+}
+
+function sanitizeSubtitleText(text, constraints) {
+  const raw = htmlToMultilineText(String(text || "")).trim();
+  if (!raw) return "";
+  const maxLines = toBoundedInt(constraints?.subtitle_max_lines, 2, 1, 4);
+  const maxChars = toBoundedInt(constraints?.subtitle_max_chars_cjk, 80, 24, 160);
+  const lines = raw
+    .split(/\r?\n/)
+    .map((line) => String(line || "").replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+  const flattened = lines.length > 0 ? lines : [raw];
+  const clipped = [];
+  for (const line of flattened) {
+    if (clipped.length >= maxLines) break;
+    if (line.length <= maxChars) {
+      clipped.push(line);
+      continue;
+    }
+    const chunks = line.split(/[；;。.!?！？]/).map((item) => item.trim()).filter(Boolean);
+    if (chunks.length > 1) {
+      for (const chunk of chunks) {
+        if (clipped.length >= maxLines) break;
+        const safeChunk = chunk.length > maxChars ? `${chunk.slice(0, maxChars - 1).trim()}…` : chunk;
+        clipped.push(safeChunk);
+      }
+      continue;
+    }
+    clipped.push(`${line.slice(0, maxChars - 1).trim()}…`);
+  }
+  return clipped.slice(0, maxLines).join("\n");
+}
+
 function addCover(pres, title, subtitle, theme, style, visualConfig, sourceSlide = undefined, templateFamily = "hero_dark") {
   const recipe = STYLE_RECIPES[style];
+  const textConstraints = resolveSlideTextConstraints(sourceSlide || {}, "cover", 5);
+  const safeSubtitle = sanitizeSubtitleText(subtitle, textConstraints);
   const slide = pres.addSlide();
   slide.background = { color: theme.bg };
   maybeAddSvgLayer(
     slide,
-    sourceSlide || { title, narration: subtitle, layout_grid: "hero_1" },
+    sourceSlide || { title, narration: safeSubtitle, layout_grid: "hero_1" },
     theme,
     "hero_1",
   );
@@ -961,7 +1262,7 @@ function addCover(pres, title, subtitle, theme, style, visualConfig, sourceSlide
       templateFamily,
       slide,
       title,
-      subtitle,
+      subtitle: safeSubtitle,
       theme,
       style,
       sourceSlide,
@@ -999,7 +1300,9 @@ function addCover(pres, title, subtitle, theme, style, visualConfig, sourceSlide
   });
 
   const titleText = String(title || "Presentation").trim();
-  const titleSize = titleText.length > 22 ? (style === "sharp" ? 34 : 36) : style === "sharp" ? 40 : 44;
+  const coverMinTitleFont = toBoundedInt(textConstraints.min_title_font_pt, 30, 20, 56);
+  const titleSizeBase = titleText.length > 22 ? (style === "sharp" ? 34 : 36) : style === "sharp" ? 40 : 44;
+  const titleSize = Math.max(coverMinTitleFont, titleSizeBase);
   slide.addText(titleText, {
     x: recipe.pageMargin + 0.3,
     y: 1.7,
@@ -1011,7 +1314,7 @@ function addCover(pres, title, subtitle, theme, style, visualConfig, sourceSlide
     color: theme.primary,
     margin: 0,
   });
-  const subtitleText = String(subtitle || "").trim();
+  const subtitleText = safeSubtitle;
   if (subtitleText) {
     slide.addText(subtitleText, {
       x: recipe.pageMargin + 0.3,
@@ -1019,7 +1322,7 @@ function addCover(pres, title, subtitle, theme, style, visualConfig, sourceSlide
       w: 5.35,
       h: 0.75,
       fontFace: FONT_BY_STYLE[style].enBody,
-      fontSize: 13,
+      fontSize: Math.max(13, toBoundedInt(textConstraints.subtitle_min_font_pt, 13, 10, 24)),
       color: theme.secondary,
       margin: 0,
       valign: "top",
@@ -1099,15 +1402,23 @@ function addToc(pres, sectionTitles, theme, style, visualConfig, pageNumber = 2,
   addPageBadge(slide, pageNumber, theme, style);
 }
 
-function addHeader(slide, title, theme, style, visualConfig, templateFamily = "dashboard_dark") {
+function addHeader(slide, title, theme, style, visualConfig, templateFamily = "dashboard_dark", textConstraints = undefined) {
   const recipe = STYLE_RECIPES[style];
   const isLightTemplate = String(templateFamily || "").endsWith("_light");
+  const headerStyle = String(
+    getTemplateField(
+      templateFamily,
+      "header_style",
+      isLightTemplate ? "underline-light" : "solid",
+    ),
+  ).toLowerCase();
   const lightBg = templateFamily === "consulting_warm_light" ? "F7F3EE" : "F4F7FC";
   const bgColor = isLightTemplate ? lightBg : theme.bg;
   const borderColor = isLightTemplate ? (templateFamily === "consulting_warm_light" ? "D8BFAA" : "CFDAEC") : theme.borderColor;
+  const darkHeaderBg = headerStyle === "line" ? blendHex(theme.primary, theme.bg, 0.72) : theme.primary;
   const titleColor = isLightTemplate
     ? (templateFamily === "consulting_warm_light" ? "3A2A23" : "0F1E35")
-    : pickReadableTextColor(theme.primary, theme.white || "FFFFFF", theme.darkText || "111827");
+    : pickReadableTextColor(darkHeaderBg, theme.white || "FFFFFF", theme.darkText || "111827");
   const accentColor = isLightTemplate ? (templateFamily === "consulting_warm_light" ? "9B3B2E" : "2F67E8") : theme.primary;
   const allowBackdropDecor = !hasTemplateContentRenderer(templateFamily);
   slide.background = { color: bgColor };
@@ -1119,9 +1430,45 @@ function addHeader(slide, title, theme, style, visualConfig, templateFamily = "d
     y: 0,
     w: 10,
     h: recipe.headerHeight,
-    fill: { color: isLightTemplate ? bgColor : theme.primary },
-    line: { color: isLightTemplate ? borderColor : theme.primary, pt: isLightTemplate ? 0.5 : 0 },
+    fill: { color: isLightTemplate ? bgColor : darkHeaderBg },
+    line: { color: isLightTemplate ? borderColor : darkHeaderBg, pt: isLightTemplate ? 0.5 : 0 },
   });
+  if (!isLightTemplate) {
+    if (headerStyle === "gradient") {
+      slide.addShape("rect", {
+        x: 0,
+        y: 0,
+        w: 10,
+        h: recipe.headerHeight,
+        fill: { color: theme.accentSoft || theme.accent, transparency: 82 },
+        line: { color: theme.accentSoft || theme.accent, pt: 0 },
+      });
+      slide.addShape("line", {
+        x: 0.4,
+        y: recipe.headerHeight - 0.01,
+        w: 9.2,
+        h: 0,
+        line: { color: theme.light, pt: 1.2, transparency: 24 },
+      });
+    } else if (headerStyle === "band") {
+      slide.addShape("rect", {
+        x: 0,
+        y: recipe.headerHeight - 0.09,
+        w: 10,
+        h: 0.09,
+        fill: { color: theme.accentStrong || theme.accent, transparency: 18 },
+        line: { color: theme.accentStrong || theme.accent, pt: 0 },
+      });
+    } else if (headerStyle === "line") {
+      slide.addShape("line", {
+        x: 0.56,
+        y: recipe.headerHeight - 0.03,
+        w: 8.8,
+        h: 0,
+        line: { color: theme.accentStrong || theme.accent, pt: 1.5, transparency: 16 },
+      });
+    }
+  }
   if (isLightTemplate) {
     slide.addShape("line", {
       x: 0.62,
@@ -1143,30 +1490,108 @@ function addHeader(slide, title, theme, style, visualConfig, templateFamily = "d
   const titleText = String(title || "");
   const titleLen = titleText.length;
   const baseTitleSize = recipe.titleSize;
-  const dynamicTitleSize = titleLen > 28 ? baseTitleSize - 3 : titleLen > 20 ? baseTitleSize - 1 : baseTitleSize;
+  const dynamicTitleSize = (
+    titleLen > 42 ? baseTitleSize - 7
+      : titleLen > 34 ? baseTitleSize - 5
+        : titleLen > 28 ? baseTitleSize - 3
+          : titleLen > 20 ? baseTitleSize - 1
+            : baseTitleSize
+  );
+  const titleFloor = toBoundedInt(textConstraints?.min_title_font_pt, 18, 16, 42);
   slide.addText(title, {
     x: isLightTemplate ? recipe.pageMargin + 0.12 : recipe.pageMargin,
-    y: 0.1,
+    y: 0.08,
     w: visualConfig?.enabled ? 7.6 : 8.8,
-    h: 0.5,
+    h: 0.42,
     fontFace: FONT_ZH,
-    fontSize: Math.max(18, dynamicTitleSize),
+    fontSize: Math.max(titleFloor, dynamicTitleSize),
     bold: true,
     color: titleColor,
+    fit: "shrink",
+    breakLine: false,
     margin: 0,
   });
 }
 
-function addBulletList(slide, bullets, x, y, w, h, theme, style, maxItems = 5) {
+function sanitizeBulletText(text) {
+  return String(text || "")
+    .replace(/^[\s\-*+•·●○◆▶✓]+\s*/g, "")
+    .replace(/^(?:补充要点|Supporting point)\s*[:：-]\s*/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function splitBulletByPunctuation(text, maxChars) {
+  const cleaned = sanitizeBulletText(text);
+  if (!cleaned) return [];
+  if (cleaned.length <= maxChars) return [cleaned];
+  const chunks = cleaned
+    .split(/[；;。.!?！？]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+  if (chunks.length > 1) {
+    return chunks.flatMap((chunk) => splitBulletByPunctuation(chunk, maxChars));
+  }
+  const out = [];
+  for (let i = 0; i < cleaned.length; i += maxChars) {
+    const slice = cleaned.slice(i, i + maxChars).trim();
+    if (slice) out.push(slice);
+    if (out.length >= 3) break;
+  }
+  return out;
+}
+
+function clampBulletText(text, width, style, maxCharsOverride = undefined) {
+  const raw = sanitizeBulletText(text);
+  if (!raw) return "";
+  const widthSafe = Math.max(1, Number(width) || 1);
+  const base = Math.floor(widthSafe * (style === "sharp" ? 10 : 11));
+  const localLimit = Math.max(18, Math.min(64, base));
+  const maxChars = toBoundedInt(maxCharsOverride, localLimit, 14, 72);
+  if (raw.length <= maxChars) return raw;
+  return `${raw.slice(0, Math.max(6, maxChars - 1)).trim()}…`;
+}
+
+function prepareBulletsForList(bullets, maxItems, maxChars, autoSplit = true) {
+  const source = Array.isArray(bullets) ? bullets : [];
+  const out = [];
+  const seen = new Set();
+  for (const item of source) {
+    const text = sanitizeBulletText(item);
+    if (!text) continue;
+    const units = autoSplit ? splitBulletByPunctuation(text, maxChars) : [text];
+    for (const unit of units) {
+      const normalized = normalizeTextKey(unit);
+      if (!normalized || seen.has(normalized)) continue;
+      seen.add(normalized);
+      out.push(unit);
+      if (out.length >= maxItems) return out;
+    }
+  }
+  return out;
+}
+
+function addBulletList(slide, bullets, x, y, w, h, theme, style, maxItems = 5, options = {}) {
   const recipe = STYLE_RECIPES[style];
-  bullets.slice(0, maxItems).forEach((item, i) => {
-    const text = String(item || "").trim();
+  const textConstraints =
+    options && typeof options === "object" && options.textConstraints && typeof options.textConstraints === "object"
+      ? options.textConstraints
+      : {};
+  const minBodyFont = toBoundedInt(textConstraints.min_body_font_pt, 11, 9, 24);
+  const maxChars = toBoundedInt(textConstraints.bullet_max_chars_cjk, 30, 14, 72);
+  const limitByConstraint = toBoundedInt(textConstraints.bullet_max_items, maxItems, 2, 8);
+  const autoSplit = textConstraints.bullet_auto_split !== false;
+  const effectiveMaxItems = Math.max(1, Math.min(Math.max(1, maxItems), limitByConstraint));
+  const prepared = prepareBulletsForList(bullets, effectiveMaxItems, maxChars, autoSplit);
+  prepared.forEach((item, i) => {
+    const text = clampBulletText(item, w, style, maxChars);
     if (!text) return;
-    const size = text.length > 44 ? Math.max(12, recipe.bodySize - 2) : recipe.bodySize;
-    const rowH = text.length > 44 ? 0.52 : 0.46;
+    const sizeBase = text.length > 40 ? recipe.bodySize - 2 : recipe.bodySize;
+    const size = Math.max(minBodyFont, sizeBase);
+    const rowH = text.length > 40 ? 0.44 : 0.40;
     const yy = y + i * Math.max(recipe.bulletStep, rowH + 0.06);
     if (yy + rowH > y + h) return;
-    slide.addText(`• ${item}`, {
+    slide.addText(`• ${text}`, {
       x: x + 0.02,
       y: yy,
       w: Math.max(0.6, w - 0.04),
@@ -1175,6 +1600,8 @@ function addBulletList(slide, bullets, x, y, w, h, theme, style, maxItems = 5) {
       fontSize: size,
       bold: false,
       color: theme.darkText,
+      fit: "shrink",
+      breakLine: false,
       margin: 0,
     });
   });
@@ -1351,6 +1778,11 @@ function addContentSlide(
     templateFamily,
   );
   const maxBullets = Math.max(3, visualConfig?.maxBullets || 5);
+  const textConstraints = resolveSlideTextConstraints(slideData || {}, subtype, maxBullets);
+  const constrainedMaxBullets = Math.max(
+    2,
+    Math.min(maxBullets, toBoundedInt(textConstraints.bullet_max_items, maxBullets, 2, 8)),
+  );
 
   const slide = pres.addSlide();
   maybeAddSvgLayer(slide, slideData, theme, pick(slideData, ["layout_grid", "layout"], "split_2"));
@@ -1359,31 +1791,89 @@ function addContentSlide(
     return;
   }
 
-  addHeader(slide, title, theme, style, visualConfig, templateFamily);
-  const bodyTop = recipe.headerHeight + recipe.gap;
-  const bodyBottom = 5.05;
-
-  if (
-    renderTemplateContent({
-      templateFamily,
-      slide,
-      title,
-      bullets,
-      pageNumber,
-      theme,
-      style,
-      sourceSlide: slideData,
-      helpers: {
-        FONT_BY_STYLE,
-        FONT_ZH,
-        addPageBadge,
-        addBulletList,
-        pptx: pptxgen,
-      },
-    })
-  ) {
-    return;
+  const templateCapability = assessTemplateCapabilityForSlide({
+    sourceSlide: slideData,
+    templateFamily,
+    slideType: pick(
+      slideData,
+      ["page_type", "pageType", "slide_type", "slideType", "subtype"],
+      subtype,
+    ),
+    layoutGrid: pick(slideData, ["layout_grid", "layout"], ""),
+  });
+  const skipTemplateRenderer = !templateCapability.compatible;
+  if (slideData && typeof slideData === "object") {
+    slideData.__template_capability = templateCapability;
+    slideData.__template_renderer_skipped = skipTemplateRenderer;
+    slideData.__template_renderer_skip_reason = skipTemplateRenderer
+      ? (
+        templateCapability.missing_required_image_asset
+          ? "missing_required_image_asset"
+          : templateCapability.unsupported_layout
+            ? "unsupported_layout"
+            : templateCapability.unsupported_slide_type
+              ? "unsupported_slide_type"
+          : "unsupported_block_types"
+      )
+      : "";
   }
+
+  const templateContentCandidate = !["mixed_media", "image_showcase"].includes(subtype) && !skipTemplateRenderer;
+  if (templateContentCandidate) {
+    const isLightTemplate = String(templateFamily || "").endsWith("_light");
+    const lightBg = templateFamily === "consulting_warm_light" ? "F7F3EE" : "F4F7FC";
+    slide.background = { color: isLightTemplate ? lightBg : theme.bg };
+    if (!isLightTemplate) addVisualBackdrop(slide, theme, visualConfig, "content");
+    if (
+      renderTemplateContent({
+        templateFamily,
+        slide,
+        title,
+        bullets,
+        pageNumber,
+        theme,
+        style,
+        sourceSlide: slideData,
+        helpers: {
+          FONT_BY_STYLE,
+          FONT_ZH,
+          addPageBadge,
+          addBulletList: (
+            tplSlide,
+            tplBullets,
+            x,
+            y,
+            w,
+            h,
+            tplTheme,
+            tplStyle,
+            tplMaxItems = 5,
+          ) =>
+            addBulletList(
+              tplSlide,
+              tplBullets,
+              x,
+              y,
+              w,
+              h,
+              tplTheme,
+              tplStyle,
+              tplMaxItems,
+              { textConstraints },
+            ),
+          pptx: pptxgen,
+        },
+      })
+    ) {
+      return;
+    }
+  }
+
+  addHeader(slide, title, theme, style, visualConfig, templateFamily, textConstraints);
+  const bodyTop = recipe.headerHeight + recipe.gap;
+  const contentLoad = Math.min(1, (bullets.join(" ").length / 360) + (bullets.length / 8));
+  const bodyHeight = Math.min(4.25, Math.max(3.5, 3.0 + contentLoad * 1.1));
+  const bodyBottom = Math.min(5.22, bodyTop + bodyHeight);
 
   if (subtype === "table") {
     const rows = buildTableRows(slideData, bullets);
@@ -1393,6 +1883,106 @@ function addContentSlide(
       w: 9.2,
       h: bodyBottom - bodyTop,
     }, rows, theme);
+  } else if (subtype === "mixed_media") {
+    const leftW = 4.45;
+    const rightX = recipe.pageMargin + leftW + recipe.gap;
+    const rightW = 9.2 - leftW - recipe.gap;
+    const imageData = pickSlideImageData(slideData);
+    slide.addShape("roundRect", {
+      x: recipe.pageMargin,
+      y: bodyTop,
+      w: leftW,
+      h: bodyBottom - bodyTop,
+      rectRadius: recipe.cardRadius,
+      fill: { color: theme.white, transparency: 4 },
+      line: { color: theme.light, pt: 1 },
+    });
+    addBulletList(
+      slide,
+      bullets.length ? bullets : [narration || title],
+      recipe.pageMargin + 0.18,
+      bodyTop + 0.2,
+      leftW - 0.34,
+      bodyBottom - bodyTop - 0.26,
+      theme,
+      style,
+      constrainedMaxBullets,
+      { textConstraints },
+    );
+    slide.addShape("roundRect", {
+      x: rightX,
+      y: bodyTop,
+      w: rightW,
+      h: bodyBottom - bodyTop,
+      rectRadius: recipe.cardRadius,
+      fill: { color: theme.white, transparency: 6 },
+      line: { color: theme.light, pt: 1 },
+    });
+    if (imageData) {
+      slide.addImage({
+        data: imageData,
+        ...clampRectToSlide(rightX + 0.14, bodyTop + 0.14, rightW - 0.28, bodyBottom - bodyTop - 0.28, 0.02),
+      });
+    } else {
+      const focal = (bullets[0] || title).slice(0, 48);
+      slide.addText(focal, {
+        x: rightX + 0.2,
+        y: bodyTop + 0.65,
+        w: rightW - 0.4,
+        h: 0.8,
+        fontFace: FONT_ZH,
+        fontSize: 16,
+        bold: true,
+        color: theme.secondary,
+        align: "center",
+        valign: "mid",
+        margin: 0,
+      });
+    }
+  } else if (subtype === "image_showcase") {
+    const imageData = pickSlideImageData(slideData);
+    const visualH = Math.max(1.9, bodyBottom - bodyTop - 1.1);
+    slide.addShape("roundRect", {
+      x: recipe.pageMargin,
+      y: bodyTop,
+      w: 9.2,
+      h: visualH,
+      rectRadius: recipe.cardRadius,
+      fill: { color: theme.white, transparency: 4 },
+      line: { color: theme.light, pt: 1 },
+    });
+    if (imageData) {
+      slide.addImage({
+        data: imageData,
+        ...clampRectToSlide(recipe.pageMargin + 0.1, bodyTop + 0.1, 9.0, visualH - 0.2, 0.02),
+      });
+    } else {
+      slide.addText((bullets[0] || title).slice(0, 56), {
+        x: recipe.pageMargin + 0.2,
+        y: bodyTop + 0.65,
+        w: 8.8,
+        h: 0.8,
+        fontFace: FONT_ZH,
+        fontSize: 18,
+        bold: true,
+        color: theme.secondary,
+        align: "center",
+        valign: "mid",
+        margin: 0,
+      });
+    }
+    addBulletList(
+      slide,
+      bullets.slice(0, 3),
+      recipe.pageMargin + 0.12,
+      bodyTop + visualH + 0.14,
+      8.95,
+      bodyBottom - (bodyTop + visualH) - 0.18,
+      theme,
+      style,
+      3,
+      { textConstraints },
+    );
   } else if (subtype === "comparison") {
     const { left, right } = splitComparison(
       bullets.length ? bullets : ["要点A", "要点B", "要点C", "要点D"],
@@ -1438,7 +2028,18 @@ function addContentSlide(
       color: theme.secondary,
       margin: 0,
     });
-    addBulletList(slide, left, recipe.pageMargin + 0.2, bodyTop + 0.45, colW - 0.34, bodyBottom - bodyTop - 0.5, theme, style, maxBullets);
+    addBulletList(
+      slide,
+      left,
+      recipe.pageMargin + 0.2,
+      bodyTop + 0.45,
+      colW - 0.34,
+      bodyBottom - bodyTop - 0.5,
+      theme,
+      style,
+      constrainedMaxBullets,
+      { textConstraints },
+    );
     addBulletList(
       slide,
       right,
@@ -1448,7 +2049,8 @@ function addContentSlide(
       bodyBottom - bodyTop - 0.5,
       theme,
       style,
-      maxBullets,
+      constrainedMaxBullets,
+      { textConstraints },
     );
   } else if (subtype === "timeline") {
     const steps = (bullets.length ? bullets : ["阶段一", "阶段二", "阶段三", "阶段四"]).slice(0, 5);
@@ -1524,12 +2126,24 @@ function addContentSlide(
         bodyBottom - bodyTop - 0.3,
         theme,
         style,
-        Math.max(maxBullets, 6),
+        constrainedMaxBullets,
+        { textConstraints },
       );
       addPageBadge(slide, pageNumber, theme, style);
       return;
     }
-    addBulletList(slide, safeBullets, recipe.pageMargin, bodyTop, leftW, bodyBottom - bodyTop, theme, style, maxBullets);
+    addBulletList(
+      slide,
+      safeBullets,
+      recipe.pageMargin,
+      bodyTop,
+      leftW,
+      bodyBottom - bodyTop,
+      theme,
+      style,
+      constrainedMaxBullets,
+      { textConstraints },
+    );
 
     const rightX = recipe.pageMargin + leftW + recipe.gap;
     const rightW = 9.2 - leftW - recipe.gap;
@@ -1553,7 +2167,7 @@ function addContentSlide(
       });
     }
 
-    if (subtype === "data") {
+    if (subtype === "data" || subtype === "data_visualization") {
       const bars = extractChartSeries(slideData);
       if (bars && bars.length) {
         addDataBars(slide, bars, rightX + 0.2, bodyTop + 0.22, rightW - 0.4, bodyBottom - bodyTop - 0.4, theme, style);
@@ -1644,9 +2258,10 @@ function addVerbatimContentSlide(pres, slideData, pageNumber, theme, style, visu
   const narration = htmlToMultilineText(String(pick(slideData, ["narration", "speaker_notes", "speakerNotes"], "")));
   const lines = collectTextLines(slideData, narration || title);
   const bodyText = lines.join("\n");
+  const textConstraints = resolveSlideTextConstraints(slideData || {}, "content", visualConfig?.maxBullets || 5);
 
   const slide = pres.addSlide();
-  addHeader(slide, title, theme, style, visualConfig, templateFamily);
+  addHeader(slide, title, theme, style, visualConfig, templateFamily, textConstraints);
 
   const bodyTop = recipe.headerHeight + recipe.gap;
   const bodyBottom = 5.05;
@@ -1670,6 +2285,7 @@ function addVerbatimContentSlide(pres, slideData, pageNumber, theme, style, visu
   else if (textLen > 700) fontSize = 13;
   else if (textLen > 520) fontSize = 14;
   else if (textLen > 360) fontSize = 15;
+  fontSize = Math.max(fontSize, toBoundedInt(textConstraints.min_body_font_pt, 11, 9, 24));
 
   slide.addText(bodyText || title, {
     x: boxX + 0.24,
@@ -1690,6 +2306,11 @@ function addVerbatimContentSlide(pres, slideData, pageNumber, theme, style, visu
 function addSummarySlide(pres, title, bullets, pageNumber, theme, style, visualConfig, sourceSlide = undefined) {
   const recipe = STYLE_RECIPES[style];
   const maxBullets = Math.max(3, visualConfig?.maxBullets || 5);
+  const textConstraints = resolveSlideTextConstraints(sourceSlide || {}, "summary", maxBullets);
+  const constrainedMaxBullets = Math.max(
+    2,
+    Math.min(maxBullets, toBoundedInt(textConstraints.bullet_max_items, maxBullets, 2, 8)),
+  );
   const slide = pres.addSlide();
   slide.background = { color: theme.bg };
   maybeAddSvgLayer(
@@ -1705,7 +2326,7 @@ function addSummarySlide(pres, title, bullets, pageNumber, theme, style, visualC
     w: 8.4,
     h: 0.8,
     fontFace: FONT_ZH,
-    fontSize: 36,
+    fontSize: Math.max(36, toBoundedInt(textConstraints.min_title_font_pt, 24, 16, 42)),
     bold: true,
     color: theme.primary,
     margin: 0,
@@ -1727,19 +2348,18 @@ function addSummarySlide(pres, title, bullets, pageNumber, theme, style, visualC
     line: { color: theme.light, pt: 1 },
   });
 
-  bullets.slice(0, maxBullets).forEach((item, i) => {
-    slide.addText(`• ${item}`, {
-      x: recipe.pageMargin + 0.24,
-      y: 2.03 + i * Math.max(recipe.bulletStep, 0.5),
-      w: 8.45,
-      h: 0.46,
-      fontFace: FONT_ZH,
-      fontSize: recipe.bodySize,
-      bold: false,
-      color: theme.darkText,
-      margin: 0,
-    });
-  });
+  addBulletList(
+    slide,
+    bullets,
+    recipe.pageMargin + 0.2,
+    2.03,
+    8.5,
+    2.7,
+    theme,
+    style,
+    constrainedMaxBullets,
+    { textConstraints },
+  );
 
   slide.addText("Thank you", {
     x: recipe.pageMargin + 0.24,
@@ -1778,6 +2398,19 @@ function pickHighlightKeyword(lines) {
 }
 
 function asScriptLine(sourceSlide, fallbackText) {
+  const existingScript = sourceSlide?.script;
+  if (Array.isArray(existingScript)) {
+    const normalized = existingScript
+      .map((item) => ({
+        role: String(item?.role || "host"),
+        text: htmlToText(String(item?.text || "")),
+      }))
+      .filter((item) => item.text);
+    if (normalized.length > 0) return normalized.slice(0, 4);
+  } else if (existingScript && typeof existingScript === "object") {
+    const text = htmlToText(String(existingScript?.text || ""));
+    if (text) return [{ role: String(existingScript?.role || "host"), text }];
+  }
   const narration = htmlToText(
     String(
       pick(sourceSlide, ["narration", "speaker_notes", "speakerNotes"], fallbackText || ""),
@@ -1798,10 +2431,74 @@ function asNarrationAudio(sourceSlide) {
   return url ? String(url) : undefined;
 }
 
+function summarizeTemplateRendererDiagnostics(renderSlides = []) {
+  const slides = Array.isArray(renderSlides) ? renderSlides : [];
+  const evaluatedSlides = slides
+    .map((slide) => slide?.template_renderer)
+    .filter((item) => item && typeof item === "object");
+  const summary = {
+    evaluated_slides: evaluatedSlides.length,
+    skipped_slides: 0,
+    skipped_ratio: 0,
+    mode_counts: {},
+    reason_counts: {},
+    reason_ratios: {},
+  };
+  if (!evaluatedSlides.length) return summary;
+
+  for (const item of evaluatedSlides) {
+    const mode = String(item.mode || "").trim().toLowerCase() || "unknown";
+    summary.mode_counts[mode] = (summary.mode_counts[mode] || 0) + 1;
+    if (Boolean(item.skipped)) {
+      summary.skipped_slides += 1;
+      const reason = String(item.reason || "").trim().toLowerCase() || "unknown";
+      summary.reason_counts[reason] = (summary.reason_counts[reason] || 0) + 1;
+    }
+  }
+  const safeRound = (value) => Math.round((Number(value) || 0) * 10000) / 10000;
+  summary.skipped_ratio = safeRound(summary.skipped_slides / Math.max(1, summary.evaluated_slides));
+  const skippedBase = Math.max(1, summary.skipped_slides);
+  for (const [reason, count] of Object.entries(summary.reason_counts)) {
+    summary.reason_ratios[reason] = safeRound(count / skippedBase);
+  }
+  return summary;
+}
+
+function buildTemplateRendererDiagnostics(sourceSlide) {
+  if (!sourceSlide || typeof sourceSlide !== "object") return undefined;
+  const skipped = asBool(sourceSlide.__template_renderer_skipped, false);
+  const reason = String(sourceSlide.__template_renderer_skip_reason || "").trim();
+  const capability =
+    sourceSlide.__template_capability && typeof sourceSlide.__template_capability === "object"
+      ? sourceSlide.__template_capability
+      : null;
+  if (!skipped && !capability) return undefined;
+  const unsupportedBlockTypes = Array.isArray(capability?.unsupported_block_types)
+    ? capability.unsupported_block_types.filter(Boolean)
+    : [];
+  return {
+    mode: skipped ? "fallback_generic" : "local_template",
+    skipped,
+    reason: reason || undefined,
+    unsupported_block_types: unsupportedBlockTypes.length ? unsupportedBlockTypes : undefined,
+    unsupported_slide_type: Boolean(capability?.unsupported_slide_type),
+    unsupported_layout: Boolean(capability?.unsupported_layout),
+    missing_required_image_asset: Boolean(capability?.missing_required_image_asset),
+  };
+}
+
 function renderIdentity(pageNumber, sourceSlide) {
+  const renderPath = resolveRenderPath(sourceSlide || {});
+  const svgRenderMode = String(sourceSlide?.__svg_render_mode || "").trim();
+  const templateRenderer = buildTemplateRendererDiagnostics(sourceSlide);
+  const resolvedTitle = htmlToText(String(pick(sourceSlide || {}, ["title"], `Slide ${pageNumber}`))) || `Slide ${pageNumber}`;
   return {
     deck_id: deckId || undefined,
     slide_id: stableSlideId(sourceSlide || {}, Math.max(pageNumber - 1, 0)),
+    title: resolvedTitle,
+    render_path: renderPath,
+    svg_render_mode: svgRenderMode || (renderPath === "svg" ? "pending_svg" : ""),
+    ...(templateRenderer ? { template_renderer: templateRenderer } : {}),
   };
 }
 
@@ -1863,10 +2560,49 @@ function buildTableMarkdown(rows) {
   return lines.join("\n");
 }
 
+function resolveContentRenderSlideType(sourceSlide, subtype) {
+  const layoutGrid = normalizeKey(String(sourceSlide?.layout_grid || sourceSlide?.layout || ""));
+  const normalizedSubtype = normalizeSubtype(subtype || "content");
+  const validLayoutTypes = new Set([
+    "split_2",
+    "asymmetric_2",
+    "grid_2",
+    "grid_3",
+    "grid_4",
+    "bento_5",
+    "bento_6",
+    "timeline",
+  ]);
+  if (normalizedSubtype === "timeline") return "timeline";
+  if (normalizedSubtype === "image_showcase") return "image_showcase";
+  if (validLayoutTypes.has(layoutGrid)) return layoutGrid;
+  if (normalizedSubtype === "comparison" || normalizedSubtype === "mixed_media" || normalizedSubtype === "table") {
+    return "grid_2";
+  }
+  if (normalizedSubtype === "data" || normalizedSubtype === "data_visualization") return "grid_3";
+  return "grid_3";
+}
+
+function resolveRenderSlideTypeByTemplate(templateFamily) {
+  const family = normalizeKey(String(templateFamily || ""));
+  if (!family) return "";
+  return normalizeKey(getTemplatePreferredLayout(family, "")) || "";
+}
+
 function buildContentRenderSlide(pageNumber, sourceSlide, subtype, title, bullets, templateFamily = "dashboard_dark") {
   const safeBullets = (bullets.length ? bullets : [title]).slice(0, 6);
   const actions = [];
   const templateProfiles = getTemplateProfiles(templateFamily);
+  const prefersTemplateRenderer = hasTemplateContentRenderer(templateFamily);
+  const lockTemplate = asBool(sourceSlide?.template_lock, false);
+  const skipTemplateRenderer = asBool(sourceSlide?.__template_renderer_skipped, false);
+  const layoutSource =
+    prefersTemplateRenderer && lockTemplate && !skipTemplateRenderer
+      ? { ...(sourceSlide || {}), layout_grid: "", layout: "" }
+      : sourceSlide;
+  const renderSlideType =
+    (skipTemplateRenderer ? "" : resolveRenderSlideTypeByTemplate(templateFamily))
+    || resolveContentRenderSlideType(layoutSource, subtype);
   if (safeBullets.length) {
     actions.push({ type: "appear_items", items: safeBullets.slice(0, 4), startFrame: 24 });
   }
@@ -1912,7 +2648,7 @@ function buildContentRenderSlide(pageNumber, sourceSlide, subtype, title, bullet
     return {
       ...renderIdentity(pageNumber, sourceSlide),
       page_number: pageNumber,
-      slide_type: "grid_2",
+      slide_type: renderSlideType,
       template_family: templateFamily,
       ...templateProfiles,
       svg_mode: svgModeEnabled ? "on" : "off",
@@ -1929,7 +2665,7 @@ function buildContentRenderSlide(pageNumber, sourceSlide, subtype, title, bullet
     return {
       ...renderIdentity(pageNumber, sourceSlide),
       page_number: pageNumber,
-      slide_type: "grid_2",
+      slide_type: renderSlideType,
       template_family: templateFamily,
       ...templateProfiles,
       svg_mode: svgModeEnabled ? "on" : "off",
@@ -1944,7 +2680,47 @@ function buildContentRenderSlide(pageNumber, sourceSlide, subtype, title, bullet
     };
   }
 
-  if (subtype === "data") {
+  if (subtype === "mixed_media") {
+    const lead = safeBullets[0] || title;
+    const rest = safeBullets.slice(1);
+    return {
+      ...renderIdentity(pageNumber, sourceSlide),
+      page_number: pageNumber,
+      slide_type: renderSlideType,
+      template_family: templateFamily,
+      ...templateProfiles,
+      svg_mode: svgModeEnabled ? "on" : "off",
+      markdown: `# ${mdEscape(title)}\n<div class="grid-2">\n<div>\n- ${mdEscape(lead)}\n${rest.map((b) => `- ${mdEscape(b)}`).join("\n")}\n</div>\n<div class="card accent">\n<mark>Visual Focus</mark>\n</div>\n</div>`,
+      script: asScriptLine(sourceSlide, title),
+      actions: [
+        { type: "appear_items", items: safeBullets.slice(0, 4), startFrame: 24 },
+        { type: "zoom_in", region: "right", startFrame: 42 },
+      ],
+      narration_audio_url: asNarrationAudio(sourceSlide),
+      duration: asDuration(sourceSlide, 7),
+    };
+  }
+
+  if (subtype === "image_showcase") {
+    return {
+      ...renderIdentity(pageNumber, sourceSlide),
+      page_number: pageNumber,
+      slide_type: "image_showcase",
+      template_family: templateFamily,
+      ...templateProfiles,
+      svg_mode: svgModeEnabled ? "on" : "off",
+      markdown: `# ${mdEscape(title)}\n<mark>${mdEscape(safeBullets[0] || title)}</mark>\n${safeBullets.slice(1).map((b) => `- ${mdEscape(b)}`).join("\n")}`,
+      script: asScriptLine(sourceSlide, title),
+      actions: [
+        { type: "zoom_in", region: "center", startFrame: 20 },
+        { type: "highlight", keyword, startFrame: 40 },
+      ],
+      narration_audio_url: asNarrationAudio(sourceSlide),
+      duration: asDuration(sourceSlide, 7),
+    };
+  }
+
+  if (subtype === "data" || subtype === "data_visualization") {
     const bars = extractChartSeries(sourceSlide);
     const dataLines = bars && bars.length
       ? bars.map((b) => `- ${mdEscape(b.label)}: <mark>${b.value}</mark>`)
@@ -1952,7 +2728,7 @@ function buildContentRenderSlide(pageNumber, sourceSlide, subtype, title, bullet
     return {
       ...renderIdentity(pageNumber, sourceSlide),
       page_number: pageNumber,
-      slide_type: "quote_stat",
+      slide_type: renderSlideType,
       template_family: templateFamily,
       ...templateProfiles,
       svg_mode: svgModeEnabled ? "on" : "off",
@@ -1970,7 +2746,7 @@ function buildContentRenderSlide(pageNumber, sourceSlide, subtype, title, bullet
   return {
     ...renderIdentity(pageNumber, sourceSlide),
     page_number: pageNumber,
-    slide_type: "grid_3",
+    slide_type: renderSlideType,
     template_family: templateFamily,
     ...templateProfiles,
     svg_mode: svgModeEnabled ? "on" : "off",
@@ -2265,13 +3041,14 @@ function buildDeck() {
   );
   const hasExplicitStructure = explicitTypeSet.size > 0;
   if (hasExplicitStructure) {
+    const layoutHintTypes = new Set(["split_2", "asymmetric_2", "grid_2", "grid_3", "grid_4", "bento_5", "bento_6"]);
     const explicitContentCandidates = [];
     for (let i = 0; i < slides.length; i += 1) {
       const sourceSlide = slides[i];
       const explicitType = normalizeKey(
         pick(sourceSlide, ["page_type", "pageType", "slide_type", "slideType", "subtype"], ""),
       );
-      if (!explicitType || explicitType === "content") {
+      if (!explicitType || explicitType === "content" || layoutHintTypes.has(explicitType)) {
         explicitContentCandidates.push({ index: i, slide: sourceSlide });
       }
     }
@@ -2331,8 +3108,14 @@ function buildDeck() {
       }
       if (explicitType === "summary") {
         const summaryBullets = (bullets.length ? bullets : [narration || title]).slice(0, 5);
-        addSummarySlide(pres, title, summaryBullets, pageNumber, theme, style, visualConfig, sourceSlide);
-        renderSlides.push(buildSummaryRenderSlide(pageNumber, title, summaryBullets, sourceSlide, "hero_dark"));
+        const summaryTemplate = normalizeTemplateFamily(
+          resolveSlideTemplateFamily(sourceSlide),
+          "summary",
+          sourceSlide?.layout_grid || "hero_1",
+        );
+        const summaryTheme = buildTheme(paletteKey, summaryTemplate);
+        addSummarySlide(pres, title, summaryBullets, pageNumber, summaryTheme, style, visualConfig, sourceSlide);
+        renderSlides.push(buildSummaryRenderSlide(pageNumber, title, summaryBullets, sourceSlide, summaryTemplate));
         continue;
       }
 
@@ -2353,8 +3136,8 @@ function buildDeck() {
       }
 
       const subtype =
-        explicitType && explicitType !== "content"
-          ? explicitType
+        explicitType && explicitType !== "content" && !layoutHintTypes.has(explicitType)
+          ? normalizeSubtype(explicitType)
           : (explicitSubtypeByIndex.get(i) || inferSubtype(sourceSlide) || "content");
       addContentSlide(pres, sourceSlide, pageNumber, slideTheme, style, visualConfig, subtype, templateFamily);
       renderSlides.push(buildContentRenderSlide(pageNumber, sourceSlide, subtype, title, bullets, templateFamily));
@@ -2411,12 +3194,18 @@ function buildDeck() {
   const summaryTitle = htmlToText(String(pick(lastSlide, ["title"], "Summary"))) || "Summary";
   const allBullets = slides.flatMap((s) => collectBullets(s, ""));
   const summaryBullets = Array.from(new Set(allBullets)).slice(0, 5);
+  const lastSummaryTemplate = normalizeTemplateFamily(
+    resolveSlideTemplateFamily(lastSlide),
+    "summary",
+    lastSlide?.layout_grid || "hero_1",
+  );
+  const lastSummaryTheme = buildTheme(paletteKey, lastSummaryTemplate);
   addSummarySlide(
     pres,
     summaryTitle,
     summaryBullets.length ? summaryBullets : [summaryTitle],
     Math.max(3, slides.length + 1),
-    theme,
+    lastSummaryTheme,
     style,
     visualConfig,
     lastSlide,
@@ -2427,7 +3216,7 @@ function buildDeck() {
       summaryTitle,
       summaryBullets,
       lastSlide,
-      "hero_dark",
+      lastSummaryTemplate,
     ),
   );
 
@@ -2436,6 +3225,7 @@ function buildDeck() {
 
 async function main() {
   const { pres, style, paletteKey, renderSlides, renderMode, visualConfig } = buildDeck();
+  const templateRendererSummary = summarizeTemplateRendererDiagnostics(renderSlides);
   const effectiveDeckTemplate = normalizeTemplateFamily(
     normalizeKey(requestedTemplateFamily) === "auto" ? "" : requestedTemplateFamily,
     "content",
@@ -2476,6 +3266,8 @@ async function main() {
           idempotency_key: idempotencyKey || undefined,
           original_style: originalStyle,
           disable_local_style_rewrite: disableLocalStyleRewrite,
+          design_spec: designSpec,
+          template_renderer_summary: templateRendererSummary,
           official_input: officialPlan.officialInput,
           official_output: officialOutput,
           slides: renderSlides,
@@ -2509,6 +3301,7 @@ async function main() {
       target_block_ids: Array.from(targetBlockIdSet),
       original_style: originalStyle,
       disable_local_style_rewrite: disableLocalStyleRewrite,
+      template_renderer_summary: templateRendererSummary,
       render_output: renderOutputPath || undefined,
       render_slides: Array.isArray(renderSlides) ? renderSlides.length : 0,
       official_slides: Array.isArray(officialOutput?.slides) ? officialOutput.slides.length : 0,

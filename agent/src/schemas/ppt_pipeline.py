@@ -44,6 +44,7 @@ class PPTPipelineRequest(BaseModel):
     language: Literal["zh-CN", "en-US"] = "zh-CN"
     title: Optional[str] = Field(default=None, max_length=300)
     author: str = Field(default="AutoViralVid", max_length=100)
+    route_mode: Literal["auto", "fast", "standard", "refine"] = "auto"
     export_channel: Literal["auto", "local", "remote"] = "local"
     with_export: bool = True
     save_artifacts: bool = True

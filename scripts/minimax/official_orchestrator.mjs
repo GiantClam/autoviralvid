@@ -24,11 +24,11 @@ export function resolveOfficialPlan({
   const requestedMode =
     cliValues?.["generator-mode"] ?? payload?.generator_mode ?? "official";
   const generatorMode = normalizeGeneratorMode(requestedMode, "official");
-  const preserveOriginal = asBool(originalStyle, payload?.original_style, true);
+  const preserveOriginal = asBool(originalStyle, payload?.original_style, false);
   const disableRewrite = asBool(
     disableLocalStyleRewrite,
     payload?.disable_local_style_rewrite,
-    preserveOriginal,
+    false,
   );
 
   const officialInput = toOfficialInput({

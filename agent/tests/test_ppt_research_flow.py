@@ -39,6 +39,10 @@ async def test_research_outline_plan_flow_contract():
     assert outline.notes[-1].layout_hint == "summary"
     for idx in range(1, len(outline.notes)):
         assert outline.notes[idx].layout_hint != outline.notes[idx - 1].layout_hint
+    middle_layouts = [str(item.layout_hint) for item in outline.notes[1:-1]]
+    for start in range(0, max(0, len(middle_layouts) - 4)):
+        window = middle_layouts[start:start + 5]
+        assert any(layout in {"hero_1", "cover", "summary", "section", "divider"} for layout in window)
 
     plan = await svc.generate_presentation_plan(
         PresentationPlanRequest(outline=outline, research=research)
@@ -47,6 +51,11 @@ async def test_research_outline_plan_flow_contract():
     for slide in plan.slides:
         assert any(block.block_type == "title" for block in slide.blocks)
         assert any(block.block_type != "title" for block in slide.blocks)
+        assert slide.content_strategy is not None
+        title_block = next(block for block in slide.blocks if block.block_type == "title")
+        assert title_block.content == slide.content_strategy.assertion
+        assert slide.content_strategy.page_role in {"argument", "evidence", "transition", "summary"}
+        assert slide.content_strategy.render_path in {"pptxgenjs", "svg"}
 
 
 def test_content_block_rejects_placeholder_content():

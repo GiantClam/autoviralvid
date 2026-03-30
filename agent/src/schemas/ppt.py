@@ -162,14 +162,16 @@ class ExportRequest(BaseModel):
     target_slide_ids: List[str] = Field(default_factory=list, max_length=50)
     target_block_ids: List[str] = Field(default_factory=list, max_length=500)
     idempotency_key: Optional[str] = Field(default=None, max_length=128)
+    template_file_url: Optional[str] = Field(default=None, max_length=2048)
+    route_mode: Literal["auto", "fast", "standard", "refine"] = "auto"
     export_channel: Literal["auto", "local", "remote"] = "local"
     generator_mode: Literal["auto", "official", "legacy"] = "official"
-    original_style: bool = True
-    disable_local_style_rewrite: bool = True
+    original_style: bool = False
+    disable_local_style_rewrite: bool = False
     visual_priority: bool = True
     visual_preset: Literal["auto", "tech_cinematic", "executive_brief", "premium_light", "energetic"] = "auto"
     visual_density: Literal["sparse", "balanced", "dense"] = "balanced"
-    constraint_hardness: Literal["minimal", "balanced"] = "minimal"
+    constraint_hardness: Literal["minimal", "balanced", "strict"] = "minimal"
     svg_mode: Literal["off", "on"] = "on"
     template_family: Literal[
         "auto",
@@ -204,6 +206,16 @@ class ExportRequest(BaseModel):
             seen.add(key)
             dedup.append(key)
         return dedup
+
+    @field_validator("template_file_url")
+    @classmethod
+    def validate_template_file_url(cls, value: Optional[str]) -> Optional[str]:
+        text = str(value or "").strip()
+        if not text:
+            return None
+        if not (text.startswith("http://") or text.startswith("https://")):
+            raise ValueError("template_file_url must start with http:// or https://")
+        return text
 
 
 class ParseRequest(BaseModel):

@@ -202,8 +202,10 @@ export default function PPTTestPage() {
         minimax_style_variant: minimaxStyleVariant,
         minimax_palette_key: minimaxPaletteKey,
         verbatim_content: false,
-        original_style: true,
-        disable_local_style_rewrite: true,
+        route_mode: "standard",
+        original_style: false,
+        disable_local_style_rewrite: false,
+        visual_priority: true,
       });
       setExportUrl(data.url);
       if (Array.isArray(data.video_slides) && data.video_slides.length > 0) {

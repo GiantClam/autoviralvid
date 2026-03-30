@@ -128,6 +128,9 @@ class PPTPipelineConfig:
     generator_mode: str = field(
         default_factory=lambda: os.getenv("PPT_GENERATOR_MODE", "official")
     )
+    route_mode: str = field(
+        default_factory=lambda: os.getenv("PPT_ROUTE_MODE", "auto")
+    )
     allow_legacy_mode: bool = field(
         default_factory=lambda: str(os.getenv("PPT_ALLOW_LEGACY_MODE", "false")).strip().lower() not in {"0", "false", "no", "off"}
     )
@@ -154,6 +157,9 @@ class PPTPipelineConfig:
     )
     video_base_mode: str = field(
         default_factory=lambda: os.getenv("PPT_VIDEO_BASE_MODE", "ppt_image_slideshow")
+    )
+    visual_qa_multimodal: bool = field(
+        default_factory=lambda: str(os.getenv("PPT_VISUAL_QA_MULTIMODAL", "false")).strip().lower() not in {"0", "false", "no", "off"}
     )
 
 
@@ -205,6 +211,8 @@ class AppConfig:
             errors.append("PPT_EXPORT_CHANNEL must be local, remote, or auto")
         if self.ppt_pipeline.generator_mode not in {"official", "legacy"}:
             errors.append("PPT_GENERATOR_MODE must be official or legacy")
+        if self.ppt_pipeline.route_mode not in {"auto", "fast", "standard", "refine"}:
+            errors.append("PPT_ROUTE_MODE must be auto, fast, standard, or refine")
         if self.ppt_pipeline.visual_density not in {"sparse", "balanced", "dense"}:
             errors.append("PPT_VISUAL_DENSITY must be sparse, balanced, or dense")
 

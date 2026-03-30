@@ -13,6 +13,7 @@ RETRYABLE_CODES = {
     "schema_invalid",
     "encoding_invalid",
     "layout_homogeneous",
+    "quality_score_low",
 }
 
 
@@ -67,6 +68,13 @@ _CLASSIFICATIONS = {
         max_attempts=2,
         base_delay_ms=700,
         message_for_retry_prompt="Layout diversity is too low. Regenerate deck with varied slide types and avoid adjacent duplicates.",
+    ),
+    "quality_score_low": FailureClassification(
+        code="quality_score_low",
+        retryable=True,
+        max_attempts=2,
+        base_delay_ms=700,
+        message_for_retry_prompt="Weighted quality score is too low. Improve visual consistency and structural clarity in failed scope.",
     ),
     "auth_invalid": FailureClassification(
         code="auth_invalid",
@@ -165,12 +173,24 @@ def classify_failure(error: object) -> FailureClassification:
         (
             "layout_homogeneous",
             "layout_adjacent_repeat",
+            "template_family_homogeneous",
+            "template_family_switch_frequent",
             "layout diversity",
             "homogeneous",
             "adjacent layout repetition",
         ),
     ):
         return _CLASSIFICATIONS["layout_homogeneous"]
+
+    if _contains_any(
+        lowered,
+        (
+            "quality_score_low",
+            "weighted_score",
+            "weighted quality score",
+        ),
+    ):
+        return _CLASSIFICATIONS["quality_score_low"]
 
     if _contains_any(
         lowered,

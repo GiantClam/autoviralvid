@@ -122,6 +122,14 @@ Optional but commonly needed:
 Notes:
 
 - The frontend expects the Python backend to be reachable at `AGENT_URL` in production.
+- For split deployment, keep Vercel in `web` role (no heavy PPT worker chain):
+  - `PPT_EXECUTION_ROLE=web`
+  - `PPT_MODULE_RETRY_ENABLED=false`
+  - `PPT_INSTALLED_SKILL_EXECUTOR_ENABLED=false`
+  - `PPT_EXPORT_SYNC_ENABLED=false`
+  - `PPT_EXPORT_WORKER_BASE_URL=https://<your-railway-worker-domain>`
+  - optional: `PPT_EXPORT_WORKER_TOKEN=<internal-shared-token>`
+  - optional (recommended): `PPT_EXPORT_WORKER_SHARED_SECRET=<shared-hmac-secret>`
 - `npm run build` runs `prisma generate` automatically before the Next.js build.
 - `npm test` excludes service-dependent integration tests by default so CI and Vercel checks stay deterministic.
 - `npm run test:deployed` requires `DEPLOYED_FRONTEND_URL` and `DEPLOYED_BACKEND_URL`; set `ALLOW_PAID_DEPLOYED_E2E=1` plus the digital-human audio env vars only when you want real end-to-end generation against production services.
@@ -130,9 +138,9 @@ Notes:
 
 Deploy the Python backend as a separate Railway service.
 
-- Set the Railway service `Root Directory` to `agent`
-- Use [agent/Dockerfile](d:/github/with-langgraph-fastapi/agent/Dockerfile)
-- If you want config-as-code, point Railway to [agent/railway.toml](d:/github/with-langgraph-fastapi/agent/railway.toml)
+- Set the Railway service `Root Directory` to repository root (`.`)
+- Use [Dockerfile](d:/github/with-langgraph-fastapi/Dockerfile)
+- If you want config-as-code, point Railway to [railway.toml](d:/github/with-langgraph-fastapi/railway.toml)
 - Health check path: `/healthz`
 - Keep the service at a single replica because the queue worker runs in-process
 
@@ -143,6 +151,39 @@ uv run uvicorn main:app --host 0.0.0.0 --port ${PORT}
 ```
 
 Do not deploy `agent/src/main.py`; it is a legacy compatibility wrapper only.
+
+Recommended Railway worker env for PPT heavy pipeline:
+
+- `PPT_EXECUTION_ROLE=worker`
+- `PPT_MODULE_RETRY_ENABLED=true`
+- `PPT_MODULE_MAINFLOW_ENABLED` defaults to `true` across roles (set `false` only for temporary rollback)
+- `PPT_MODULE_MAINFLOW_RENDER_EACH_ENABLED` defaults to `true` across roles (mainflow runs per-slide + subagent chain)
+- S13 installed skill executor is enabled by default across roles.
+- Main path now runs skill-driven planning (`ppt-orchestra-skill` + `slide-making-skill` + `design-style-skill` + `color-font-skill` + conditional `pptx`) before visual orchestration/export.
+- optional override: `PPT_INSTALLED_SKILL_EXECUTOR_ENABLED=true|false`
+- optional override: `PPT_INSTALLED_SKILL_EXECUTOR_BIN=uv`
+- optional override: `PPT_INSTALLED_SKILL_EXECUTOR_ARGS=["run","python","-m","src.installed_skill_executor"]`
+- optional override: `PPT_INSTALLED_SKILL_EXECUTOR_TIMEOUT_SEC=30`
+- optional override: `PPT_INSTALLED_SKILL_EXECUTOR_CWD=<path-to-agent-dir>` (default auto-resolves to `agent/`)
+- optional direct runtime bridge: `PPT_DIRECT_SKILL_RUNTIME_ENABLED=true|false`
+- optional direct runtime bridge: `PPT_DIRECT_SKILL_RUNTIME_BIN=<external-skill-runtime-bin>`
+- optional direct runtime bridge: `PPT_DIRECT_SKILL_RUNTIME_ARGS=[...]`
+- optional direct runtime bridge: `PPT_DIRECT_SKILL_RUNTIME_TIMEOUT_SEC=25`
+- optional direct runtime bridge: `PPT_DIRECT_SKILL_RUNTIME_CWD=<path>`
+- strict mode (default): `PPT_DIRECT_SKILL_RUNTIME_REQUIRE=true` (no builtin fallback; missing/failed direct runtime returns hard skill error)
+- recommended local bridge:
+  - `PPT_DIRECT_SKILL_RUNTIME_BIN=python`
+  - `PPT_DIRECT_SKILL_RUNTIME_ARGS=["-m","src.ppt_direct_skill_runtime"]`
+  - `PPT_DIRECT_SKILL_RUNTIME_CWD=<repo>/agent`
+- `PPT_EXPORT_SYNC_ENABLED=true`
+- optional: `PPT_EXPORT_WORKER_SHARED_SECRET=<same-shared-hmac-secret-as-vercel>`
+- optional: `PPT_EXPORT_WORKER_REQUIRE_SIGNATURE=true` (auto-enabled when shared secret exists)
+
+V7 PPT export API in split mode:
+
+- Submit: `POST /api/v1/v7/export/submit`
+- Poll: `GET /api/v1/v7/export/status/{task_id}`
+- `POST /api/v1/v7/export` stays available on worker, but is disabled by default on web role.
 
 ## Documentation
 
@@ -155,6 +196,7 @@ The main UI component is in `src/app/page.tsx`. You can:
 
 - [Next.js Documentation](https://nextjs.org/docs) - Learn about Next.js features and API
 - [DEPLOYED_TESTING.md](d:/github/with-langgraph-fastapi/docs/DEPLOYED_TESTING.md) - Deployed-environment smoke tests and paid E2E checks
+- [VERCEL_RAILWAY_SPLIT_DEPLOYMENT.md](d:/github/with-langgraph-fastapi/docs/VERCEL_RAILWAY_SPLIT_DEPLOYMENT.md) - Production role split and env matrix for Vercel + Railway
 
 ## Contributing
 

@@ -4,6 +4,8 @@ import { getContractProfile, getTemplateCapabilities, getTemplateProfiles } from
 const DENSITY_ORDER = { sparse: 0, balanced: 1, dense: 2 };
 const VISUAL_BLOCK_TYPES = new Set(["image", "chart", "kpi", "workflow", "diagram"]);
 const DATA_BLOCK_TYPES = new Set(["chart", "kpi", "table"]);
+const CONSTRAINED_BLOCK_TYPES = new Set(["image", "chart", "kpi", "table", "workflow", "diagram", "icon_text", "svg"]);
+const LAYOUT_HINT_TYPES = new Set(["split_2", "asymmetric_2", "grid_2", "grid_3", "grid_4", "bento_5", "bento_6", "hero_1"]);
 
 function normalizeKey(value) {
   return String(value || "")
@@ -54,6 +56,21 @@ function getSlideBlockTypes(sourceSlide) {
     if (t) out.add(t);
   }
   return out;
+}
+
+function normalizeBlockTypeAlias(blockType) {
+  const normalized = normalizeKey(blockType || "");
+  if (normalized === "subtitle" || normalized === "text") return "body";
+  return normalized;
+}
+
+function normalizeSlideTypeAlias(slideType) {
+  const normalized = normalizeKey(slideType || "");
+  if (normalized === "data_visualization") return "data";
+  if (normalized === "mixed_media") return "content";
+  if (normalized === "image_showcase") return "showcase";
+  if (LAYOUT_HINT_TYPES.has(normalized)) return "";
+  return normalized;
 }
 
 function hasImageAsset(sourceSlide) {
@@ -251,4 +268,73 @@ export function isLightTemplateFamily(templateFamily) {
 export function defaultTemplateForLayout(layoutGrid = "split_2") {
   const layout = normalizeKey(layoutGrid || "split_2");
   return String(getCatalog().layout_defaults?.[layout] || "dashboard_dark");
+}
+
+export function assessTemplateCapabilityForSlide({
+  sourceSlide,
+  templateFamily,
+  slideType = "",
+  layoutGrid = "",
+}) {
+  const family = normalizeKey(templateFamily || "") || "dashboard_dark";
+  const capabilities = getTemplateCapabilities(family);
+  const supportedSlideTypes = new Set(
+    (Array.isArray(capabilities?.supported_slide_types) ? capabilities.supported_slide_types : [])
+      .map((value) => normalizeSlideTypeAlias(value))
+      .filter(Boolean),
+  );
+  const supportedLayouts = new Set(
+    (Array.isArray(capabilities?.supported_layouts) ? capabilities.supported_layouts : [])
+      .map((value) => normalizeKey(value))
+      .filter(Boolean),
+  );
+  const normalizedSlideType = normalizeSlideTypeAlias(
+    slideType
+    || sourceSlide?.subtype
+    || sourceSlide?.page_type
+    || sourceSlide?.slide_type
+    || "",
+  );
+  const normalizedLayout = normalizeKey(layoutGrid || sourceSlide?.layout_grid || sourceSlide?.layout || "");
+  const supportedBlocks = new Set(
+    (Array.isArray(capabilities?.supported_block_types) ? capabilities.supported_block_types : [])
+      .map((blockType) => normalizeBlockTypeAlias(blockType))
+      .filter(Boolean),
+  );
+  const slideBlockTypes = Array.from(getSlideBlockTypes(sourceSlide))
+    .map((blockType) => normalizeBlockTypeAlias(blockType))
+    .filter(Boolean);
+  const unsupportedBlockTypes = slideBlockTypes
+    .filter((blockType) => CONSTRAINED_BLOCK_TYPES.has(blockType) && !supportedBlocks.has(blockType))
+    .filter((value, idx, arr) => arr.indexOf(value) === idx);
+
+  const missingRequiredImageAsset =
+    Boolean(capabilities?.requires_image_asset) && !hasImageAsset(sourceSlide);
+  const unsupportedSlideType =
+    normalizedSlideType
+    && supportedSlideTypes.size > 0
+    && !supportedSlideTypes.has(normalizedSlideType);
+  const unsupportedLayout =
+    normalizedLayout
+    && supportedLayouts.size > 0
+    && !supportedLayouts.has(normalizedLayout);
+
+  return {
+    template_family: family,
+    supported_slide_types: Array.from(supportedSlideTypes),
+    supported_layouts: Array.from(supportedLayouts),
+    slide_type: normalizedSlideType,
+    layout_grid: normalizedLayout,
+    supported_block_types: Array.from(supportedBlocks),
+    slide_block_types: slideBlockTypes,
+    unsupported_block_types: unsupportedBlockTypes,
+    unsupported_slide_type: Boolean(unsupportedSlideType),
+    unsupported_layout: Boolean(unsupportedLayout),
+    missing_required_image_asset: missingRequiredImageAsset,
+    compatible:
+      unsupportedBlockTypes.length === 0
+      && !missingRequiredImageAsset
+      && !unsupportedSlideType
+      && !unsupportedLayout,
+  };
 }

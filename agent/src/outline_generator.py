@@ -15,7 +15,7 @@ from src.schemas.ppt import PresentationOutline, SlideOutline
 
 logger = logging.getLogger("outline_generator")
 
-OUTLINE_MODEL = os.getenv("OUTLINE_LLM_MODEL", "openai/gpt-4o-mini")
+OUTLINE_MODEL = os.getenv("CONTENT_LLM_MODEL", "openai/gpt-4o-mini")
 
 SYSTEM_PROMPT_ZH = """你是一位专业的课程设计师和PPT大纲规划师。
 根据用户的需求，设计一份结构清晰、逻辑连贯的PPT大纲。

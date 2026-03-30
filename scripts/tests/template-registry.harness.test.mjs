@@ -1,7 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { resolveTemplateFamilyForSlide } from "../minimax/templates/template-registry.mjs";
+import {
+  assessTemplateCapabilityForSlide,
+  resolveTemplateFamilyForSlide,
+} from "../minimax/templates/template-registry.mjs";
 
 test("template registry: weak orchestration keyword should not force architecture template", () => {
   const family = resolveTemplateFamilyForSlide({
@@ -77,7 +80,7 @@ test("template registry: dense data slide prefers data-capable template", () => 
     layoutGrid: "grid_3",
     desiredDensity: "dense",
   });
-  assert.equal(["dashboard_dark", "ops_lifecycle_light"].includes(family), true);
+  assert.equal(["dashboard_dark", "kpi_dashboard_dark", "ops_lifecycle_light"].includes(family), true);
 });
 
 test("template registry: no image asset should avoid image-required templates", () => {
@@ -96,4 +99,163 @@ test("template registry: no image asset should avoid image-required templates", 
     layoutGrid: "split_2",
   });
   assert.equal(["neural_blueprint_light", "consulting_warm_light"].includes(family), false);
+});
+
+test("template registry: kpi keyword route can select kpi dashboard family", () => {
+  const family = resolveTemplateFamilyForSlide({
+    sourceSlide: {
+      title: "KPI dashboard trend and performance scorecard",
+      content_density: "dense",
+      blocks: [
+        { block_type: "title", content: "KPI Dashboard" },
+        { block_type: "kpi", content: "NPS 68" },
+        { block_type: "chart", content: "Q1-Q4 trend" },
+        { block_type: "table", content: "channel breakdown" },
+      ],
+    },
+    requestedTemplateFamily: "auto",
+    explicitType: "content",
+    layoutGrid: "grid_3",
+    desiredDensity: "dense",
+  });
+  assert.equal(family, "kpi_dashboard_dark");
+});
+
+test("template registry: image showcase keywords can select image_showcase_light", () => {
+  const family = resolveTemplateFamilyForSlide({
+    sourceSlide: {
+      title: "Product gallery image showcase",
+      blocks: [
+        { block_type: "title", content: "Visual showcase" },
+        { block_type: "body", content: "Three hero visuals for launch" },
+        { block_type: "image", content: { url: "data:image/png;base64,aa", title: "hero" } },
+      ],
+    },
+    requestedTemplateFamily: "auto",
+    explicitType: "content",
+    layoutGrid: "split_2",
+    desiredDensity: "balanced",
+  });
+  assert.equal(family, "image_showcase_light");
+});
+
+test("template registry: process keywords can select process_flow_dark", () => {
+  const family = resolveTemplateFamilyForSlide({
+    sourceSlide: {
+      title: "Workflow process pipeline roadmap",
+      blocks: [
+        { block_type: "title", content: "Process roadmap" },
+        { block_type: "workflow", content: "capture -> process -> review -> ship" },
+        { block_type: "list", content: "step1;step2;step3;step4" },
+      ],
+    },
+    requestedTemplateFamily: "auto",
+    explicitType: "workflow",
+    layoutGrid: "timeline",
+    desiredDensity: "balanced",
+  });
+  assert.equal(family, "process_flow_dark");
+});
+
+test("template registry: comparison keywords can select comparison_cards_light", () => {
+  const family = resolveTemplateFamilyForSlide({
+    sourceSlide: {
+      title: "Feature comparison benchmark",
+      blocks: [
+        { block_type: "title", content: "Option A vs B vs C" },
+        { block_type: "list", content: "cost;latency;quality" },
+        { block_type: "chart", content: "comparison trend" },
+      ],
+    },
+    requestedTemplateFamily: "auto",
+    explicitType: "comparison",
+    layoutGrid: "split_2",
+    desiredDensity: "balanced",
+  });
+  assert.equal(family, "comparison_cards_light");
+});
+
+test("template registry: quote-heavy content can select quote_hero_dark", () => {
+  const family = resolveTemplateFamilyForSlide({
+    sourceSlide: {
+      title: "Vision quote insight",
+      blocks: [
+        { block_type: "title", content: "Core insight" },
+        { block_type: "quote", content: "Insight drives execution." },
+      ],
+    },
+    requestedTemplateFamily: "auto",
+    explicitType: "content",
+    layoutGrid: "split_2",
+    desiredDensity: "sparse",
+  });
+  assert.equal(family, "quote_hero_dark");
+});
+
+test("template registry: capability assessment flags unsupported constrained blocks", () => {
+  const compatibility = assessTemplateCapabilityForSlide({
+    templateFamily: "bento_mosaic_dark",
+    sourceSlide: {
+      title: "Mismatch sample",
+      blocks: [
+        { block_type: "title", content: "Mismatch sample" },
+        { block_type: "body", content: "Body text" },
+        { block_type: "chart", content: "Q1-Q4 trend" },
+      ],
+    },
+  });
+  assert.equal(compatibility.compatible, false);
+  assert.equal(compatibility.unsupported_block_types.includes("chart"), true);
+});
+
+test("template registry: capability assessment flags missing required image asset", () => {
+  const compatibility = assessTemplateCapabilityForSlide({
+    templateFamily: "neural_blueprint_light",
+    sourceSlide: {
+      title: "Image required template",
+      blocks: [
+        { block_type: "title", content: "Image required template" },
+        { block_type: "body", content: "Workflow summary" },
+        { block_type: "image", content: { title: "placeholder only" } },
+      ],
+    },
+  });
+  assert.equal(compatibility.compatible, false);
+  assert.equal(compatibility.missing_required_image_asset, true);
+});
+
+test("template registry: capability assessment flags unsupported slide type", () => {
+  const compatibility = assessTemplateCapabilityForSlide({
+    templateFamily: "neural_blueprint_light",
+    slideType: "timeline",
+    layoutGrid: "timeline",
+    sourceSlide: {
+      title: "Timeline mismatch",
+      blocks: [
+        { block_type: "title", content: "Timeline mismatch" },
+        { block_type: "body", content: "Roadmap snapshot" },
+        { block_type: "list", content: "Phase1;Phase2;Phase3" },
+      ],
+    },
+  });
+  assert.equal(compatibility.compatible, false);
+  assert.equal(compatibility.unsupported_slide_type, true);
+});
+
+test("template registry: capability assessment flags unsupported layout", () => {
+  const compatibility = assessTemplateCapabilityForSlide({
+    templateFamily: "dashboard_dark",
+    slideType: "content",
+    layoutGrid: "bento_5",
+    sourceSlide: {
+      title: "Layout mismatch",
+      blocks: [
+        { block_type: "title", content: "Layout mismatch" },
+        { block_type: "body", content: "Body text" },
+        { block_type: "list", content: "A;B;C" },
+      ],
+    },
+  });
+  assert.equal(compatibility.compatible, false);
+  assert.equal(compatibility.unsupported_layout, true);
 });

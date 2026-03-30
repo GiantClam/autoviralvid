@@ -2,14 +2,21 @@
 
 from __future__ import annotations
 
+import asyncio
+import hashlib
+import hmac
+import json
 import logging
 import os
 import re
+import time
 import uuid
+from datetime import datetime, timezone
+from threading import Lock
 from typing import Any, Dict, List
 from urllib.parse import urlparse
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from src.auth import AuthUser, get_current_user
 from src.schemas.ppt_v3 import ApiResponse
@@ -17,6 +24,11 @@ from src.schemas.ppt_v7 import SlideAction, SlideData
 
 logger = logging.getLogger("v7_routes")
 router = APIRouter(prefix="/api/v1/v7", tags=["PPT v7"])
+
+_V7_EXPORT_TASKS: Dict[str, Dict[str, Any]] = {}
+_V7_EXPORT_TASKS_LOCK = Lock()
+_V7_SUPABASE_CLIENT: Any = None
+_V7_SUPABASE_INIT_ATTEMPTED = False
 
 
 _HEADING_RE = re.compile(r"^\s{0,3}#{1,6}\s+(.+?)\s*$")
@@ -207,6 +219,316 @@ def _presign_video_slides(slides: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return out
 
 
+def _utc_now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _runtime_role() -> str:
+    explicit = str(os.getenv("PPT_EXECUTION_ROLE", "auto")).strip().lower()
+    if explicit in {"worker", "web"}:
+        return explicit
+    if str(os.getenv("VERCEL", "")).strip() or str(os.getenv("VERCEL_ENV", "")).strip():
+        return "web"
+    return "worker"
+
+
+def _parse_bool(raw: str, default: bool) -> bool:
+    value = str(raw or "").strip().lower()
+    if not value:
+        return bool(default)
+    return value in {"1", "true", "yes", "on"}
+
+
+def _sync_export_enabled() -> bool:
+    configured = str(os.getenv("PPT_EXPORT_SYNC_ENABLED", "")).strip()
+    if configured:
+        return _parse_bool(configured, default=False)
+    return _runtime_role() != "web"
+
+
+def _allow_local_async_on_web() -> bool:
+    configured = str(os.getenv("PPT_EXPORT_ALLOW_LOCAL_ASYNC_ON_WEB", "")).strip()
+    return _parse_bool(configured, default=False)
+
+
+def _worker_base_url() -> str:
+    return str(os.getenv("PPT_EXPORT_WORKER_BASE_URL", "")).strip().rstrip("/")
+
+
+def _worker_timeout_sec() -> int:
+    raw = str(os.getenv("PPT_EXPORT_WORKER_TIMEOUT_SEC", "20")).strip()
+    try:
+        value = int(raw)
+    except Exception:
+        value = 20
+    return max(5, min(120, value))
+
+
+def _worker_auth_headers() -> Dict[str, str]:
+    token = str(os.getenv("PPT_EXPORT_WORKER_TOKEN", "")).strip()
+    if not token:
+        return {}
+    return {"Authorization": f"Bearer {token}"}
+
+
+def _worker_shared_secret() -> str:
+    return str(os.getenv("PPT_EXPORT_WORKER_SHARED_SECRET", "")).strip()
+
+
+def _worker_signature_required() -> bool:
+    explicit = str(os.getenv("PPT_EXPORT_WORKER_REQUIRE_SIGNATURE", "")).strip()
+    if explicit:
+        return _parse_bool(explicit, default=False)
+    return bool(_worker_shared_secret())
+
+
+def _worker_signature_ttl_sec() -> int:
+    raw = str(os.getenv("PPT_EXPORT_WORKER_SIGNATURE_TTL_SEC", "300")).strip()
+    try:
+        value = int(raw)
+    except Exception:
+        value = 300
+    return max(30, min(3600, value))
+
+
+def _canonical_json(value: Any) -> str:
+    try:
+        return json.dumps(value or {}, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    except Exception:
+        return "{}"
+
+
+def _sha256_hex(text: str) -> str:
+    return hashlib.sha256((text or "").encode("utf-8")).hexdigest()
+
+
+def _build_worker_signature(
+    *,
+    method: str,
+    path: str,
+    ts: str,
+    digest: str,
+) -> str:
+    secret = _worker_shared_secret()
+    if not secret:
+        return ""
+    payload = "\n".join(
+        [
+            str(method or "").upper(),
+            str(path or ""),
+            str(ts or ""),
+            str(digest or ""),
+        ]
+    )
+    return hmac.new(secret.encode("utf-8"), payload.encode("utf-8"), hashlib.sha256).hexdigest()
+
+
+def _build_worker_signature_headers(
+    *,
+    method: str,
+    path: str,
+    body_payload: Any,
+) -> Dict[str, str]:
+    secret = _worker_shared_secret()
+    if not secret:
+        return {}
+    ts = str(int(time.time()))
+    digest = _sha256_hex(_canonical_json(body_payload)) if body_payload is not None else "-"
+    signature = _build_worker_signature(method=method, path=path, ts=ts, digest=digest)
+    return {
+        "X-PPT-Worker-TS": ts,
+        "X-PPT-Worker-Digest": digest,
+        "X-PPT-Worker-Signature": signature,
+    }
+
+
+def _verify_worker_signature(
+    *,
+    request: Request,
+    body_payload: Any,
+) -> None:
+    if _runtime_role() != "worker":
+        return
+    required = _worker_signature_required()
+    if not required:
+        return
+
+    secret = _worker_shared_secret()
+    if not secret:
+        raise HTTPException(status_code=500, detail="worker signature required but shared secret is not configured")
+
+    ts = str(request.headers.get("X-PPT-Worker-TS", "")).strip()
+    digest = str(request.headers.get("X-PPT-Worker-Digest", "")).strip()
+    provided = str(request.headers.get("X-PPT-Worker-Signature", "")).strip().lower()
+    if not ts or not digest or not provided:
+        raise HTTPException(status_code=401, detail="missing worker signature headers")
+
+    try:
+        ts_value = int(ts)
+    except Exception as exc:
+        raise HTTPException(status_code=401, detail="invalid worker signature timestamp") from exc
+    if abs(int(time.time()) - ts_value) > _worker_signature_ttl_sec():
+        raise HTTPException(status_code=401, detail="worker signature timestamp expired")
+
+    expected_digest = _sha256_hex(_canonical_json(body_payload)) if body_payload is not None else "-"
+    if digest != expected_digest:
+        raise HTTPException(status_code=401, detail="worker signature digest mismatch")
+
+    expected = _build_worker_signature(
+        method=str(request.method or "GET"),
+        path=str(request.url.path or ""),
+        ts=ts,
+        digest=digest,
+    )
+    if not expected or not hmac.compare_digest(expected, provided):
+        raise HTTPException(status_code=401, detail="worker signature mismatch")
+
+
+def _should_proxy_to_worker() -> bool:
+    return _runtime_role() == "web" and bool(_worker_base_url())
+
+
+def _export_tasks_table() -> str:
+    return str(os.getenv("PPT_EXPORT_TASKS_TABLE", "autoviralvid_ppt_export_tasks")).strip()
+
+
+def _get_supabase_client() -> Any:
+    global _V7_SUPABASE_CLIENT, _V7_SUPABASE_INIT_ATTEMPTED
+    if _V7_SUPABASE_CLIENT is not None:
+        return _V7_SUPABASE_CLIENT
+    if _V7_SUPABASE_INIT_ATTEMPTED:
+        return None
+    _V7_SUPABASE_INIT_ATTEMPTED = True
+    url = str(os.getenv("SUPABASE_URL", "")).strip()
+    key = str(os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")).strip() or str(os.getenv("SUPABASE_SERVICE_KEY", "")).strip()
+    if not url or not key:
+        return None
+    try:
+        from supabase import create_client
+
+        _V7_SUPABASE_CLIENT = create_client(url, key)
+        return _V7_SUPABASE_CLIENT
+    except Exception as exc:
+        logger.warning("v7 supabase client init failed: %s", exc)
+        return None
+
+
+def _to_db_task_row(task: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "task_id": str(task.get("task_id") or ""),
+        "status": str(task.get("status") or "queued"),
+        "mode": str(task.get("mode") or "local_background"),
+        "runtime_role": str(task.get("runtime_role") or _runtime_role()),
+        "user_id": str(task.get("user_id") or ""),
+        "request_meta": task.get("request_meta") if isinstance(task.get("request_meta"), dict) else {},
+        "result": task.get("result") if isinstance(task.get("result"), dict) else None,
+        "error": str(task.get("error") or "") or None,
+        "failure": task.get("failure") if isinstance(task.get("failure"), dict) else None,
+        "created_at": task.get("created_at") or _utc_now_iso(),
+        "started_at": task.get("started_at"),
+        "finished_at": task.get("finished_at"),
+        "updated_at": _utc_now_iso(),
+    }
+
+
+def _persist_export_task(task: Dict[str, Any]) -> None:
+    sb = _get_supabase_client()
+    if sb is None:
+        return
+    try:
+        row = _to_db_task_row(task)
+        if not row.get("task_id"):
+            return
+        sb.table(_export_tasks_table()).upsert(row).execute()
+    except Exception as exc:
+        logger.warning("v7 export task persist failed: %s", exc)
+
+
+def _load_export_task_from_supabase(task_id: str) -> Dict[str, Any] | None:
+    sb = _get_supabase_client()
+    if sb is None:
+        return None
+    try:
+        res = (
+            sb.table(_export_tasks_table())
+            .select("*")
+            .eq("task_id", task_id)
+            .limit(1)
+            .execute()
+        )
+    except Exception as exc:
+        logger.warning("v7 export task load failed: %s", exc)
+        return None
+    rows = getattr(res, "data", None) or []
+    if not rows:
+        return None
+    row = rows[0] if isinstance(rows[0], dict) else {}
+    if not row:
+        return None
+    normalized = {
+        "task_id": str(row.get("task_id") or task_id),
+        "status": str(row.get("status") or "queued"),
+        "mode": str(row.get("mode") or "local_background"),
+        "runtime_role": str(row.get("runtime_role") or ""),
+        "user_id": str(row.get("user_id") or ""),
+        "request_meta": row.get("request_meta") if isinstance(row.get("request_meta"), dict) else {},
+        "created_at": row.get("created_at"),
+        "started_at": row.get("started_at"),
+        "finished_at": row.get("finished_at"),
+        "result": row.get("result") if isinstance(row.get("result"), dict) else None,
+        "error": str(row.get("error") or "") or None,
+        "failure": row.get("failure") if isinstance(row.get("failure"), dict) else None,
+    }
+    return normalized
+
+
+def _put_export_task(task_id: str, payload: Dict[str, Any]) -> None:
+    row = dict(payload)
+    row["task_id"] = task_id
+    with _V7_EXPORT_TASKS_LOCK:
+        _V7_EXPORT_TASKS[task_id] = row
+    _persist_export_task(row)
+
+
+def _update_export_task(task_id: str, **patch: Any) -> None:
+    with _V7_EXPORT_TASKS_LOCK:
+        existing = _V7_EXPORT_TASKS.get(task_id)
+        if not existing:
+            existing = _load_export_task_from_supabase(task_id) or {"task_id": task_id}
+        existing.update(patch)
+        _V7_EXPORT_TASKS[task_id] = existing
+    _persist_export_task(existing)
+
+
+def _get_export_task(task_id: str) -> Dict[str, Any] | None:
+    with _V7_EXPORT_TASKS_LOCK:
+        row = _V7_EXPORT_TASKS.get(task_id)
+    if isinstance(row, dict):
+        return dict(row)
+    row = _load_export_task_from_supabase(task_id)
+    if isinstance(row, dict):
+        with _V7_EXPORT_TASKS_LOCK:
+            _V7_EXPORT_TASKS[task_id] = row
+        return dict(row)
+    return None
+
+
+def _status_payload_from_task(task: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "task_id": task.get("task_id"),
+        "status": task.get("status"),
+        "mode": task.get("mode", "local_background"),
+        "runtime_role": task.get("runtime_role"),
+        "request_meta": task.get("request_meta") if isinstance(task.get("request_meta"), dict) else {},
+        "created_at": task.get("created_at"),
+        "started_at": task.get("started_at"),
+        "finished_at": task.get("finished_at"),
+        "result": task.get("result"),
+        "error": task.get("error"),
+        "failure": task.get("failure"),
+    }
+
+
 def _tokenize_for_timeline(text: str) -> List[str]:
     normalized = re.sub(r"\s+", " ", (text or "").strip())
     if not normalized:
@@ -347,132 +669,317 @@ async def synthesize_tts(req: dict, user: AuthUser = Depends(get_current_user)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+async def _execute_export(req: Dict[str, Any]) -> Dict[str, Any]:
+    from src.minimax_exporter import export_minimax_pptx
+    from src.r2 import upload_bytes_to_r2
+
+    slides = _parse_slides(req.get("slides", []))
+    run_id = uuid.uuid4().hex[:12]
+    title = str(req.get("title", "")).strip() or _extract_title_and_points(
+        slides[0].markdown if slides else "",
+        "PPT V7 Deck",
+    )[0]
+    style_variant = str(req.get("minimax_style_variant", "auto") or "auto")
+    palette_key = str(req.get("minimax_palette_key", "auto") or "auto")
+    verbatim_content = bool(req.get("verbatim_content", False))
+    retry_scope = str(req.get("retry_scope", "deck") or "deck")
+    target_slide_ids = [str(s).strip() for s in req.get("target_slide_ids", []) if str(s).strip()]
+    target_block_ids = [str(s).strip() for s in req.get("target_block_ids", []) if str(s).strip()]
+    retry_hint = str(req.get("retry_hint", "") or "")
+    idempotency_key = str(req.get("idempotency_key", "") or "")
+    route_mode = str(req.get("route_mode", "auto") or "auto")
+    allow_legacy_mode = str(
+        os.getenv("PPT_ALLOW_LEGACY_MODE", "false")
+    ).strip().lower() not in {"0", "false", "no", "off"}
+    requested_generator_mode = str(req.get("generator_mode", "official") or "official").strip().lower()
+    if requested_generator_mode == "legacy" and not allow_legacy_mode:
+        requested_generator_mode = "official"
+    elif requested_generator_mode not in {"official", "legacy"}:
+        requested_generator_mode = str(os.getenv("PPT_GENERATOR_MODE", "official")).strip().lower()
+        if requested_generator_mode == "legacy" and not allow_legacy_mode:
+            requested_generator_mode = "official"
+        if requested_generator_mode not in {"official", "legacy"}:
+            requested_generator_mode = "official"
+    enable_legacy_fallback = (
+        str(os.getenv("PPT_ENABLE_LEGACY_FALLBACK", "false")).strip().lower()
+        not in {"0", "false", "no", "off"}
+    ) and allow_legacy_mode
+    original_style = bool(req.get("original_style", False))
+    disable_local_style_rewrite = bool(req.get("disable_local_style_rewrite", False))
+    visual_priority = bool(req.get("visual_priority", True))
+    visual_preset = str(req.get("visual_preset", "auto") or "auto")
+    visual_density = str(req.get("visual_density", "balanced") or "balanced")
+    constraint_hardness = str(req.get("constraint_hardness", "minimal") or "minimal")
+    if constraint_hardness not in {"minimal", "balanced", "strict"}:
+        constraint_hardness = "minimal"
+
+    source_slides = _slides_to_minimax_sources(slides)
+    export_result = export_minimax_pptx(
+        slides=source_slides,
+        title=title,
+        author="AutoViralVid",
+        style_variant=style_variant,
+        palette_key=palette_key,
+        verbatim_content=verbatim_content,
+        deck_id=run_id,
+        retry_scope=retry_scope,
+        target_slide_ids=target_slide_ids,
+        target_block_ids=target_block_ids,
+        retry_hint=retry_hint,
+        idempotency_key=idempotency_key,
+        route_mode=route_mode,
+        generator_mode=requested_generator_mode,
+        enable_legacy_fallback=enable_legacy_fallback,
+        original_style=original_style,
+        disable_local_style_rewrite=disable_local_style_rewrite,
+        visual_priority=visual_priority,
+        visual_preset=visual_preset,
+        visual_density=visual_density,
+        constraint_hardness=constraint_hardness,
+        timeout=180,
+    )
+    pptx_bytes = export_result["pptx_bytes"]
+    pptx_url = await upload_bytes_to_r2(
+        pptx_bytes,
+        key=f"projects/{run_id}/pptx/presentation.pptx",
+        content_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    )
+
+    slide_image_urls: List[str] = []
+    try:
+        from src.pptx_rasterizer import rasterize_pptx_bytes_to_png_bytes
+
+        png_bytes_list = rasterize_pptx_bytes_to_png_bytes(pptx_bytes)
+        for idx, png_bytes in enumerate(png_bytes_list):
+            image_url = await upload_bytes_to_r2(
+                png_bytes,
+                key=f"projects/{run_id}/slides/slide_{idx + 1:03d}.png",
+                content_type="image/png",
+            )
+            slide_image_urls.append(image_url)
+    except Exception as raster_exc:
+        logger.warning("v7 export rasterize failed: %s", raster_exc)
+
+    render_spec = export_result.get("render_spec") or {}
+    video_slides = render_spec.get("slides") if isinstance(render_spec, dict) else None
+    exported_slide_count = (
+        len(video_slides)
+        if isinstance(video_slides, list) and video_slides
+        else int((export_result.get("generator_meta") or {}).get("render_slides") or len(slides))
+    )
+    if slide_image_urls:
+        exported_slide_count = len(slide_image_urls)
+
+    data: Dict[str, Any] = {
+        "run_id": run_id,
+        "pptx_url": pptx_url,
+        "slide_image_urls": slide_image_urls,
+        "slide_count": exported_slide_count,
+        "skill": "minimax_pptx_generator",
+        "generator_mode": export_result.get("generator_mode", requested_generator_mode),
+    }
+    if export_result.get("generator_meta"):
+        data["generator_meta"] = export_result["generator_meta"]
+    if slide_image_urls:
+        data["video_mode"] = "ppt_image_slideshow"
+        data["video_slides"] = _build_image_video_slides(slide_image_urls, slides)
+        data["video_slide_count"] = len(slide_image_urls)
+    elif isinstance(render_spec, dict):
+        data["video_mode"] = render_spec.get("mode", "minimax_presentation")
+    if not slide_image_urls and isinstance(video_slides, list) and video_slides:
+        safe_video_slides = _presign_video_slides(video_slides)
+        data["video_slides"] = safe_video_slides
+        data["video_slide_count"] = len(safe_video_slides)
+    return data
+
+
+async def _run_export_task(task_id: str, req: Dict[str, Any]) -> None:
+    from src.minimax_exporter import MiniMaxExportError
+
+    _update_export_task(task_id, status="running", started_at=_utc_now_iso())
+    try:
+        result = await _execute_export(req)
+        _update_export_task(
+            task_id,
+            status="succeeded",
+            finished_at=_utc_now_iso(),
+            result=result,
+            error=None,
+            failure=None,
+        )
+    except MiniMaxExportError as exc:
+        logger.error("v7 export async failed classified: %s", exc, exc_info=True)
+        _update_export_task(
+            task_id,
+            status="failed",
+            finished_at=_utc_now_iso(),
+            error=str(exc),
+            failure=exc.to_dict(),
+        )
+    except Exception as exc:
+        logger.error("v7 export async failed: %s", exc, exc_info=True)
+        _update_export_task(
+            task_id,
+            status="failed",
+            finished_at=_utc_now_iso(),
+            error=str(exc),
+        )
+
+
+async def _proxy_worker_submit(req: Dict[str, Any]) -> Dict[str, Any]:
+    import httpx
+
+    base = _worker_base_url()
+    if not base:
+        raise HTTPException(status_code=503, detail="PPT_EXPORT_WORKER_BASE_URL is not configured")
+    endpoint = f"{base}/api/v1/v7/export/submit"
+    headers = _worker_auth_headers()
+    headers.update(
+        _build_worker_signature_headers(
+            method="POST",
+            path="/api/v1/v7/export/submit",
+            body_payload=req,
+        )
+    )
+    try:
+        async with httpx.AsyncClient(timeout=_worker_timeout_sec()) as client:
+            resp = await client.post(endpoint, json=req, headers=headers)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"worker_submit_unreachable: {exc}") from exc
+    try:
+        body = resp.json()
+    except Exception:
+        body = {"success": False, "error": resp.text[:200]}
+    if int(resp.status_code) >= 400:
+        detail = body.get("error") if isinstance(body, dict) else ""
+        raise HTTPException(status_code=resp.status_code, detail=f"worker_submit_failed: {detail or resp.text[:160]}")
+    if isinstance(body, dict) and isinstance(body.get("data"), dict):
+        return dict(body["data"])
+    return {"worker_response": body}
+
+
+async def _proxy_worker_status(task_id: str) -> Dict[str, Any]:
+    import httpx
+
+    base = _worker_base_url()
+    if not base:
+        raise HTTPException(status_code=503, detail="PPT_EXPORT_WORKER_BASE_URL is not configured")
+    endpoint = f"{base}/api/v1/v7/export/status/{task_id}"
+    headers = _worker_auth_headers()
+    headers.update(
+        _build_worker_signature_headers(
+            method="GET",
+            path=f"/api/v1/v7/export/status/{task_id}",
+            body_payload=None,
+        )
+    )
+    try:
+        async with httpx.AsyncClient(timeout=_worker_timeout_sec()) as client:
+            resp = await client.get(endpoint, headers=headers)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"worker_status_unreachable: {exc}") from exc
+    try:
+        body = resp.json()
+    except Exception:
+        body = {"success": False, "error": resp.text[:200]}
+    if int(resp.status_code) >= 400:
+        detail = body.get("error") if isinstance(body, dict) else ""
+        raise HTTPException(status_code=resp.status_code, detail=f"worker_status_failed: {detail or resp.text[:160]}")
+    if isinstance(body, dict) and isinstance(body.get("data"), dict):
+        return dict(body["data"])
+    return {"worker_response": body}
+
+
+@router.post("/export/submit", response_model=ApiResponse)
+async def export_submit(req: dict, request: Request, user: AuthUser = Depends(get_current_user)):
+    try:
+        slides = _parse_slides(req.get("slides", []))
+        _verify_worker_signature(request=request, body_payload=req)
+
+        if _should_proxy_to_worker():
+            payload = await _proxy_worker_submit(req)
+            payload["mode"] = "proxy_worker"
+            return ApiResponse(success=True, data=payload)
+
+        if _runtime_role() == "web" and not _allow_local_async_on_web():
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    "web role cannot execute local ppt export submit; "
+                    "configure PPT_EXPORT_WORKER_BASE_URL or set PPT_EXPORT_ALLOW_LOCAL_ASYNC_ON_WEB=true"
+                ),
+            )
+
+        task_id = uuid.uuid4().hex
+        _put_export_task(
+            task_id,
+            {
+                "task_id": task_id,
+                "status": "queued",
+                "mode": "local_background",
+                "runtime_role": _runtime_role(),
+                "user_id": str(user.id or ""),
+                "request_meta": {
+                    "slide_count": len(slides),
+                    "idempotency_key": str(req.get("idempotency_key", "") or ""),
+                    "retry_scope": str(req.get("retry_scope", "") or ""),
+                },
+                "created_at": _utc_now_iso(),
+                "started_at": None,
+                "finished_at": None,
+                "result": None,
+                "error": None,
+                "failure": None,
+            },
+        )
+        asyncio.create_task(_run_export_task(task_id, dict(req or {})))
+        return ApiResponse(
+            success=True,
+            data={
+                "task_id": task_id,
+                "status": "queued",
+                "mode": "local_background",
+                "status_url": f"/api/v1/v7/export/status/{task_id}",
+            },
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("v7 export submit failed: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.get("/export/status/{task_id}", response_model=ApiResponse)
+async def export_status(task_id: str, request: Request, user: AuthUser = Depends(get_current_user)):
+    _verify_worker_signature(request=request, body_payload=None)
+    if _should_proxy_to_worker():
+        payload = await _proxy_worker_status(task_id)
+        payload["mode"] = payload.get("mode") or "proxy_worker"
+        return ApiResponse(success=True, data=payload)
+
+    task = _get_export_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail=f"export task {task_id} not found")
+    return ApiResponse(success=True, data=_status_payload_from_task(task))
+
+
 @router.post("/export", response_model=ApiResponse)
 async def export(req: dict, user: AuthUser = Depends(get_current_user)):
     """
     Export with MiniMax PPTX generator.
     """
-    from src.minimax_exporter import MiniMaxExportError, export_minimax_pptx
+    from src.minimax_exporter import MiniMaxExportError
 
+    if not _sync_export_enabled():
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "sync export is disabled on web role; use "
+                "/api/v1/v7/export/submit and /api/v1/v7/export/status/{task_id}"
+            ),
+        )
     try:
-        from src.r2 import upload_bytes_to_r2
-
-        slides = _parse_slides(req.get("slides", []))
-        run_id = uuid.uuid4().hex[:12]
-        title = str(req.get("title", "")).strip() or _extract_title_and_points(
-            slides[0].markdown if slides else "",
-            "PPT V7 Deck",
-        )[0]
-        style_variant = str(req.get("minimax_style_variant", "auto") or "auto")
-        palette_key = str(req.get("minimax_palette_key", "auto") or "auto")
-        verbatim_content = bool(req.get("verbatim_content", False))
-        retry_scope = str(req.get("retry_scope", "deck") or "deck")
-        target_slide_ids = [str(s).strip() for s in req.get("target_slide_ids", []) if str(s).strip()]
-        target_block_ids = [str(s).strip() for s in req.get("target_block_ids", []) if str(s).strip()]
-        retry_hint = str(req.get("retry_hint", "") or "")
-        idempotency_key = str(req.get("idempotency_key", "") or "")
-        allow_legacy_mode = str(
-            os.getenv("PPT_ALLOW_LEGACY_MODE", "false")
-        ).strip().lower() not in {"0", "false", "no", "off"}
-        requested_generator_mode = str(req.get("generator_mode", "official") or "official").strip().lower()
-        if requested_generator_mode == "legacy" and not allow_legacy_mode:
-            requested_generator_mode = "official"
-        elif requested_generator_mode not in {"official", "legacy"}:
-            requested_generator_mode = str(os.getenv("PPT_GENERATOR_MODE", "official")).strip().lower()
-            if requested_generator_mode == "legacy" and not allow_legacy_mode:
-                requested_generator_mode = "official"
-            if requested_generator_mode not in {"official", "legacy"}:
-                requested_generator_mode = "official"
-        enable_legacy_fallback = (
-            str(os.getenv("PPT_ENABLE_LEGACY_FALLBACK", "false")).strip().lower()
-            not in {"0", "false", "no", "off"}
-        ) and allow_legacy_mode
-        original_style = bool(req.get("original_style", True))
-        disable_local_style_rewrite = bool(req.get("disable_local_style_rewrite", True))
-        visual_priority = bool(req.get("visual_priority", True))
-        visual_preset = str(req.get("visual_preset", "auto") or "auto")
-        visual_density = str(req.get("visual_density", "balanced") or "balanced")
-        constraint_hardness = str(req.get("constraint_hardness", "minimal") or "minimal")
-        if constraint_hardness not in {"minimal", "balanced"}:
-            constraint_hardness = "minimal"
-
-        source_slides = _slides_to_minimax_sources(slides)
-        export_result = export_minimax_pptx(
-            slides=source_slides,
-            title=title,
-            author="AutoViralVid",
-            style_variant=style_variant,
-            palette_key=palette_key,
-            verbatim_content=verbatim_content,
-            deck_id=run_id,
-            retry_scope=retry_scope,
-            target_slide_ids=target_slide_ids,
-            target_block_ids=target_block_ids,
-            retry_hint=retry_hint,
-            idempotency_key=idempotency_key,
-            generator_mode=requested_generator_mode,
-            enable_legacy_fallback=enable_legacy_fallback,
-            original_style=original_style,
-            disable_local_style_rewrite=disable_local_style_rewrite,
-            visual_priority=visual_priority,
-            visual_preset=visual_preset,
-            visual_density=visual_density,
-            constraint_hardness=constraint_hardness,
-            timeout=180,
-        )
-        pptx_bytes = export_result["pptx_bytes"]
-        pptx_url = await upload_bytes_to_r2(
-            pptx_bytes,
-            key=f"projects/{run_id}/pptx/presentation.pptx",
-            content_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
-        )
-
-        slide_image_urls: List[str] = []
-        try:
-            from src.pptx_rasterizer import rasterize_pptx_bytes_to_png_bytes
-
-            png_bytes_list = rasterize_pptx_bytes_to_png_bytes(pptx_bytes)
-            for idx, png_bytes in enumerate(png_bytes_list):
-                image_url = await upload_bytes_to_r2(
-                    png_bytes,
-                    key=f"projects/{run_id}/slides/slide_{idx + 1:03d}.png",
-                    content_type="image/png",
-                )
-                slide_image_urls.append(image_url)
-        except Exception as raster_exc:
-            logger.warning("v7 export rasterize failed: %s", raster_exc)
-
-        render_spec = export_result.get("render_spec") or {}
-        video_slides = render_spec.get("slides") if isinstance(render_spec, dict) else None
-        exported_slide_count = (
-            len(video_slides)
-            if isinstance(video_slides, list) and video_slides
-            else int((export_result.get("generator_meta") or {}).get("render_slides") or len(slides))
-        )
-        if slide_image_urls:
-            exported_slide_count = len(slide_image_urls)
-
-        data: Dict[str, Any] = {
-            "run_id": run_id,
-            "pptx_url": pptx_url,
-            "slide_image_urls": slide_image_urls,
-            "slide_count": exported_slide_count,
-            "skill": "minimax_pptx_generator",
-            "generator_mode": export_result.get("generator_mode", requested_generator_mode),
-        }
-        if export_result.get("generator_meta"):
-            data["generator_meta"] = export_result["generator_meta"]
-        if slide_image_urls:
-            data["video_mode"] = "ppt_image_slideshow"
-            data["video_slides"] = _build_image_video_slides(slide_image_urls, slides)
-            data["video_slide_count"] = len(slide_image_urls)
-        elif isinstance(render_spec, dict):
-            data["video_mode"] = render_spec.get("mode", "minimax_presentation")
-        if not slide_image_urls and isinstance(video_slides, list) and video_slides:
-            safe_video_slides = _presign_video_slides(video_slides)
-            data["video_slides"] = safe_video_slides
-            data["video_slide_count"] = len(safe_video_slides)
-
+        data = await _execute_export(req)
         return ApiResponse(success=True, data=data)
     except HTTPException:
         raise

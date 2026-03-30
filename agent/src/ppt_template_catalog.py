@@ -7,8 +7,47 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, List, Set
 
+from src.schemas.ppt_policy import (
+    QualityOrchestrationPolicy,
+    RoutePolicyConfig,
+    RouteRecommendationConfig,
+)
+
 
 _DEFAULT_TEMPLATE_ID = "dashboard_dark"
+_DEFAULT_ROUTE_POLICIES = {
+    "fast": RoutePolicyConfig(
+        mode="fast",
+        max_retry_attempts=1,
+        partial_retry_enabled=False,
+        run_post_render_visual_qa=False,
+        require_weighted_quality_score=False,
+        force_rasterization=False,
+        quality_threshold_offset=-6.0,
+        warn_threshold_offset=-5.0,
+    ),
+    "standard": RoutePolicyConfig(
+        mode="standard",
+        max_retry_attempts=3,
+        partial_retry_enabled=True,
+        run_post_render_visual_qa=True,
+        require_weighted_quality_score=True,
+        force_rasterization=True,
+        quality_threshold_offset=0.0,
+        warn_threshold_offset=0.0,
+    ),
+    "refine": RoutePolicyConfig(
+        mode="refine",
+        max_retry_attempts=4,
+        partial_retry_enabled=True,
+        run_post_render_visual_qa=True,
+        require_weighted_quality_score=True,
+        force_rasterization=True,
+        quality_threshold_offset=4.0,
+        warn_threshold_offset=4.0,
+    ),
+}
+_DEFAULT_ROUTE_RECOMMENDATION = RouteRecommendationConfig()
 
 
 def _catalog_path() -> Path:
@@ -27,9 +66,11 @@ def get_template_catalog() -> Dict[str, Any]:
         return {
             "layout_defaults": {},
             "subtype_overrides": {},
+            "palette_keywords": {},
             "keyword_rules": [],
             "contract_profiles": {},
             "quality_profiles": {},
+            "route_policies": {},
             "templates": {},
         }
     try:
@@ -38,17 +79,21 @@ def get_template_catalog() -> Dict[str, Any]:
         return {
             "layout_defaults": {},
             "subtype_overrides": {},
+            "palette_keywords": {},
             "keyword_rules": [],
             "contract_profiles": {},
             "quality_profiles": {},
+            "route_policies": {},
             "templates": {},
         }
     return {
         "layout_defaults": _as_dict(data.get("layout_defaults")),
         "subtype_overrides": _as_dict(data.get("subtype_overrides")),
+        "palette_keywords": _as_dict(data.get("palette_keywords")),
         "keyword_rules": data.get("keyword_rules") if isinstance(data.get("keyword_rules"), list) else [],
         "contract_profiles": _as_dict(data.get("contract_profiles")),
         "quality_profiles": _as_dict(data.get("quality_profiles")),
+        "route_policies": _as_dict(data.get("route_policies")),
         "templates": _as_dict(data.get("templates")),
     }
 
@@ -84,6 +129,16 @@ def default_template_for_layout(layout_grid: str) -> str:
 _DENSITY_ORDER = {"sparse": 0, "balanced": 1, "dense": 2}
 _VISUAL_BLOCK_TYPES = {"image", "chart", "kpi", "workflow", "diagram"}
 _DATA_BLOCK_TYPES = {"chart", "kpi", "table"}
+_LAYOUT_CARD_COUNTS = {
+    "hero_1": 1,
+    "split_2": 2,
+    "asymmetric_2": 2,
+    "grid_3": 3,
+    "grid_4": 4,
+    "bento_5": 5,
+    "bento_6": 6,
+    "timeline": 5,
+}
 
 
 def _normalize_density(value: str) -> str:
@@ -228,10 +283,35 @@ def quality_profile(profile_id: str = "default") -> Dict[str, Any]:
         requested = "default"
     if not profile:
         profile = {}
+    raw_weights = _as_dict(profile.get("quality_score_weights"))
+    structure_weight = float(raw_weights.get("structure") or 0.26)
+    layout_weight = float(raw_weights.get("layout") or 0.20)
+    family_weight = float(raw_weights.get("family") or 0.16)
+    visual_weight = float(raw_weights.get("visual") or 0.22)
+    consistency_weight = float(raw_weights.get("consistency") or 0.16)
+    total_weight = structure_weight + layout_weight + family_weight + visual_weight + consistency_weight
+    if total_weight <= 0:
+        total_weight = 1.0
+    min_content_blocks = max(1, int(profile.get("min_content_blocks") or 2))
+    raw_orchestration = _as_dict(profile.get("orchestration"))
+    try:
+        parsed_orchestration = QualityOrchestrationPolicy.model_validate(raw_orchestration)
+    except Exception:
+        parsed_orchestration = QualityOrchestrationPolicy()
+    orchestration = parsed_orchestration.model_dump()
+    if "require_image_anchor" not in raw_orchestration:
+        orchestration["require_image_anchor"] = min_content_blocks >= 3
+    normalized_weights = {
+        "structure": max(0.0, structure_weight) / total_weight,
+        "layout": max(0.0, layout_weight) / total_weight,
+        "family": max(0.0, family_weight) / total_weight,
+        "visual": max(0.0, visual_weight) / total_weight,
+        "consistency": max(0.0, consistency_weight) / total_weight,
+    }
     return {
         "id": requested,
         "min_typography_levels": max(1, int(profile.get("min_typography_levels") or 2)),
-        "min_content_blocks": max(1, int(profile.get("min_content_blocks") or 2)),
+        "min_content_blocks": min_content_blocks,
         "blank_area_max_ratio": max(0.1, min(0.9, float(profile.get("blank_area_max_ratio") or 0.45))),
         "chart_min_font_size": max(6.0, float(profile.get("chart_min_font_size") or 9)),
         "require_emphasis_signal": bool(profile.get("require_emphasis_signal", True)),
@@ -239,12 +319,73 @@ def quality_profile(profile_id: str = "default") -> Dict[str, Any]:
         "forbid_title_echo": bool(profile.get("forbid_title_echo", True)),
         "require_image_url": bool(profile.get("require_image_url", True)),
         "layout_max_type_ratio": max(0.1, min(0.95, float(profile.get("layout_max_type_ratio") or 0.45))),
+        "layout_max_top2_ratio": max(0.1, min(1.0, float(profile.get("layout_max_top2_ratio") or 0.65))),
         "layout_max_adjacent_repeat": max(1, int(profile.get("layout_max_adjacent_repeat") or 1)),
+        "layout_abab_max_run": max(4, int(profile.get("layout_abab_max_run") or 4)),
         "layout_min_slide_count": max(2, int(profile.get("layout_min_slide_count") or 6)),
         "layout_min_variety_long_deck": max(1, int(profile.get("layout_min_variety_long_deck") or 4)),
         "layout_long_deck_threshold": max(4, int(profile.get("layout_long_deck_threshold") or 10)),
+        "density_max_consecutive_high": max(1, int(profile.get("density_max_consecutive_high") or 2)),
+        "density_window_size": max(3, int(profile.get("density_window_size") or 5)),
+        "density_require_low_or_breathing_per_window": max(
+            1, int(profile.get("density_require_low_or_breathing_per_window") or 1)
+        ),
         "enforce_terminal_slide_types": bool(profile.get("enforce_terminal_slide_types", False)),
+        "template_family_max_type_ratio": max(0.1, min(1.0, float(profile.get("template_family_max_type_ratio") or 0.55))),
+        "template_family_max_top2_ratio": max(0.1, min(1.0, float(profile.get("template_family_max_top2_ratio") or 0.8))),
+        "template_family_max_switch_ratio": max(0.0, min(1.0, float(profile.get("template_family_max_switch_ratio") or 0.75))),
+        "template_family_abab_max_run": max(4, int(profile.get("template_family_abab_max_run") or 6)),
+        "template_family_min_slide_count": max(2, int(profile.get("template_family_min_slide_count") or 8)),
+        "pagination_max_bullets_per_slide": max(3, int(profile.get("pagination_max_bullets_per_slide") or 6)),
+        "pagination_max_chars_per_slide": max(120, int(profile.get("pagination_max_chars_per_slide") or 360)),
+        "pagination_max_continuation_pages": max(1, int(profile.get("pagination_max_continuation_pages") or 3)),
+        "visual_blank_slide_max_ratio": max(0.0, min(1.0, float(profile.get("visual_blank_slide_max_ratio") or 0.05))),
+        "visual_low_contrast_max_ratio": max(0.0, min(1.0, float(profile.get("visual_low_contrast_max_ratio") or 0.22))),
+        "visual_blank_area_max_ratio": max(0.0, min(1.0, float(profile.get("visual_blank_area_max_ratio") or 0.55))),
+        "visual_style_drift_max_ratio": max(0.0, min(1.0, float(profile.get("visual_style_drift_max_ratio") or 1.0))),
+        "visual_text_overlap_max_ratio": max(0.0, min(1.0, float(profile.get("visual_text_overlap_max_ratio") or 0.75))),
+        "visual_occlusion_max_ratio": max(0.0, min(1.0, float(profile.get("visual_occlusion_max_ratio") or 0.75))),
+        "visual_card_overlap_max_ratio": max(0.0, min(1.0, float(profile.get("visual_card_overlap_max_ratio") or 0.65))),
+        "visual_title_crowded_max_ratio": max(0.0, min(1.0, float(profile.get("visual_title_crowded_max_ratio") or 0.65))),
+        "visual_multi_title_max_ratio": max(0.0, min(1.0, float(profile.get("visual_multi_title_max_ratio") or 0.5))),
+        "visual_text_overflow_max_ratio": max(0.0, min(1.0, float(profile.get("visual_text_overflow_max_ratio") or 0.65))),
+        "visual_irrelevant_image_max_ratio": max(0.0, min(1.0, float(profile.get("visual_irrelevant_image_max_ratio") or 0.25))),
+        "visual_image_distortion_max_ratio": max(0.0, min(1.0, float(profile.get("visual_image_distortion_max_ratio") or 0.25))),
+        "visual_whitespace_max_ratio": max(0.0, min(1.0, float(profile.get("visual_whitespace_max_ratio") or 0.45))),
+        "visual_layout_monotony_max_ratio": max(0.0, min(1.0, float(profile.get("visual_layout_monotony_max_ratio") or 0.45))),
+        "visual_style_inconsistent_max_ratio": max(0.0, min(1.0, float(profile.get("visual_style_inconsistent_max_ratio") or 0.45))),
+        "quality_score_threshold": max(1.0, min(100.0, float(profile.get("quality_score_threshold") or 72))),
+        "quality_score_warn_threshold": max(1.0, min(100.0, float(profile.get("quality_score_warn_threshold") or 80))),
+        "quality_score_weights": normalized_weights,
+        "orchestration": orchestration,
     }
+
+
+def route_policy(mode: str) -> Dict[str, Any]:
+    requested = str(mode or "").strip().lower()
+    if requested not in _DEFAULT_ROUTE_POLICIES:
+        requested = "standard"
+    route_root = _as_dict(get_template_catalog().get("route_policies"))
+    raw = _as_dict(route_root.get(requested))
+    fallback = _DEFAULT_ROUTE_POLICIES[requested].model_dump()
+    merged = {**fallback, **raw, "mode": requested}
+    try:
+        parsed = RoutePolicyConfig.model_validate(merged)
+    except Exception:
+        parsed = _DEFAULT_ROUTE_POLICIES[requested]
+    return parsed.model_dump()
+
+
+def route_recommendation_policy() -> Dict[str, Any]:
+    route_root = _as_dict(get_template_catalog().get("route_policies"))
+    raw = _as_dict(route_root.get("recommendation"))
+    fallback = _DEFAULT_ROUTE_RECOMMENDATION.model_dump()
+    merged = {**fallback, **raw}
+    try:
+        parsed = RouteRecommendationConfig.model_validate(merged)
+    except Exception:
+        parsed = _DEFAULT_ROUTE_RECOMMENDATION
+    return parsed.model_dump()
 
 
 def template_capabilities(template_id: str) -> Dict[str, Any]:
@@ -311,6 +452,7 @@ def resolve_template_for_slide(
     blob = _build_text_blob(slide)
     layout_default = default_template_for_layout(normalized_layout)
     keyword_rules = get_template_catalog().get("keyword_rules") or []
+    layout_capacity = int(_LAYOUT_CARD_COUNTS.get(normalized_layout, 3))
 
     def _keyword_score(candidate: str) -> int:
         best = 0
@@ -340,11 +482,17 @@ def resolve_template_for_slide(
         cap = template_capabilities(template_id)
         contract = contract_profile(str(_as_dict(templates.get(template_id)).get("contract_profile") or "default"))
         score = 0.0
+        supported_layouts = set(cap["supported_layouts"])
+        supported_types = set(cap["supported_slide_types"])
 
-        if normalized_layout in set(cap["supported_layouts"]):
+        if normalized_layout in supported_layouts:
+            score += 4.0
+        else:
+            score -= 6.0
+        if normalized_type in supported_types:
             score += 3.0
-        if normalized_type in set(cap["supported_slide_types"]):
-            score += 2.5
+        else:
+            score -= 4.0
 
         density_min = _DENSITY_ORDER.get(cap["density_range"]["min"], 0)
         density_max = _DENSITY_ORDER.get(cap["density_range"]["max"], 2)
@@ -365,8 +513,15 @@ def resolve_template_for_slide(
             score += 1.5 if cap["visual_anchor_capacity"] > 0 else -4.0
         if cap.get("requires_image_asset") and not has_image_visual:
             score -= 5.0
-        if int(contract.get("min_visual_blocks") or 0) > 0 and not needs_visual:
-            score -= 4.0
+        required_text = int(contract.get("min_text_blocks") or 0)
+        required_visual = int(contract.get("min_visual_blocks") or 0)
+        min_required_non_title = required_text + required_visual
+        # Hard feasibility guard: avoid templates whose contract cannot fit
+        # the selected layout card capacity.
+        if layout_capacity > 0 and min_required_non_title > layout_capacity:
+            score -= 10.0
+        if required_visual > 0 and not needs_visual:
+            score -= 2.0
         if needs_data:
             score += 1.5 if cap["data_block_capacity"] > 0 else -4.0
 

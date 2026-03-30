@@ -105,6 +105,15 @@ for (const templateFamily of [
   "neural_blueprint_light",
   "ops_lifecycle_light",
   "consulting_warm_light",
+  "split_media_dark",
+  "dashboard_dark",
+  "bento_2x2_dark",
+  "bento_mosaic_dark",
+  "kpi_dashboard_dark",
+  "image_showcase_light",
+  "process_flow_dark",
+  "comparison_cards_light",
+  "quote_hero_dark",
 ]) {
   const slide = makeFakeSlide();
   const ok = renderTemplateContent({

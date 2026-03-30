@@ -10,12 +10,19 @@ export const TEMPLATE_FAMILIES = [
   "neural_blueprint_light",
   "ops_lifecycle_light",
   "consulting_warm_light",
+  "kpi_dashboard_dark",
+  "image_showcase_light",
+  "process_flow_dark",
+  "comparison_cards_light",
+  "quote_hero_dark",
 ];
 
 const LIGHT_TEMPLATE_FAMILIES = new Set([
   "neural_blueprint_light",
   "ops_lifecycle_light",
   "consulting_warm_light",
+  "image_showcase_light",
+  "comparison_cards_light",
 ]);
 
 export const DARK_VISUAL_TOKENS = {
@@ -54,6 +61,23 @@ export const DARK_VISUAL_TOKENS = {
   },
 };
 
+function cleanHex(value, fallback = "000000") {
+  const v = String(value || "").replace("#", "").trim();
+  return /^[0-9a-fA-F]{6}$/.test(v) ? v.toUpperCase() : fallback;
+}
+
+function mixHex(baseHex, overlayHex, ratio = 0.5) {
+  const base = cleanHex(baseHex, "000000");
+  const mix = cleanHex(overlayHex, "000000");
+  const alpha = Math.max(0, Math.min(1, Number(ratio) || 0));
+  const toChannel = (offset) => {
+    const a = parseInt(base.slice(offset, offset + 2), 16);
+    const b = parseInt(mix.slice(offset, offset + 2), 16);
+    return Math.round(a * (1 - alpha) + b * alpha).toString(16).padStart(2, "0").toUpperCase();
+  };
+  return `${toChannel(0)}${toChannel(2)}${toChannel(4)}`;
+}
+
 export function normalizeTemplateFamily(input, slideType, layoutGrid) {
   const requested = String(input || "").trim().toLowerCase();
   if (TEMPLATE_FAMILIES.includes(requested)) return requested;
@@ -65,7 +89,7 @@ export function normalizeTemplateFamily(input, slideType, layoutGrid) {
   if (st === "summary") return "hero_dark";
   if (grid === "split_2" || grid === "asymmetric_2") return "architecture_dark_panel";
   if (grid === "grid_4") return "neural_blueprint_light";
-  if (grid === "timeline") return "ops_lifecycle_light";
+  if (grid === "timeline") return "process_flow_dark";
   if (grid === "bento_5") return "bento_mosaic_dark";
   if (grid === "bento_6") return "dashboard_dark";
   return "dashboard_dark";
@@ -164,18 +188,19 @@ export function buildDarkTheme(baseTheme = {}, templateFamily = "dashboard_dark"
 
   const blended = {
     ...baseTheme,
-    bg: t.colors.bg,
+    // Keep palette hue while darkening, instead of flattening all dark families to one black.
+    bg: mixHex(baseTheme.bg || t.colors.bg, t.colors.bg, 0.42),
     primary: baseTheme.primary || t.colors.primary,
     secondary: baseTheme.secondary || t.colors.secondary,
     accent: baseTheme.accent || t.colors.accent,
     accentStrong: baseTheme.accentStrong || t.colors.secondary,
-    accentSoft: baseTheme.accentSoft || t.colors.surfaceAlt,
+    accentSoft: mixHex(baseTheme.accentSoft || baseTheme.accent || t.colors.surfaceAlt, t.colors.bg, 0.35),
     light: t.colors.border,
-    white: t.colors.surfaceAlt,
+    white: mixHex(baseTheme.white || t.colors.surfaceAlt, t.colors.bg, 0.18),
     darkText: t.colors.text,
     mutedText: t.colors.textMuted,
-    cardBg: t.colors.surface,
-    cardAltBg: t.colors.surfaceAlt,
+    cardBg: mixHex(baseTheme.bg || t.colors.surface, t.colors.surface, 0.55),
+    cardAltBg: mixHex(baseTheme.bg || t.colors.surfaceAlt, t.colors.surfaceAlt, 0.45),
     borderColor: t.colors.border,
     success: t.colors.success,
     danger: t.colors.danger,

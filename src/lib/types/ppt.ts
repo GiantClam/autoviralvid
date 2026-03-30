@@ -137,10 +137,14 @@ export interface ExportRequest {
   targetSlideIds?: string[];
   targetBlockIds?: string[];
   idempotencyKey?: string;
+  routeMode?: "auto" | "fast" | "standard" | "refine";
+  route_mode?: "auto" | "fast" | "standard" | "refine";
   originalStyle?: boolean;
   disableLocalStyleRewrite?: boolean;
   original_style?: boolean;
   disable_local_style_rewrite?: boolean;
+  visualPriority?: boolean;
+  visual_priority?: boolean;
 }
 
 export interface ExportResponse {
@@ -149,6 +153,10 @@ export interface ExportResponse {
   attempts?: number;
   retry_scope?: "deck" | "slide" | "block";
   diagnostics?: Record<string, any>[];
+  route_mode?: "fast" | "standard" | "refine" | string;
+  quality_score?: Record<string, any>;
+  visual_qa?: Record<string, any>;
+  observability_report?: Record<string, any>;
   skill?: "minimax_pptx_generator" | string;
   video_mode?: string;
   video_slide_count?: number;

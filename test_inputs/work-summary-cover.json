@@ -1,0 +1,129 @@
+{
+  "title": "2024年工作总结PPT",
+  "author": "企业演示",
+  
+  "theme": {
+    "palette": "business_authority",
+    "style": "sharp"
+  },
+  
+  "template_family": "hero_tech_cover",
+  "visual_priority": true,
+  "visual_preset": "executive_brief",
+  "visual_density": "balanced",
+  "constraint_hardness": "balanced",
+  "svg_mode": "auto",
+  
+  "verbatim_content": false,
+  "original_style": false,
+  "disable_local_style_rewrite": false,
+  
+  "design_spec": {
+    "colors": {
+      "primary": "C41E3A",
+      "secondary": "8B0000",
+      "accent": "FF6B35",
+      "background": "FFFFFF"
+    },
+    "typography": {},
+    "spacing": {},
+    "visual": {
+      "style_recipe": "sharp",
+      "visual_priority": true,
+      "visual_density": "balanced"
+    }
+  },
+  
+  "slides": [
+    {
+      "page_number": 1,
+      "slide_id": "cover-1",
+      "id": "cover-1",
+      
+      "slide_type": "cover",
+      "page_type": "cover",
+      "subtype": "cover",
+      
+      "layout_grid": "hero_1",
+      "template_family": "hero_tech_cover",
+      "template_lock": true,
+      
+      "render_path": "pptxgenjs",
+      "bg_style": "light",
+      "content_density": "sparse",
+      
+      "title": "2024年工作总结PPT",
+      "narration": "回顾成就，分析不足，规划未来",
+      "speaker_notes": "封面讲解：欢迎各位，本报告将全面回顾2024年度工作成果，深入分析存在的不足之处，并对未来发展规划进行展望。",
+      
+      "duration": 5,
+      
+      "script": [
+        {
+          "role": "host",
+          "text": "各位领导、同事，大家好。感谢参加本次2024年度工作总结汇报，接下来我将从工作成就、不足分析和未来规划三个维度进行分享。"
+        }
+      ],
+      
+      "image_keywords": ["business", "building", "skyscraper", "corporate", "modern architecture", "城市", "高楼", "企业"],
+      
+      "blocks": [
+        {
+          "block_type": "title",
+          "type": "title",
+          "card_id": "cover-title-1",
+          "id": "cover-title-1",
+          "content": "2024年工作总结PPT",
+          "emphasis": ["2024", "工作总结"]
+        },
+        {
+          "block_type": "subtitle",
+          "type": "subtitle",
+          "card_id": "cover-subtitle-1",
+          "id": "cover-subtitle-1",
+          "content": "回顾成就，分析不足，规划未来",
+          "data": {
+            "title": "年度总结",
+            "body": "本报告涵盖2024年度全部工作内容的系统性梳理与深度复盘",
+            "description": "总结过往经验，为新一年发展奠定坚实基础"
+          }
+        },
+        {
+          "block_type": "image",
+          "type": "image",
+          "card_id": "cover-image-1",
+          "id": "cover-image-1",
+          "content": {
+            "url": "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=800",
+            "src": "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=800",
+            "imageUrl": "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=800"
+          },
+          "url": "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=800",
+          "imageUrl": "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=800"
+        },
+        {
+          "block_type": "body",
+          "type": "body",
+          "card_id": "cover-body-1",
+          "id": "cover-body-1",
+          "content": "汇报人：[部门/姓名]",
+          "data": {
+            "label": "汇报部门",
+            "caption": "点击此处添加部门或姓名信息"
+          }
+        }
+      ],
+      
+      "text_constraints": {
+        "bullet_max_items": 3,
+        "bullet_max_chars_cjk": 40,
+        "min_body_font_pt": 12,
+        "min_title_font_pt": 36,
+        "subtitle_max_lines": 2,
+        "subtitle_max_chars_cjk": 60,
+        "subtitle_min_font_pt": 14,
+        "bullet_auto_split": true
+      }
+    }
+  ]
+}

@@ -73,3 +73,21 @@ def test_template_routing_avoids_image_required_template_when_image_asset_missin
         desired_density="balanced",
     )
     assert template not in {"neural_blueprint_light", "consulting_warm_light"}
+
+
+def test_template_routing_avoids_contract_infeasible_templates_on_split_layout():
+    slide = {
+        "title": "业务进展",
+        "blocks": [
+            {"block_type": "title", "content": "业务进展"},
+            {"block_type": "body", "content": "收入增长与渠道优化"},
+            {"block_type": "list", "content": "增长动因;执行动作;风险控制"},
+        ],
+    }
+    template = resolve_template_for_slide(
+        slide=slide,
+        slide_type="content",
+        layout_grid="split_2",
+        desired_density="dense",
+    )
+    assert template in {"split_media_dark", "consulting_warm_light"}

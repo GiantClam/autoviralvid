@@ -4,32 +4,15 @@ This backend should be deployed as a dedicated Railway service.
 
 ## Service settings
 
-- Recommended:
-  - Root Directory: repository root
-  - Dockerfile path: `Dockerfile`
-- Alternative:
-  - Root Directory: `agent`
-  - Dockerfile path: `Dockerfile`
+- Root Directory: repository root (`.`)
+- Dockerfile path: `Dockerfile`
 - Health check: `/healthz`
 - Replicas: `1`
 
-The repository now includes both a repository-root Dockerfile and
-`agent/Dockerfile` so either deployment layout can work.
-
-If you deploy from the repository root, Railway should use:
+Use:
 
 - [Dockerfile](d:/github/with-langgraph-fastapi/Dockerfile)
 - [railway.toml](d:/github/with-langgraph-fastapi/railway.toml)
-
-If you deploy from `agent`, Railway should use:
-
-- [agent/Dockerfile](d:/github/with-langgraph-fastapi/agent/Dockerfile)
-- [agent/railway.toml](d:/github/with-langgraph-fastapi/agent/railway.toml)
-
-Do not combine `Root Directory = agent` with `Dockerfile path = agent/Dockerfile`,
-or Railway will look for `agent/agent/Dockerfile` and fail.
-
-If you use Railway config-as-code, point the service at `agent/railway.toml`.
 
 ## Required environment variables
 
@@ -62,7 +45,79 @@ For storyboard/LLM features:
 ```text
 OPENROUTER_API_KEY=
 OPENROUTER_API_BASE=https://openrouter.ai/api/v1
+# Optional: use AIBERM as primary upstream, auto-fallback to OpenRouter
+# AIBERM_API_BASE=https://your-aiberm-gateway.example.com/v1
+# AIBERM_API_KEY=
+# OPENROUTER_FALLBACK_API_BASE=https://openrouter.ai/api/v1
+# OPENROUTER_FALLBACK_API_KEY=   # optional, defaults to OPENROUTER_API_KEY
+# CONTENT_LLM_MODEL=openai/gpt-5.3-codex  # optional
 ```
+
+For PPT module retry + subagent executor:
+
+```text
+# Runtime role hint (worker/web/auto). Railway service should be worker.
+PPT_EXECUTION_ROLE=worker
+PPT_EXPORT_SYNC_ENABLED=true
+# Optional shared-secret signature verification for web->worker submit/status proxy.
+# If set, worker endpoints require valid HMAC headers by default.
+PPT_EXPORT_WORKER_SHARED_SECRET=
+# Optional explicit switch (default true when shared secret is set)
+# PPT_EXPORT_WORKER_REQUIRE_SIGNATURE=true
+
+# Enable per-slide module retry orchestration (single-slide retry -> parallel render -> full-deck compile)
+PPT_MODULE_RETRY_ENABLED=true
+PPT_MODULE_RETRY_MAX_PARALLEL=5
+# Mainflow is enabled by default on worker role (set false only for temporary rollback)
+# PPT_MODULE_MAINFLOW_ENABLED=true
+
+# Installed skill executor (S13 real skill chain) is enabled by default on worker role.
+# Optional overrides:
+# PPT_INSTALLED_SKILL_EXECUTOR_ENABLED=true
+# PPT_INSTALLED_SKILL_EXECUTOR_BIN=uv
+# PPT_INSTALLED_SKILL_EXECUTOR_ARGS=["run","python","-m","src.installed_skill_executor"]
+# PPT_INSTALLED_SKILL_EXECUTOR_TIMEOUT_SEC=30
+# Optional explicit cwd override (defaults to agent root automatically)
+# PPT_INSTALLED_SKILL_EXECUTOR_CWD=/app
+
+# Subagent execution before each targeted slide render is always enabled on worker role.
+
+# Optional: custom subagent executor process.
+# Default executor (when these are unset):
+#   uv run python -m src.ppt_subagent_executor
+# PPT_SUBAGENT_EXECUTOR_BIN=
+# PPT_SUBAGENT_EXECUTOR_ARGS=
+# PPT_SUBAGENT_EXECUTOR_CWD=/app
+
+# Shared model id (used by all LLM call sites in this project)
+CONTENT_LLM_MODEL=openai/gpt-5.3-codex
+OPENROUTER_API_KEY=
+OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
+
+# OR OpenAI mode
+# OPENAI_API_KEY=
+# CONTENT_LLM_MODEL=gpt-5.3-codex
+```
+
+For Vercel frontend runtime (non-worker), explicitly keep heavy execution off:
+
+```text
+PPT_EXECUTION_ROLE=web
+PPT_EXPORT_SYNC_ENABLED=false
+PPT_EXPORT_WORKER_BASE_URL=https://your-railway-worker-domain
+# Optional internal auth passthrough when backend auth is enabled:
+# PPT_EXPORT_WORKER_TOKEN=
+# Optional HMAC signing secret (must match worker side)
+# PPT_EXPORT_WORKER_SHARED_SECRET=
+PPT_MODULE_RETRY_ENABLED=false
+PPT_INSTALLED_SKILL_EXECUTOR_ENABLED=false
+```
+
+V7 export split calls:
+
+- `POST /api/v1/v7/export/submit` to enqueue export
+- `GET /api/v1/v7/export/status/{task_id}` to poll status
+- `POST /api/v1/v7/export` remains sync path for worker role
 
 ## Verification
 

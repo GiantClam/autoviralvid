@@ -888,7 +888,7 @@ async def create_batch(body: BatchCreateRequest, user: AuthUser = Depends(get_cu
 # 13. POST /ai/chat — AI assistant endpoint
 # ---------------------------------------------------------------------------
 
-AI_CHAT_MODEL = os.getenv("AI_CHAT_MODEL", "openai/gpt-4o-mini")
+AI_CHAT_MODEL = os.getenv("CONTENT_LLM_MODEL", "openai/gpt-4o-mini")
 
 
 @router.post("/ai/chat")
