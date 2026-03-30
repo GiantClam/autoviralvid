@@ -69,9 +69,9 @@ test("subtype harness: title and elements inference", () => {
   assert.equal(inferSubtype({ title: ZH_SECTION }), "section");
   assert.equal(inferSubtype({ title: ZH_COMPARE }), "comparison");
   assert.equal(inferSubtype({ title: ZH_TIMELINE }), "timeline");
-  assert.equal(inferSubtype({ title: ZH_DATA, elements: [{ type: "chart" }] }), "data");
+  assert.equal(inferSubtype({ title: ZH_DATA, elements: [{ type: "chart" }] }), "data_visualization");
   assert.equal(inferSubtype({ title: ZH_TABLE, elements: [{ type: "table" }] }), "table");
-  assert.equal(inferSubtype({ title: ZH_CASE, elements: [{ type: "image" }] }), "mixed");
+  assert.equal(inferSubtype({ title: ZH_CASE, elements: [{ type: "image" }] }), "image_showcase");
   assert.equal(inferSubtype({ title: ZH_NORMAL, elements: [{ type: "text" }] }), "content");
 });
 
@@ -81,6 +81,6 @@ test("subtype harness: infer from blocks when elements are missing", () => {
       title: "Growth Snapshot",
       blocks: [{ block_type: "chart", content: "Revenue trend" }],
     }),
-    "data",
+    "data_visualization",
   );
 });

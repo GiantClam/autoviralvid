@@ -15,7 +15,7 @@ export const TEMPLATE_SPECS = {
     divider: { x: 0.66, y: 3.62, w: 0.95, h: 0.06 },
     footer: { x: 0.66, y: 4.78, w: 8.8, h: 0.28, fontSize: 12 },
     ghostYear: { x: 5.4, y: 4.66, w: 3.9, h: 0.54, fontSize: 44 },
-    orbit: { x: 5.75, y: -0.25, w: 4.8, h: 3.7, radius: 1.8 },
+    orbit: { x: 7.05, y: 0.08, w: 2.6, h: 2.2, radius: 1.1 },
   },
   architecture_dark_panel: {
     board: { x: 0.58, y: 0.9, w: 7.24, h: 4.34, radius: 0.08, borderWidth: 0.75 },
@@ -83,6 +83,41 @@ export const TEMPLATE_SPECS = {
     ],
     left: { x: 0.86, y: 2.32, w: 3.28, h: 2.74, radius: 0.08 },
     chart: { x: 4.34, y: 2.32, w: 4.74, h: 2.74, radius: 0.08 },
+  },
+  kpi_dashboard_dark: {
+    canvas: { x: 0.62, y: 0.94, w: 8.7, h: 4.32, radius: 0.08 },
+    kpiCards: [
+      { x: 0.84, y: 1.12, w: 2.72, h: 1.04 },
+      { x: 3.68, y: 1.12, w: 2.72, h: 1.04 },
+      { x: 6.52, y: 1.12, w: 2.62, h: 1.04 },
+    ],
+    chart: { x: 0.84, y: 2.36, w: 8.3, h: 2.74, radius: 0.08 },
+  },
+  image_showcase_light: {
+    hero: { x: 0.68, y: 1.04, w: 5.72, h: 3.98, radius: 0.08 },
+    sideTop: { x: 6.58, y: 1.04, w: 2.72, h: 1.88, radius: 0.08 },
+    sideBottom: { x: 6.58, y: 3.14, w: 2.72, h: 1.88, radius: 0.08 },
+  },
+  process_flow_dark: {
+    board: { x: 0.68, y: 1.06, w: 8.62, h: 3.96, radius: 0.09 },
+    nodes: [
+      { x: 1.0, y: 2.02, w: 1.86, h: 1.72 },
+      { x: 3.1, y: 2.02, w: 1.86, h: 1.72 },
+      { x: 5.2, y: 2.02, w: 1.86, h: 1.72 },
+      { x: 7.3, y: 2.02, w: 1.72, h: 1.72 },
+    ],
+  },
+  comparison_cards_light: {
+    cards: [
+      { x: 0.68, y: 1.14, w: 2.7, h: 3.9 },
+      { x: 3.62, y: 1.14, w: 2.7, h: 3.9 },
+      { x: 6.56, y: 1.14, w: 2.7, h: 3.9 },
+    ],
+  },
+  quote_hero_dark: {
+    quotePanel: { x: 0.9, y: 1.34, w: 8.24, h: 3.24, radius: 0.1 },
+    quote: { x: 1.18, y: 1.78, w: 7.68, h: 2.06, fontSize: 36 },
+    author: { x: 1.18, y: 4.06, w: 7.68, h: 0.34, fontSize: 16 },
   },
 };
 

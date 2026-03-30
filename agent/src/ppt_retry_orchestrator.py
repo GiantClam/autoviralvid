@@ -16,6 +16,16 @@ TRANSIENT_CODES = {
     "layout_homogeneous",
 }
 
+RENDER_PATH_DOWNGRADE_CODES = {
+    "schema_invalid",
+    "encoding_invalid",
+    "timeout",
+    "upstream_5xx",
+    "unknown",
+}
+
+_RENDER_PATH_SEQUENCE = ("pptxgenjs", "svg", "png_fallback")
+
 
 @dataclass(frozen=True)
 class RetryDecision:
@@ -87,3 +97,28 @@ def build_retry_hint(
         f"scope={retry_scope}; targets={ids_text}; "
         f"detail={str(failure_detail or '').strip()[:500]}"
     )
+
+
+def _normalize_render_path(value: str | None) -> str:
+    normalized = str(value or "").strip().lower()
+    if normalized in _RENDER_PATH_SEQUENCE:
+        return normalized
+    return "pptxgenjs"
+
+
+def compute_render_path_downgrade(
+    *,
+    current_render_path: str | None,
+    failure_code: str,
+) -> str | None:
+    code = str(failure_code or "").strip().lower()
+    if code not in RENDER_PATH_DOWNGRADE_CODES:
+        return None
+    current = _normalize_render_path(current_render_path)
+    try:
+        index = _RENDER_PATH_SEQUENCE.index(current)
+    except ValueError:
+        index = 0
+    if index >= len(_RENDER_PATH_SEQUENCE) - 1:
+        return None
+    return _RENDER_PATH_SEQUENCE[index + 1]

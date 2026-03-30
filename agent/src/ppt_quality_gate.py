@@ -43,6 +43,17 @@ class QualityResult:
     issues: List[QualityIssue]
 
 
+@dataclass(frozen=True)
+class QualityScoreResult:
+    score: float
+    passed: bool
+    threshold: float
+    warn_threshold: float
+    dimensions: Dict[str, float]
+    issue_counts: Dict[str, int]
+    diagnostics: Dict[str, Any]
+
+
 def _resolve_quality_profile(
     profile: Optional[str | Dict[str, Any]] = None,
     *,
@@ -350,6 +361,53 @@ def _min_chart_font_size(slide: Dict[str, Any]) -> float | None:
     return min(values)
 
 
+def _clamp_100(value: float) -> float:
+    return max(0.0, min(100.0, float(value)))
+
+
+def _issue_counter(issues: List[QualityIssue]) -> Counter:
+    return Counter(str(issue.code or "").strip().lower() for issue in issues if str(issue.code or "").strip())
+
+
+def _slide_type_values(slides: List[Dict[str, Any]]) -> List[str]:
+    values: List[str] = []
+    for idx, slide in enumerate(slides):
+        if not isinstance(slide, dict):
+            values.append(f"unknown_{idx}")
+            continue
+        slide_type = str(slide.get("slide_type") or "").strip().lower()
+        if slide_type in {"cover", "summary", "toc", "divider", "hero_1"}:
+            values.append(slide_type)
+            continue
+        raw_type = slide.get("layout_grid") or slide.get("layout") or slide_type or "unknown"
+        values.append(str(raw_type).strip().lower() or "unknown")
+    return values
+
+
+def _template_family_values(slides: List[Dict[str, Any]]) -> List[str]:
+    values: List[str] = []
+    for slide in slides:
+        if not isinstance(slide, dict):
+            continue
+        slide_type = str(slide.get("slide_type") or "").strip().lower()
+        if slide_type in {"cover", "summary", "toc", "divider", "hero_1"}:
+            continue
+        family = str(slide.get("template_family") or slide.get("template_id") or "").strip().lower()
+        if family:
+            values.append(family)
+    return values
+
+
+def _switch_ratio(values: List[str]) -> float:
+    if len(values) <= 1:
+        return 0.0
+    switches = 0
+    for idx in range(1, len(values)):
+        if values[idx] != values[idx - 1]:
+            switches += 1
+    return switches / max(1, len(values) - 1)
+
+
 def validate_slide(
     slide: Dict[str, Any],
     index: int = 0,
@@ -549,12 +607,14 @@ def validate_slide(
 
     # Visual QA: missing image assets
     if bool(active_profile.get("require_image_url", True)):
+        image_blocks: List[Dict[str, Any]] = []
         for block in slide.get("blocks") or []:
             if not isinstance(block, dict):
                 continue
             btype = str(block.get("block_type") or block.get("type") or "").strip().lower()
             if btype != "image":
                 continue
+            image_blocks.append(block)
             if not _resolve_image_url(block):
                 issues.append(
                     QualityIssue(
@@ -566,6 +626,23 @@ def validate_slide(
                     )
                 )
                 break
+        # Strict image anchor requirement is orchestration-profile driven.
+        orchestration = (
+            active_profile.get("orchestration")
+            if isinstance(active_profile.get("orchestration"), dict)
+            else {}
+        )
+        strict_image_anchor = bool(orchestration.get("require_image_anchor", False))
+        if strict_image_anchor and slide_type == "content" and not image_blocks:
+            issues.append(
+                QualityIssue(
+                    slide_id=sid,
+                    code="image_missing",
+                    message="Content slide lacks image anchor block.",
+                    retry_scope="slide",
+                    retry_target_ids=[sid],
+                )
+            )
 
     # Visual QA: chart readability (font size baseline)
     min_chart_font = _min_chart_font_size(slide)
@@ -596,27 +673,69 @@ def validate_deck(
     return QualityResult(ok=len(all_issues) == 0, issues=all_issues)
 
 
+_DENSITY_HIGH_LAYOUTS = {"grid_4", "bento_5", "bento_6"}
+_DENSITY_LOW_LAYOUTS = {"hero_1"}
+_DENSITY_BREATHING_LAYOUTS = {"section", "cover", "summary", "divider", "toc"}
+
+
+def _density_level(layout_or_type: str) -> str:
+    normalized = str(layout_or_type or "").strip().lower()
+    if normalized in _DENSITY_HIGH_LAYOUTS:
+        return "high"
+    if normalized in _DENSITY_LOW_LAYOUTS:
+        return "low"
+    if normalized in _DENSITY_BREATHING_LAYOUTS:
+        return "breathing"
+    return "medium"
+
+
 def validate_layout_diversity(
     render_spec: Dict[str, Any],
     *,
     profile: Optional[str | Dict[str, Any]] = None,
     max_type_ratio: Optional[float] = None,
+    max_top2_ratio: Optional[float] = None,
     max_adjacent_repeat: Optional[int] = None,
+    abab_max_run: Optional[int] = None,
     min_slide_count: Optional[int] = None,
     min_layout_variety: Optional[int] = None,
     enforce_terminal_slide_types: Optional[bool] = None,
+    template_family_max_type_ratio: Optional[float] = None,
+    template_family_max_top2_ratio: Optional[float] = None,
+    template_family_max_switch_ratio: Optional[float] = None,
+    template_family_abab_max_run: Optional[int] = None,
+    template_family_min_slide_count: Optional[int] = None,
 ) -> QualityResult:
     active_profile = _resolve_quality_profile(profile)
     if max_type_ratio is None:
         max_type_ratio = float(active_profile.get("layout_max_type_ratio") or 0.45)
+    if max_top2_ratio is None:
+        max_top2_ratio = float(active_profile.get("layout_max_top2_ratio") or 0.65)
     if max_adjacent_repeat is None:
         max_adjacent_repeat = int(active_profile.get("layout_max_adjacent_repeat") or 1)
+    if abab_max_run is None:
+        abab_max_run = int(active_profile.get("layout_abab_max_run") or 4)
     if min_slide_count is None:
         min_slide_count = int(active_profile.get("layout_min_slide_count") or 6)
     if min_layout_variety is None:
         min_layout_variety = int(active_profile.get("layout_min_variety_long_deck") or 4)
+    density_max_consecutive_high = max(1, int(active_profile.get("density_max_consecutive_high") or 2))
+    density_window_size = max(3, int(active_profile.get("density_window_size") or 5))
+    density_required_low_or_breathing = max(
+        1, int(active_profile.get("density_require_low_or_breathing_per_window") or 1)
+    )
     if enforce_terminal_slide_types is None:
         enforce_terminal_slide_types = bool(active_profile.get("enforce_terminal_slide_types", False))
+    if template_family_max_type_ratio is None:
+        template_family_max_type_ratio = float(active_profile.get("template_family_max_type_ratio") or 0.55)
+    if template_family_max_top2_ratio is None:
+        template_family_max_top2_ratio = float(active_profile.get("template_family_max_top2_ratio") or 0.8)
+    if template_family_max_switch_ratio is None:
+        template_family_max_switch_ratio = float(active_profile.get("template_family_max_switch_ratio") or 0.75)
+    if template_family_abab_max_run is None:
+        template_family_abab_max_run = int(active_profile.get("template_family_abab_max_run") or 6)
+    if template_family_min_slide_count is None:
+        template_family_min_slide_count = int(active_profile.get("template_family_min_slide_count") or 8)
     long_deck_threshold = int(active_profile.get("layout_long_deck_threshold") or 10)
 
     slides = (
@@ -643,6 +762,18 @@ def validate_layout_diversity(
     total = len(normalized_types)
     counts = Counter(normalized_types)
     ratio_limit = max(1, math.floor(total * max(0.1, min(1.0, max_type_ratio))))
+    density_tokens: List[str] = []
+    for idx, slide in enumerate(slides):
+        if not isinstance(slide, dict):
+            density_tokens.append(normalized_types[idx])
+            continue
+        slide_type = str(slide.get("slide_type") or "").strip().lower()
+        if slide_type in _DENSITY_BREATHING_LAYOUTS:
+            density_tokens.append(slide_type)
+            continue
+        density_tokens.append(
+            str(slide.get("layout_grid") or slide.get("layout") or normalized_types[idx]).strip().lower()
+        )
 
     issues: List[QualityIssue] = []
     for slide_type, count in counts.items():
@@ -661,6 +792,24 @@ def validate_layout_diversity(
             )
         )
         break
+
+    top2 = counts.most_common(2)
+    if len(top2) >= 2:
+        top2_count = int(top2[0][1]) + int(top2[1][1])
+        top2_limit = max(2, math.floor(total * max(0.1, min(1.0, max_top2_ratio))))
+        if top2_count > top2_limit:
+            issues.append(
+                QualityIssue(
+                    slide_id="deck",
+                    code="layout_top2_homogeneous",
+                    message=(
+                        f"Top-2 layout types '{top2[0][0]}' + '{top2[1][0]}' dominate deck "
+                        f"({top2_count}/{total}, limit={top2_limit})."
+                    ),
+                    retry_scope="deck",
+                    retry_target_ids=[],
+                )
+            )
 
     run_length = 1
     for idx in range(1, total):
@@ -684,6 +833,35 @@ def validate_layout_diversity(
             )
             break
 
+    if total >= max(4, int(abab_max_run)):
+        for start in range(0, total - 3):
+            first = normalized_types[start]
+            second = normalized_types[start + 1]
+            if first == second:
+                continue
+            run = 2
+            expected = first
+            cursor = start + 2
+            while cursor < total and normalized_types[cursor] == expected:
+                run += 1
+                expected = second if expected == first else first
+                cursor += 1
+            if run >= int(abab_max_run):
+                sid = _slide_id(slides[min(cursor - 1, total - 1)], min(cursor - 1, total - 1))
+                issues.append(
+                    QualityIssue(
+                        slide_id=sid,
+                        code="layout_abab_repeat",
+                        message=(
+                            f"Alternating ABAB layout pattern detected for {run} slides "
+                            f"('{first}' <-> '{second}')."
+                        ),
+                        retry_scope="deck",
+                        retry_target_ids=[],
+                    )
+                )
+                break
+
     if total >= max(4, long_deck_threshold) and len(set(normalized_types)) < max(1, int(min_layout_variety)):
         issues.append(
             QualityIssue(
@@ -697,6 +875,62 @@ def validate_layout_diversity(
                 retry_target_ids=[],
             )
         )
+
+    if total > 2:
+        middle_start = 1
+        middle_end = total - 1
+        seq = 0
+        for idx in range(middle_start, middle_end):
+            level = _density_level(density_tokens[idx])
+            if level == "high":
+                seq += 1
+            else:
+                seq = 0
+            if seq <= density_max_consecutive_high:
+                continue
+            sid = _slide_id(slides[idx], idx) if isinstance(slides[idx], dict) else f"slide-{idx + 1}"
+            issues.append(
+                QualityIssue(
+                    slide_id=sid,
+                    code="layout_density_consecutive_high",
+                    message=(
+                        f"Density rhythm violation: high-density run={seq} exceeds "
+                        f"limit={density_max_consecutive_high}."
+                    ),
+                    retry_scope="deck",
+                    retry_target_ids=[],
+                )
+            )
+            break
+
+        if middle_end - middle_start >= density_window_size:
+            for start in range(middle_start, middle_end):
+                end = min(middle_end, start + density_window_size)
+                if end - start < density_window_size:
+                    break
+                levels = [_density_level(density_tokens[pos]) for pos in range(start, end)]
+                low_or_breathing = sum(1 for item in levels if item in {"low", "breathing"})
+                if low_or_breathing >= density_required_low_or_breathing:
+                    continue
+                sid_idx = end - 1
+                sid = (
+                    _slide_id(slides[sid_idx], sid_idx)
+                    if isinstance(slides[sid_idx], dict)
+                    else f"slide-{sid_idx + 1}"
+                )
+                issues.append(
+                    QualityIssue(
+                        slide_id=sid,
+                        code="layout_density_window_missing_breathing",
+                        message=(
+                            f"Density rhythm violation: each {density_window_size}-slide window must include "
+                            f">= {density_required_low_or_breathing} low/breathing slide(s)."
+                        ),
+                        retry_scope="deck",
+                        retry_target_ids=[],
+                    )
+                )
+                break
 
     if enforce_terminal_slide_types and total >= 2:
         first_type = normalized_types[0]
@@ -730,6 +964,518 @@ def validate_layout_diversity(
                 )
             )
 
+    family_values = _template_family_values(slides)
+    family_total = len(family_values)
+    if family_total >= max(2, int(template_family_min_slide_count)):
+        family_counts = Counter(family_values)
+        family_limit = max(1, math.floor(family_total * max(0.1, min(1.0, template_family_max_type_ratio))))
+        dominant_family, dominant_count = family_counts.most_common(1)[0]
+        if dominant_count > family_limit:
+            issues.append(
+                QualityIssue(
+                    slide_id="deck",
+                    code="template_family_homogeneous",
+                    message=(
+                        f"Template family '{dominant_family}' dominates deck "
+                        f"({dominant_count}/{family_total}, limit={family_limit})."
+                    ),
+                    retry_scope="deck",
+                    retry_target_ids=[],
+                )
+            )
+
+        family_top2 = family_counts.most_common(2)
+        if len(family_top2) >= 2:
+            family_top2_count = int(family_top2[0][1]) + int(family_top2[1][1])
+            family_top2_limit = max(
+                2, math.floor(family_total * max(0.1, min(1.0, template_family_max_top2_ratio)))
+            )
+            if family_top2_count > family_top2_limit:
+                issues.append(
+                    QualityIssue(
+                        slide_id="deck",
+                        code="template_family_top2_homogeneous",
+                        message=(
+                            f"Top-2 template families '{family_top2[0][0]}' + '{family_top2[1][0]}' dominate deck "
+                            f"({family_top2_count}/{family_total}, limit={family_top2_limit})."
+                        ),
+                        retry_scope="deck",
+                        retry_target_ids=[],
+                    )
+                )
+
+        family_switch_ratio = _switch_ratio(family_values)
+        if family_switch_ratio > max(0.0, min(1.0, template_family_max_switch_ratio)):
+            issues.append(
+                QualityIssue(
+                    slide_id="deck",
+                    code="template_family_switch_frequent",
+                    message=(
+                        f"Template-family switch ratio too high "
+                        f"({family_switch_ratio:.2f}, limit={template_family_max_switch_ratio:.2f})."
+                    ),
+                    retry_scope="deck",
+                    retry_target_ids=[],
+                )
+            )
+
+        if family_total >= max(4, int(template_family_abab_max_run)):
+            for start in range(0, family_total - 3):
+                first = family_values[start]
+                second = family_values[start + 1]
+                if first == second:
+                    continue
+                run = 2
+                expected = first
+                cursor = start + 2
+                while cursor < family_total and family_values[cursor] == expected:
+                    run += 1
+                    expected = second if expected == first else first
+                    cursor += 1
+                if run >= int(template_family_abab_max_run):
+                    issues.append(
+                        QualityIssue(
+                            slide_id="deck",
+                            code="template_family_abab_repeat",
+                            message=(
+                                f"Alternating ABAB template-family pattern detected for {run} slides "
+                                f"('{first}' <-> '{second}')."
+                            ),
+                            retry_scope="deck",
+                            retry_target_ids=[],
+                        )
+                    )
+                    break
+
     return QualityResult(ok=len(issues) == 0, issues=issues)
 
 
+def validate_visual_audit(
+    *,
+    visual_audit: Optional[Dict[str, Any]],
+    slides: List[Dict[str, Any]],
+    profile: Optional[str | Dict[str, Any]] = None,
+    layout_diversity_ok: Optional[bool] = None,
+) -> QualityResult:
+    if not isinstance(visual_audit, dict):
+        return QualityResult(ok=True, issues=[])
+    active_profile = _resolve_quality_profile(profile)
+    issue_ratios = (
+        visual_audit.get("issue_ratios")
+        if isinstance(visual_audit.get("issue_ratios"), dict)
+        else {}
+    )
+    local_issue_ratios = (
+        visual_audit.get("local_issue_ratios")
+        if isinstance(visual_audit.get("local_issue_ratios"), dict)
+        else {}
+    )
+    multimodal_issue_ratios = (
+        visual_audit.get("multimodal_issue_ratios")
+        if isinstance(visual_audit.get("multimodal_issue_ratios"), dict)
+        else {}
+    )
+
+    blank_slide_ratio = max(0.0, min(1.0, float(visual_audit.get("blank_slide_ratio") or 0.0)))
+    low_contrast_ratio = max(0.0, min(1.0, float(visual_audit.get("low_contrast_ratio") or 0.0)))
+    blank_area_ratio = max(0.0, min(1.0, float(visual_audit.get("blank_area_ratio") or 0.0)))
+    style_drift_ratio = max(0.0, min(1.0, float(visual_audit.get("style_drift_ratio") or 0.0)))
+
+    slide_count = len(slides)
+    sid = "deck"
+    issues: List[QualityIssue] = []
+    visual_rows = visual_audit.get("slides") if isinstance(visual_audit.get("slides"), list) else []
+    index_to_slide_id: Dict[int, str] = {}
+    for idx, slide in enumerate(slides):
+        if not isinstance(slide, dict):
+            continue
+        index_to_slide_id[idx + 1] = _slide_id(slide, idx)
+
+    issue_to_slide_ids: Dict[str, List[str]] = {}
+    row_metrics: Dict[str, Dict[str, float]] = {}
+    for row in visual_rows:
+        if not isinstance(row, dict):
+            continue
+        raw_idx = int(row.get("slide") or 0)
+        if raw_idx <= 0:
+            continue
+        target_sid = index_to_slide_id.get(raw_idx) or f"slide-{raw_idx}"
+        local_issues = row.get("local_issues") if isinstance(row.get("local_issues"), list) else []
+        mm_issues = row.get("multimodal_issues") if isinstance(row.get("multimodal_issues"), list) else []
+        for code in [*local_issues, *mm_issues]:
+            key = str(code or "").strip().lower()
+            if not key:
+                continue
+            bucket = issue_to_slide_ids.setdefault(key, [])
+            if target_sid not in bucket:
+                bucket.append(target_sid)
+        row_metrics[target_sid] = {
+            "contrast": float(row.get("contrast") or 0.0),
+            "edge_density": float(row.get("edge_density") or 0.0),
+            "mean_luminance": float(row.get("mean_luminance") or 128.0),
+        }
+
+    all_slide_ids = [
+        _slide_id(slide, idx)
+        for idx, slide in enumerate(slides)
+        if isinstance(slide, dict)
+    ]
+
+    def _rank_slide_ids(metric_key: str, *, reverse: bool = False) -> List[str]:
+        ranked = sorted(
+            all_slide_ids,
+            key=lambda item: row_metrics.get(item, {}).get(metric_key, 0.0),
+            reverse=reverse,
+        )
+        return ranked
+
+    def _target_slide_ids_for_issue(
+        *,
+        issue_key: str,
+        ratio: float,
+        fallback_metric: str = "contrast",
+        fallback_reverse: bool = False,
+    ) -> List[str]:
+        estimated = max(1, math.ceil(max(0.0, min(1.0, ratio)) * max(1, slide_count)))
+        direct = list(issue_to_slide_ids.get(str(issue_key or "").strip().lower(), []))
+        if direct:
+            return direct[:estimated]
+        ranked = _rank_slide_ids(fallback_metric, reverse=fallback_reverse)
+        if ranked:
+            return ranked[:estimated]
+        return []
+
+    def _threshold(name: str, fallback: float) -> float:
+        return max(0.0, min(1.0, float(active_profile.get(name) or fallback)))
+
+    blank_slide_limit = _threshold("visual_blank_slide_max_ratio", 0.05)
+    low_contrast_limit = _threshold("visual_low_contrast_max_ratio", 0.22)
+    blank_area_limit = _threshold("visual_blank_area_max_ratio", 0.55)
+    style_drift_limit = _threshold("visual_style_drift_max_ratio", 1.0)
+
+    if blank_slide_ratio > blank_slide_limit:
+        target_ids = _target_slide_ids_for_issue(
+            issue_key="blank_slide",
+            ratio=blank_slide_ratio,
+            fallback_metric="edge_density",
+            fallback_reverse=False,
+        )
+        issues.append(
+            QualityIssue(
+                slide_id=target_ids[0] if target_ids else sid,
+                code="visual_blank_slide_ratio_high",
+                message=f"blank_slide_ratio={blank_slide_ratio:.2f} exceeds limit={blank_slide_limit:.2f}",
+                retry_scope="slide" if target_ids else "deck",
+                retry_target_ids=target_ids,
+            )
+        )
+    if low_contrast_ratio > low_contrast_limit:
+        target_ids = _target_slide_ids_for_issue(
+            issue_key="low_contrast",
+            ratio=low_contrast_ratio,
+            fallback_metric="contrast",
+            fallback_reverse=False,
+        )
+        issues.append(
+            QualityIssue(
+                slide_id=target_ids[0] if target_ids else sid,
+                code="visual_low_contrast_ratio_high",
+                message=f"low_contrast_ratio={low_contrast_ratio:.2f} exceeds limit={low_contrast_limit:.2f}",
+                retry_scope="slide" if target_ids else "deck",
+                retry_target_ids=target_ids,
+            )
+        )
+    if blank_area_ratio > blank_area_limit:
+        target_ids = _target_slide_ids_for_issue(
+            issue_key="excessive_whitespace",
+            ratio=blank_area_ratio,
+            fallback_metric="edge_density",
+            fallback_reverse=False,
+        )
+        issues.append(
+            QualityIssue(
+                slide_id=target_ids[0] if target_ids else sid,
+                code="visual_blank_area_ratio_high",
+                message=f"blank_area_ratio={blank_area_ratio:.2f} exceeds limit={blank_area_limit:.2f}",
+                retry_scope="slide" if target_ids else "deck",
+                retry_target_ids=target_ids,
+            )
+        )
+    if style_drift_ratio > style_drift_limit:
+        target_ids = _target_slide_ids_for_issue(
+            issue_key="style_inconsistent",
+            ratio=style_drift_ratio,
+            fallback_metric="mean_luminance",
+            fallback_reverse=False,
+        )
+        issues.append(
+            QualityIssue(
+                slide_id=target_ids[0] if target_ids else sid,
+                code="visual_style_drift_ratio_high",
+                message=f"style_drift_ratio={style_drift_ratio:.2f} exceeds limit={style_drift_limit:.2f}",
+                retry_scope="slide" if target_ids else "deck",
+                retry_target_ids=target_ids,
+            )
+        )
+
+    ratio_checks = [
+        ("text_overlap", "visual_text_overlap_max_ratio", 0.75, "visual_text_overlap_ratio_high"),
+        ("occlusion", "visual_occlusion_max_ratio", 0.75, "visual_occlusion_ratio_high"),
+        ("card_overlap", "visual_card_overlap_max_ratio", 0.65, "visual_card_overlap_ratio_high"),
+        ("title_crowded", "visual_title_crowded_max_ratio", 0.65, "visual_title_crowded_ratio_high"),
+        ("multi_title_bar", "visual_multi_title_max_ratio", 0.50, "visual_multi_title_ratio_high"),
+        ("text_overflow", "visual_text_overflow_max_ratio", 0.65, "visual_text_overflow_ratio_high"),
+        ("irrelevant_image", "visual_irrelevant_image_max_ratio", 0.25, "visual_irrelevant_image_ratio_high"),
+        ("image_distortion", "visual_image_distortion_max_ratio", 0.25, "visual_image_distortion_ratio_high"),
+        ("excessive_whitespace", "visual_whitespace_max_ratio", 0.45, "visual_whitespace_ratio_high"),
+        ("layout_monotony", "visual_layout_monotony_max_ratio", 0.45, "visual_layout_monotony_ratio_high"),
+        ("style_inconsistent", "visual_style_inconsistent_max_ratio", 0.45, "visual_style_inconsistent_ratio_high"),
+    ]
+    for issue_code, threshold_key, default_limit, gate_code in ratio_checks:
+        ratio = max(0.0, min(1.0, float(issue_ratios.get(issue_code) or 0.0)))
+        limit = _threshold(threshold_key, default_limit)
+
+        # Whitespace hard gate needs local corroboration; pure multimodal suspicion
+        # should become score penalty rather than hard fail.
+        if issue_code == "excessive_whitespace":
+            local_ratio = max(0.0, min(1.0, float(local_issue_ratios.get(issue_code) or 0.0)))
+            mm_ratio = max(0.0, min(1.0, float(multimodal_issue_ratios.get(issue_code) or 0.0)))
+            if (
+                ratio > limit
+                and local_ratio <= max(0.15, limit * 0.45)
+                and blank_area_ratio <= max(blank_area_limit, 0.45)
+                and mm_ratio >= ratio
+            ):
+                continue
+
+        # text_overlap must fail at boundary value too (>= limit).
+        if issue_code == "text_overlap":
+            if ratio < limit:
+                continue
+        elif ratio <= limit:
+            continue
+        affected = max(1, math.ceil(ratio * max(1, slide_count)))
+        fallback_metric = "contrast"
+        fallback_reverse = False
+        if issue_code in {"excessive_whitespace", "layout_monotony"}:
+            fallback_metric = "edge_density"
+        elif issue_code in {"style_inconsistent"}:
+            fallback_metric = "mean_luminance"
+        target_ids = _target_slide_ids_for_issue(
+            issue_key=issue_code,
+            ratio=ratio,
+            fallback_metric=fallback_metric,
+            fallback_reverse=fallback_reverse,
+        )
+        issues.append(
+            QualityIssue(
+                slide_id=target_ids[0] if target_ids else sid,
+                code=gate_code,
+                message=(
+                    f"{issue_code}_ratio={ratio:.2f} exceeds limit={limit:.2f} "
+                    f"(estimated_affected_slides={affected})."
+                ),
+                retry_scope="slide" if target_ids else "deck",
+                retry_target_ids=target_ids,
+            )
+        )
+
+    return QualityResult(ok=len(issues) == 0, issues=issues)
+
+
+def score_deck_quality(
+    *,
+    slides: List[Dict[str, Any]],
+    render_spec: Optional[Dict[str, Any]] = None,
+    profile: Optional[str | Dict[str, Any]] = None,
+    content_issues: Optional[List[QualityIssue]] = None,
+    layout_issues: Optional[List[QualityIssue]] = None,
+    visual_audit: Optional[Dict[str, Any]] = None,
+) -> QualityScoreResult:
+    active_profile = _resolve_quality_profile(profile)
+    content_result = (
+        QualityResult(ok=not content_issues, issues=list(content_issues or []))
+        if content_issues is not None
+        else validate_deck(slides, profile=active_profile)
+    )
+    layout_result = (
+        QualityResult(ok=not layout_issues, issues=list(layout_issues or []))
+        if layout_issues is not None
+        else validate_layout_diversity(
+            render_spec if isinstance(render_spec, dict) else {"slides": slides},
+            profile=active_profile,
+        )
+    )
+    all_issues = [*content_result.issues, *layout_result.issues]
+    issue_counts = _issue_counter(all_issues)
+
+    structure_penalties = {
+        "blank_slide": 45,
+        "encoding_invalid": 40,
+        "placeholder_pollution": 22,
+        "placeholder_chart_data": 16,
+        "placeholder_kpi_data": 14,
+        "image_missing": 12,
+        "low_content_density": 10,
+    }
+    layout_penalties = {
+        "layout_homogeneous": 32,
+        "layout_top2_homogeneous": 24,
+        "layout_adjacent_repeat": 14,
+        "layout_abab_repeat": 16,
+        "layout_variety_low": 12,
+        "layout_density_consecutive_high": 18,
+        "layout_density_window_missing_breathing": 18,
+        "layout_terminal_cover_missing": 10,
+        "layout_terminal_summary_missing": 10,
+    }
+    family_penalties = {
+        "template_family_homogeneous": 26,
+        "template_family_top2_homogeneous": 20,
+        "template_family_switch_frequent": 20,
+        "template_family_abab_repeat": 16,
+    }
+    visual_penalties = {
+        "blank_area_high": 16,
+        "chart_readability_low": 10,
+        "visual_blank_slide_ratio_high": 22,
+        "visual_low_contrast_ratio_high": 20,
+        "visual_blank_area_ratio_high": 16,
+        "visual_style_drift_ratio_high": 14,
+        "visual_text_overlap_ratio_high": 24,
+        "visual_occlusion_ratio_high": 22,
+        "visual_card_overlap_ratio_high": 22,
+        "visual_title_crowded_ratio_high": 14,
+        "visual_multi_title_ratio_high": 16,
+        "visual_text_overflow_ratio_high": 18,
+        "visual_irrelevant_image_ratio_high": 16,
+        "visual_image_distortion_ratio_high": 14,
+        "visual_whitespace_ratio_high": 14,
+        "visual_layout_monotony_ratio_high": 12,
+        "visual_style_inconsistent_ratio_high": 14,
+    }
+    consistency_penalties = {
+        "duplicate_text": 18,
+        "title_echo": 16,
+        "weak_emphasis": 12,
+        "flat_typography": 12,
+    }
+
+    def _dimension_score(penalty_map: Dict[str, int]) -> float:
+        penalty = 0.0
+        for code, count in issue_counts.items():
+            penalty += float(penalty_map.get(code, 0)) * float(count)
+        return _clamp_100(100.0 - penalty)
+
+    structure_score = _dimension_score(structure_penalties)
+    layout_score = _dimension_score(layout_penalties)
+    family_score = _dimension_score(family_penalties)
+    visual_score = _dimension_score(visual_penalties)
+    consistency_score = _dimension_score(consistency_penalties)
+
+    layout_values = _slide_type_values(slides)
+    if layout_values:
+        variety_ratio = len(set(layout_values)) / max(1, len(layout_values))
+        layout_score = _clamp_100(min(layout_score, 40.0 + 60.0 * variety_ratio))
+
+    family_values = _template_family_values(slides)
+    family_counts = Counter(family_values)
+    if family_values:
+        dominant_family_ratio = max(family_counts.values()) / max(1, len(family_values))
+        top2_family_ratio = (
+            sum(count for _, count in family_counts.most_common(2)) / max(1, len(family_values))
+        )
+        family_switch_ratio = _switch_ratio(family_values)
+        family_score = _clamp_100(
+            min(
+                family_score,
+                100.0
+                - max(0.0, (dominant_family_ratio - float(active_profile.get("template_family_max_type_ratio") or 0.55)) * 120.0)
+                - max(0.0, (top2_family_ratio - float(active_profile.get("template_family_max_top2_ratio") or 0.8)) * 90.0)
+                - max(0.0, (family_switch_ratio - float(active_profile.get("template_family_max_switch_ratio") or 0.75)) * 80.0),
+            )
+        )
+    else:
+        dominant_family_ratio = 1.0
+        top2_family_ratio = 1.0
+        family_switch_ratio = 0.0
+
+    visual_payload = visual_audit if isinstance(visual_audit, dict) else {}
+    blank_slide_ratio = max(0.0, min(1.0, float(visual_payload.get("blank_slide_ratio") or 0.0)))
+    low_contrast_ratio = max(0.0, min(1.0, float(visual_payload.get("low_contrast_ratio") or 0.0)))
+    blank_area_ratio = max(0.0, min(1.0, float(visual_payload.get("blank_area_ratio") or 0.0)))
+    style_drift_ratio = max(0.0, min(1.0, float(visual_payload.get("style_drift_ratio") or 0.0)))
+    mean_luminance = float(visual_payload.get("mean_luminance") or 128.0)
+    multimodal_score = visual_payload.get("multimodal_score")
+    multimodal_numeric = _to_number(multimodal_score)
+    issue_ratios = visual_payload.get("issue_ratios") if isinstance(visual_payload.get("issue_ratios"), dict) else {}
+    visual_issue_pressure = (
+        max(0.0, min(1.0, float(issue_ratios.get("text_overlap") or 0.0))) * 0.22
+        + max(0.0, min(1.0, float(issue_ratios.get("occlusion") or 0.0))) * 0.20
+        + max(0.0, min(1.0, float(issue_ratios.get("card_overlap") or 0.0))) * 0.18
+        + max(0.0, min(1.0, float(issue_ratios.get("title_crowded") or 0.0))) * 0.14
+        + max(0.0, min(1.0, float(issue_ratios.get("multi_title_bar") or 0.0))) * 0.14
+        + max(0.0, min(1.0, float(issue_ratios.get("text_overflow") or 0.0))) * 0.16
+        + max(0.0, min(1.0, float(issue_ratios.get("irrelevant_image") or 0.0))) * 0.16
+        + max(0.0, min(1.0, float(issue_ratios.get("image_distortion") or 0.0))) * 0.12
+        + max(0.0, min(1.0, float(issue_ratios.get("excessive_whitespace") or 0.0))) * 0.12
+        + max(0.0, min(1.0, float(issue_ratios.get("layout_monotony") or 0.0))) * 0.10
+        + max(0.0, min(1.0, float(issue_ratios.get("style_inconsistent") or 0.0))) * 0.10
+    )
+    visual_score = _clamp_100(
+        visual_score
+        - (blank_slide_ratio * 40.0)
+        - (low_contrast_ratio * 30.0)
+        - (blank_area_ratio * 22.0)
+        - (style_drift_ratio * 20.0)
+        - (visual_issue_pressure * 80.0)
+    )
+    if mean_luminance < 25.0 or mean_luminance > 245.0:
+        visual_score = _clamp_100(visual_score - 8.0)
+    if multimodal_numeric is not None:
+        visual_score = _clamp_100((visual_score * 0.7) + (_clamp_100(multimodal_numeric) * 0.3))
+
+    weights = active_profile.get("quality_score_weights") or {}
+    weighted_score = _clamp_100(
+        (float(weights.get("structure", 0.26)) * structure_score)
+        + (float(weights.get("layout", 0.20)) * layout_score)
+        + (float(weights.get("family", 0.16)) * family_score)
+        + (float(weights.get("visual", 0.22)) * visual_score)
+        + (float(weights.get("consistency", 0.16)) * consistency_score)
+    )
+    threshold = float(active_profile.get("quality_score_threshold") or 72.0)
+    warn_threshold = float(active_profile.get("quality_score_warn_threshold") or 80.0)
+    fatal_codes = {"blank_slide", "encoding_invalid"}
+    has_fatal = any(code in fatal_codes for code in issue_counts.keys())
+    passed = (weighted_score >= threshold) and (not has_fatal)
+
+    return QualityScoreResult(
+        score=weighted_score,
+        passed=passed,
+        threshold=threshold,
+        warn_threshold=warn_threshold,
+        dimensions={
+            "structure": structure_score,
+            "layout": layout_score,
+            "family": family_score,
+            "visual": visual_score,
+            "consistency": consistency_score,
+        },
+        issue_counts={code: int(count) for code, count in issue_counts.items()},
+        diagnostics={
+            "fatal_codes_present": sorted([code for code in issue_counts.keys() if code in fatal_codes]),
+            "layout_variety_ratio": (
+                len(set(layout_values)) / max(1, len(layout_values)) if layout_values else 0.0
+            ),
+            "template_family_dominant_ratio": dominant_family_ratio,
+            "template_family_top2_ratio": top2_family_ratio,
+            "template_family_switch_ratio": family_switch_ratio,
+            "visual_blank_slide_ratio": blank_slide_ratio,
+            "visual_low_contrast_ratio": low_contrast_ratio,
+            "visual_blank_area_ratio": blank_area_ratio,
+            "visual_style_drift_ratio": style_drift_ratio,
+            "visual_issue_pressure": visual_issue_pressure,
+            "visual_mean_luminance": mean_luminance,
+            "visual_multimodal_score": multimodal_numeric,
+        },
+    )

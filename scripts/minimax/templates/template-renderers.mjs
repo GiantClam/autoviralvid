@@ -1,6 +1,8 @@
 ﻿import { getTemplateSpec } from "./template-specs.mjs";
+import { getTemplatePreferredLayout } from "./template-catalog.mjs";
 
 import { createChart } from "../chart-factory.mjs";
+import { renderBentoSlide } from "../card-renderers.mjs";
 
 const SLIDE_W = 10;
 const SLIDE_H = 5.625;
@@ -201,7 +203,8 @@ function addSlideText(slide, text, rect, options = {}) {
     align: options.align,
     valign: options.valign,
     margin: 0,
-    breakLine: options.breakLine !== false,
+    fit: options.fit || "shrink",
+    breakLine: options.breakLine === true,
   });
 }
 
@@ -1082,6 +1085,358 @@ function renderDashboardDarkTemplate(slide, bullets, pageNumber, theme, style, h
   return true;
 }
 
+function renderKpiDashboardDarkTemplate(slide, bullets, pageNumber, theme, style, helpers, sourceSlide) {
+  const nextTheme = {
+    ...theme,
+    template_family: "kpi_dashboard_dark",
+    cardBg: theme.cardBg || "0E1630",
+    cardAltBg: theme.cardAltBg || "121F3D",
+    borderColor: theme.borderColor || "1E335E",
+  };
+  const ok = renderDashboardDarkTemplate(slide, bullets, pageNumber, nextTheme, style, helpers, sourceSlide);
+  if (!ok) return false;
+  addPanel(slide, { x: 0.66, y: 0.9, w: 2.2, h: 0.26 }, nextTheme, {
+    radius: 0.13,
+    fill: nextTheme.primary || "2F7BFF",
+    transparency: 0,
+    border: nextTheme.primary || "2F7BFF",
+    pt: 0,
+  });
+  addSlideText(slide, "KPI Dashboard", { x: 0.74, y: 0.92, w: 1.96, h: 0.22 }, {
+    fontFace: helpers?.FONT_BY_STYLE?.[style]?.enBody,
+    fontSize: 10,
+    bold: true,
+    color: nextTheme.white || "FFFFFF",
+    maxChars: 32,
+  });
+  return true;
+}
+
+function renderImageShowcaseLightTemplate(slide, bullets, pageNumber, theme, style, helpers, sourceSlide) {
+  const { addBulletList, addPageBadge, FONT_ZH } = helpers;
+  const spec = getTemplateSpec("image_showcase_light");
+  const nextTheme = {
+    ...theme,
+    template_family: "image_showcase_light",
+    bg: "F6F8FC",
+    cardBg: "FFFFFF",
+    cardAltBg: "EEF3FB",
+    borderColor: "CFDAEC",
+    darkText: "0F1E35",
+    mutedText: "6B7C96",
+  };
+  const points = safeBulletsFromArgs({ bullets, sourceSlide }, 8);
+  const imageData = pickImageSource(sourceSlide);
+
+  addPanel(slide, spec.hero, nextTheme, {
+    radius: spec.hero.radius,
+    fill: nextTheme.cardBg,
+    transparency: 0,
+    border: nextTheme.borderColor,
+    pt: 0.7,
+  });
+  if (imageData) {
+    slide.addImage({
+      data: imageData,
+      ...clampRect(spec.hero.x + 0.1, spec.hero.y + 0.1, spec.hero.w - 0.2, spec.hero.h - 0.2, 0.02),
+    });
+  } else {
+    addBulletList(
+      slide,
+      points.slice(0, 5),
+      spec.hero.x + 0.22,
+      spec.hero.y + 0.24,
+      spec.hero.w - 0.44,
+      spec.hero.h - 0.46,
+      nextTheme,
+      style,
+      5,
+    );
+  }
+
+  for (const [idx, slot] of [spec.sideTop, spec.sideBottom].entries()) {
+    addPanel(slide, slot, nextTheme, {
+      radius: slot.radius,
+      fill: nextTheme.cardBg,
+      transparency: 0,
+      border: nextTheme.borderColor,
+      pt: 0.7,
+    });
+    addSlideText(slide, points[idx] || `Highlight ${idx + 1}`, {
+      x: slot.x + 0.16,
+      y: slot.y + 0.18,
+      w: slot.w - 0.32,
+      h: slot.h - 0.3,
+    }, {
+      fontFace: FONT_ZH,
+      fontSize: 13,
+      color: nextTheme.darkText,
+      maxChars: 72,
+      breakLine: true,
+    });
+  }
+
+  addPageBadge(slide, pageNumber, nextTheme, style);
+  return true;
+}
+
+function renderProcessFlowDarkTemplate(slide, bullets, pageNumber, theme, style, helpers, sourceSlide) {
+  const { FONT_ZH, addPageBadge } = helpers;
+  const spec = getTemplateSpec("process_flow_dark");
+  const nextTheme = {
+    ...theme,
+    template_family: "process_flow_dark",
+    cardBg: theme.cardBg || "0F162C",
+    cardAltBg: theme.cardAltBg || "132241",
+    borderColor: theme.borderColor || "2A3F6E",
+  };
+  const points = safeBulletsFromArgs({ bullets, sourceSlide }, 8);
+
+  addPanel(slide, spec.board, nextTheme, {
+    radius: spec.board.radius,
+    fill: nextTheme.cardBg,
+    transparency: 8,
+    border: nextTheme.borderColor,
+    pt: 0.8,
+  });
+
+  const nodeTexts = [points[0], points[1], points[2], points[3]].map((v, i) => v || `Step ${i + 1}`);
+  spec.nodes.forEach((node, idx) => {
+    addPanel(slide, node, nextTheme, {
+      radius: 0.08,
+      fill: nextTheme.cardAltBg,
+      transparency: 4,
+      border: nextTheme.borderColor,
+      pt: 0.7,
+    });
+    addSlideText(slide, `0${idx + 1}`, {
+      x: node.x + 0.14,
+      y: node.y + 0.16,
+      w: 0.38,
+      h: 0.26,
+    }, {
+      fontFace: FONT_ZH,
+      fontSize: 12,
+      bold: true,
+      color: nextTheme.accent || "18E0D1",
+      maxChars: 4,
+    });
+    addSlideText(slide, nodeTexts[idx], {
+      x: node.x + 0.14,
+      y: node.y + 0.5,
+      w: node.w - 0.28,
+      h: node.h - 0.62,
+    }, {
+      fontFace: FONT_ZH,
+      fontSize: 11,
+      color: nextTheme.darkText,
+      maxChars: 88,
+      breakLine: true,
+    });
+    if (idx < spec.nodes.length - 1) {
+      slide.addShape("line", {
+        x: node.x + node.w,
+        y: node.y + node.h / 2,
+        w: spec.nodes[idx + 1].x - (node.x + node.w),
+        h: 0,
+        line: { color: nextTheme.accent || "18E0D1", pt: 1.1 },
+      });
+    }
+  });
+
+  addPageBadge(slide, pageNumber, nextTheme, style);
+  return true;
+}
+
+function renderComparisonCardsLightTemplate(slide, bullets, pageNumber, theme, style, helpers, sourceSlide) {
+  const { FONT_ZH, addPageBadge } = helpers;
+  const spec = getTemplateSpec("comparison_cards_light");
+  const nextTheme = {
+    ...theme,
+    template_family: "comparison_cards_light",
+    bg: "F7F8FB",
+    cardBg: "FFFFFF",
+    cardAltBg: "F1F4FA",
+    borderColor: "D7E0EE",
+    darkText: "17243D",
+    mutedText: "667A9D",
+  };
+  const points = safeBulletsFromArgs({ bullets, sourceSlide }, 9);
+
+  spec.cards.forEach((card, idx) => {
+    addPanel(slide, card, nextTheme, {
+      radius: 0.09,
+      fill: nextTheme.cardBg,
+      transparency: 0,
+      border: nextTheme.borderColor,
+      pt: 0.7,
+    });
+    addSlideText(slide, idx === 0 ? "Option A" : idx === 1 ? "Option B" : "Option C", {
+      x: card.x + 0.16,
+      y: card.y + 0.18,
+      w: card.w - 0.32,
+      h: 0.24,
+    }, {
+      fontFace: FONT_ZH,
+      fontSize: 12,
+      bold: true,
+      color: nextTheme.primary || "2F67E8",
+      maxChars: 24,
+    });
+    const text = [points[idx * 2], points[idx * 2 + 1]].filter(Boolean).join("; ") || points[idx] || "Comparison point";
+    addSlideText(slide, text, {
+      x: card.x + 0.16,
+      y: card.y + 0.5,
+      w: card.w - 0.32,
+      h: card.h - 0.72,
+    }, {
+      fontFace: FONT_ZH,
+      fontSize: 11,
+      color: nextTheme.darkText,
+      maxChars: 120,
+      breakLine: true,
+    });
+  });
+
+  addPageBadge(slide, pageNumber, nextTheme, style);
+  return true;
+}
+
+function renderQuoteHeroDarkTemplate(slide, bullets, pageNumber, theme, style, helpers, sourceSlide) {
+  const { FONT_ZH, addPageBadge } = helpers;
+  const spec = getTemplateSpec("quote_hero_dark");
+  const quoteBlock = findFirstBlock(sourceSlide, ["quote", "body", "list"]);
+  const quoteText = truncate(
+    blockText(quoteBlock) || safeBulletsFromArgs({ bullets, sourceSlide }, 2).join("；") || "Insight drives execution.",
+    200,
+  );
+  const authorText = truncate(String(sourceSlide?.author || sourceSlide?.speaker || "Source"), 48);
+  const nextTheme = {
+    ...theme,
+    template_family: "quote_hero_dark",
+    cardBg: theme.cardBg || "0E1630",
+    cardAltBg: theme.cardAltBg || "132241",
+    borderColor: theme.borderColor || "2A3F6E",
+  };
+
+  addPanel(slide, spec.quotePanel, nextTheme, {
+    radius: spec.quotePanel.radius,
+    fill: nextTheme.cardAltBg,
+    transparency: 8,
+    border: nextTheme.borderColor,
+    pt: 0.8,
+  });
+  addSlideText(slide, `"${quoteText}"`, spec.quote, {
+    fontFace: FONT_ZH,
+    fontSize: spec.quote.fontSize,
+    color: nextTheme.darkText,
+    bold: true,
+    align: "center",
+    valign: "mid",
+    maxChars: 220,
+    breakLine: true,
+  });
+  addSlideText(slide, `- ${authorText}`, spec.author, {
+    fontFace: FONT_ZH,
+    fontSize: spec.author.fontSize,
+    color: nextTheme.mutedText,
+    align: "right",
+    maxChars: 68,
+  });
+
+  addPageBadge(slide, pageNumber, nextTheme, style);
+  return true;
+}
+
+const BENTO_CARD_ORDER = {
+  grid_4: ["tl", "tr", "bl", "br"],
+  bento_5: ["hero", "s1", "s2", "s3", "s4"],
+};
+
+function ensureBentoTemplateSource(sourceSlide = {}, bullets = [], templateFamily = "bento_2x2_dark") {
+  const family = String(templateFamily || "").trim().toLowerCase();
+  const forcedLayout = getTemplatePreferredLayout(family, "grid_4");
+  if (sourceSlide && typeof sourceSlide === "object") {
+    sourceSlide.layout_grid = forcedLayout;
+  }
+  const out = sourceSlide && typeof sourceSlide === "object" ? { ...sourceSlide } : {};
+  out.layout_grid = forcedLayout;
+  const blocks = Array.isArray(out.blocks)
+    ? out.blocks
+      .filter((item) => item && typeof item === "object")
+      .map((item) => ({ ...item }))
+    : [];
+  const titleText = truncate(String(out.title || bullets[0] || "Core Highlights"), 64);
+  if (!blocks.some((item) => blockType(item) === "title")) {
+    blocks.unshift({ block_type: "title", card_id: "title", content: titleText });
+  }
+
+  const slots = BENTO_CARD_ORDER[forcedLayout] || ["tl", "tr", "bl", "br"];
+  let slotIdx = 0;
+  let nonTitleCount = 0;
+  for (const block of blocks) {
+    if (blockType(block) === "title") continue;
+    nonTitleCount += 1;
+    const hasSlot = String(block.card_id || block.id || "").trim().length > 0;
+    if (hasSlot) continue;
+    block.card_id = slots[slotIdx % slots.length];
+    slotIdx += 1;
+  }
+
+  if (nonTitleCount === 0) {
+    const fallbackItems = safeBulletsFromArgs({ bullets, sourceSlide: out }, 6);
+    const generated = [
+      { block_type: "body", card_id: slots[0], content: fallbackItems[0] || "Core narrative" },
+      { block_type: "list", card_id: slots[1], content: fallbackItems.slice(1, 4).join("; ") || "Insight A; Insight B" },
+      { block_type: "kpi", card_id: slots[2], data: { number: 118, unit: "%", trend: 8 }, content: "118%" },
+      { block_type: "image", card_id: slots[3], content: { title: fallbackItems[4] || "Visual anchor" } },
+    ];
+    blocks.push(...generated);
+  }
+
+  out.blocks = blocks;
+  return out;
+}
+
+function renderBentoTemplate(slide, bullets, pageNumber, theme, style, helpers, sourceSlide, templateFamily) {
+  const preparedSource = ensureBentoTemplateSource(sourceSlide, bullets, templateFamily);
+  const pptx = helpers?.pptx || {
+    shapes: { ROUNDED_RECTANGLE: "roundRect" },
+    charts: { BAR: "bar" },
+  };
+  const ok = renderBentoSlide({
+    pptx,
+    slide,
+    sourceSlide: preparedSource,
+    theme,
+    style,
+  });
+  if (!ok) return false;
+
+  if (String(templateFamily || "").trim().toLowerCase() === "bento_mosaic_dark") {
+    slide.addShape("line", {
+      x: 0.54,
+      y: 0.88,
+      w: 8.92,
+      h: 0,
+      line: { color: theme.accentStrong || theme.accent || "18E0D1", pt: 0.8, transparency: 22 },
+    });
+    slide.addShape("ellipse", {
+      x: 9.14,
+      y: 0.82,
+      w: 0.16,
+      h: 0.16,
+      fill: { color: theme.accentStrong || theme.accent || "18E0D1", transparency: 0 },
+      line: { color: theme.accentStrong || theme.accent || "18E0D1", pt: 0 },
+    });
+  }
+
+  if (typeof helpers?.addPageBadge === "function") {
+    helpers.addPageBadge(slide, pageNumber, theme, style);
+  }
+  return true;
+}
+
 const CONTENT_RENDERERS = new Set([
   "architecture_dark_panel",
   "ecosystem_orange_dark",
@@ -1090,6 +1445,13 @@ const CONTENT_RENDERERS = new Set([
   "consulting_warm_light",
   "split_media_dark",
   "dashboard_dark",
+  "bento_2x2_dark",
+  "bento_mosaic_dark",
+  "kpi_dashboard_dark",
+  "image_showcase_light",
+  "process_flow_dark",
+  "comparison_cards_light",
+  "quote_hero_dark",
 ]);
 
 const COVER_RENDERERS = new Set(["hero_tech_cover"]);
@@ -1100,6 +1462,14 @@ export function hasTemplateContentRenderer(templateFamily) {
 
 export function hasTemplateCoverRenderer(templateFamily) {
   return COVER_RENDERERS.has(String(templateFamily || "").trim().toLowerCase());
+}
+
+export function listTemplateContentRenderers() {
+  return Array.from(CONTENT_RENDERERS).sort();
+}
+
+export function listTemplateCoverRenderers() {
+  return Array.from(COVER_RENDERERS).sort();
 }
 
 export function renderTemplateCover(args) {
@@ -1181,8 +1551,72 @@ export function renderTemplateContent(args) {
         args.helpers,
         args.sourceSlide,
       );
+    case "kpi_dashboard_dark":
+      return renderKpiDashboardDarkTemplate(
+        args.slide,
+        args.bullets,
+        args.pageNumber,
+        args.theme,
+        args.style,
+        args.helpers,
+        args.sourceSlide,
+      );
+    case "image_showcase_light":
+      return renderImageShowcaseLightTemplate(
+        args.slide,
+        args.bullets,
+        args.pageNumber,
+        args.theme,
+        args.style,
+        args.helpers,
+        args.sourceSlide,
+      );
+    case "process_flow_dark":
+      return renderProcessFlowDarkTemplate(
+        args.slide,
+        args.bullets,
+        args.pageNumber,
+        args.theme,
+        args.style,
+        args.helpers,
+        args.sourceSlide,
+      );
+    case "comparison_cards_light":
+      return renderComparisonCardsLightTemplate(
+        args.slide,
+        args.bullets,
+        args.pageNumber,
+        args.theme,
+        args.style,
+        args.helpers,
+        args.sourceSlide,
+      );
+    case "quote_hero_dark":
+      return renderQuoteHeroDarkTemplate(
+        args.slide,
+        args.bullets,
+        args.pageNumber,
+        args.theme,
+        args.style,
+        args.helpers,
+        args.sourceSlide,
+      );
+    case "bento_2x2_dark":
+    case "bento_mosaic_dark":
+      return renderBentoTemplate(
+        args.slide,
+        args.bullets,
+        args.pageNumber,
+        args.theme,
+        args.style,
+        args.helpers,
+        args.sourceSlide,
+        family,
+      );
     default:
       return false;
   }
 }
+
+
 

@@ -1,5 +1,7 @@
 ﻿import { getCardById, getGrid, validateGrid } from "./bento-grid.mjs";
-import { createChart } from "./chart-factory.mjs";
+import { createChart, inferChartTypeFromBlock } from "./chart-factory.mjs";
+import { renderIconDataForPptx, resolveIconName } from "./icon-factory.mjs";
+import { isNonStandardChartType, renderNonStandardChartInCard } from "./svg-chart-converter.mjs";
 
 const STYLE_RECIPE = {
   sharp: { cardRadius: 0.03 },
@@ -90,6 +92,67 @@ function renderTextCard(ctx) {
     fontSize: 14,
     color: theme.darkText || "1E293B",
     valign: "top",
+  });
+}
+
+function renderIconTextCard(ctx) {
+  const { slide, card, theme, block } = ctx;
+  const contentObj = block?.content && typeof block.content === "object" ? block.content : {};
+  const dataObj = block?.data && typeof block.data === "object" ? block.data : {};
+  const titleText = String(contentObj.title || dataObj.title || "").trim();
+  const bodyText = String(contentObj.body || contentObj.text || readContent(block) || "").trim();
+  const iconHint = String(
+    block?.icon || dataObj.icon || contentObj.icon || contentObj.icon_name || dataObj.icon_name || "",
+  ).trim();
+  const iconName = resolveIconName({
+    icon: iconHint,
+    title: titleText,
+    text: bodyText,
+  });
+
+  if (typeof slide.addImage === "function") {
+    try {
+      const iconData = renderIconDataForPptx({
+        icon: iconName,
+        title: titleText,
+        text: bodyText,
+        size: 56,
+        color: theme.primary || "2F7BFF",
+      });
+      slide.addImage({
+        data: iconData,
+        x: card.x + 0.16,
+        y: card.y + 0.16,
+        w: 0.42,
+        h: 0.42,
+      });
+    } catch {
+      // degrade gracefully to text-only rendering
+    }
+  }
+
+  if (titleText) {
+    slide.addText(titleText, {
+      x: card.x + 0.66,
+      y: card.y + 0.16,
+      w: card.w - 0.82,
+      h: 0.28,
+      fontSize: 13,
+      color: theme.darkText || "1E293B",
+      bold: true,
+      valign: "top",
+    });
+  }
+
+  slide.addText(bodyText || "Key point", {
+    x: card.x + 0.66,
+    y: card.y + (titleText ? 0.46 : 0.16),
+    w: card.w - 0.82,
+    h: card.h - (titleText ? 0.58 : 0.28),
+    fontSize: 12,
+    color: theme.darkText || "1E293B",
+    valign: "top",
+    breakLine: true,
   });
 }
 
@@ -321,16 +384,38 @@ function renderChartCard(ctx) {
   const data = block?.data || block?.content || {};
   const labels = Array.isArray(data.labels) ? data.labels : [];
   const datasets = Array.isArray(data.datasets) ? data.datasets : [];
-  if (labels.length === 0 || datasets.length === 0 || typeof slide.addChart !== "function") {
+  if (labels.length === 0 || datasets.length === 0) {
     throw createRenderError(
       "chart_data_missing",
       "Chart block requires labels and datasets.",
     );
   }
+  const chartType = inferChartTypeFromBlock(block);
+  if (isNonStandardChartType(chartType)) {
+    const rendered = renderNonStandardChartInCard({
+      slide,
+      pptx,
+      card,
+      theme,
+      data: {
+        chartType,
+        labels,
+        datasets,
+        title: String(block?.content?.title || block?.title || "").trim(),
+      },
+    });
+    if (rendered?.applied) return;
+  }
+  if (typeof slide.addChart !== "function") {
+    throw createRenderError(
+      "chart_data_missing",
+      "Chart block requires addChart support for standard chart types.",
+    );
+  }
   createChart(
     slide,
     pptx,
-    data.chartType || data.type || "bar",
+    chartType,
     datasets.map((d) => ({
       name: String(d.label || "Series"),
       labels,
@@ -472,7 +557,7 @@ const RENDERERS = {
   body: renderTextCard,
   title: renderTextCard,
   subtitle: renderTextCard,
-  icon_text: renderTextCard,
+  icon_text: renderIconTextCard,
   quote: renderTextCard,
   image: renderImageCard,
   list: renderListCard,
@@ -571,3 +656,6 @@ export function renderBentoSlide({ pptx, slide, sourceSlide, theme, style }) {
   }
   return true;
 }
+
+
+

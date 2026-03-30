@@ -3,6 +3,8 @@
  * Keep this module deterministic so it can be tested via harness.
  */
 
+import { getTemplateCatalog } from "./minimax/templates/template-catalog.mjs";
+
 export function normalizeKey(value) {
   return String(value || "")
     .trim()
@@ -50,11 +52,15 @@ export function inferSubtype(slide) {
       "comparison",
       "timeline",
       "data",
+      "data_visualization",
+      "mixed_media",
+      "image_showcase",
     ].includes(explicit)
   ) {
     if (explicit === "toc" || explicit === "cover" || explicit === "summary" || explicit === "contact") {
       return "content";
     }
+    if (explicit === "data") return "data_visualization";
     return explicit;
   }
 
@@ -64,10 +70,14 @@ export function inferSubtype(slide) {
   const hasElementType = (type) =>
     elements.some((el) => String(el?.type || "").toLowerCase() === String(type).toLowerCase());
   const hasBlockType = (type) => blocks.some((block) => blockType(block) === String(type).toLowerCase());
+  const hasImage = hasElementType("image") || hasBlockType("image");
+  const hasDataVisual = hasElementType("chart") || hasBlockType("chart") || hasBlockType("kpi");
+  const hasWorkflow = hasBlockType("workflow") || hasBlockType("diagram");
   if (/(part|section|\u7ae0\u8282|\u90e8\u5206|\u5206\u7bc7)/.test(title)) return "section";
   if (hasElementType("table") || hasBlockType("table")) return "table";
   if (/(\u5bf9\u6bd4|\u6bd4\u8f83|vs|versus|\u4f18\u52bf|\u5dee\u5f02)/.test(title)) return "comparison";
-  if (hasElementType("chart") || hasBlockType("chart") || hasBlockType("kpi")) return "data";
+  if (hasDataVisual && hasImage) return "mixed_media";
+  if (hasDataVisual) return "data_visualization";
   if (
     /(\u6d41\u7a0b|\u9636\u6bb5|\u8def\u7ebf\u56fe|roadmap|timeline|\u6b65\u9aa4|\u91cc\u7a0b\u7891|\u5b9e\u65bd\u8def\u5f84)/.test(
       title,
@@ -75,8 +85,10 @@ export function inferSubtype(slide) {
   ) {
     return "timeline";
   }
-  if (/(\u6570\u636e|\u589e\u957f|\u8f6c\u5316|roi|\u6548\u7387|\u6307\u6807)/.test(title)) return "data";
-  if (hasElementType("image") || hasBlockType("image")) return "mixed";
+  if (/(\u6570\u636e|\u589e\u957f|\u8f6c\u5316|roi|\u6548\u7387|\u6307\u6807)/.test(title)) return "data_visualization";
+  if (/(showcase|\u5c55\u793a|\u6848\u4f8b|\u6210\u679c)/.test(title) && hasImage) return "image_showcase";
+  if (hasImage) return "mixed_media";
+  if (hasWorkflow) return "mixed_media";
   return "content";
 }
 
@@ -102,7 +114,21 @@ export function selectPalette(paletteInput, topicText, preserveOriginal = false)
   if (normalized && normalized !== "auto") return normalized;
   if (preserveOriginal) return "business_authority";
 
+  const catalog = getTemplateCatalog();
+  const paletteRules = catalog?.palette_keywords && typeof catalog.palette_keywords === "object"
+    ? catalog.palette_keywords
+    : {};
   const topic = String(topicText || "").toLowerCase();
+  for (const [pattern, palette] of Object.entries(paletteRules)) {
+    if (!pattern || !palette) continue;
+    try {
+      if (new RegExp(String(pattern), "i").test(topic)) {
+        return String(palette);
+      }
+    } catch {
+      // ignore invalid custom regex and continue fallback matching
+    }
+  }
   if (/(\u4f01\u4e1a|\u516c\u53f8|\u5236\u9020|\u5de5\u4e1a|\u884c\u4e1a|\u5546\u4e1a|business|enterprise|industry)/.test(topic)) return "business_authority";
   if (/(finance|\u7ecf\u8425|\u5b63\u5ea6|analysis|report|saas|business)/.test(topic)) return "business_authority";
   if (/(health|\u533b\u7597|wellness)/.test(topic)) return "modern_wellness";

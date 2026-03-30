@@ -86,6 +86,17 @@ class ContentBlock(BaseModel):
         return self
 
 
+class SlideContentStrategy(BaseModel):
+    """SCQA-inspired strategy metadata for a slide."""
+
+    assertion: str = Field(..., min_length=2, max_length=220)
+    evidence: List[str] = Field(default_factory=list, max_length=6)
+    data_anchor: str = Field(default="", max_length=160)
+    page_role: Literal["argument", "evidence", "transition", "summary"] = "argument"
+    density_hint: Literal["high", "medium", "low", "breathing"] = "medium"
+    render_path: Literal["pptxgenjs", "svg"] = "pptxgenjs"
+
+
 class SlidePlan(BaseModel):
     """Wireframe + finalized content for one slide."""
 
@@ -96,6 +107,7 @@ class SlidePlan(BaseModel):
     bg_style: Literal["light", "dark", "accent", "image"] = "light"
     image_keywords: List[str] = Field(default_factory=list, max_length=8)
     notes_for_designer: str = Field(default="", max_length=500)
+    content_strategy: Optional[SlideContentStrategy] = None
 
     @model_validator(mode="after")
     def validate_block_composition(self) -> "SlidePlan":

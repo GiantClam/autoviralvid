@@ -28,10 +28,10 @@ EMBED_REFERER = os.getenv(
     "EMBEDDING_REFERER", os.getenv("SITE_URL", "https://saleagent.app")
 )
 PROMPT_LLM_MODEL = os.getenv(
-    "PROMPT_LLM_MODEL", "openai/gpt-5-mini"
+    "CONTENT_LLM_MODEL", "openai/gpt-5-mini"
 )  # 默认使用 gpt-5-mini，结构化输出更稳定
 STORYBOARD_LLM_MODEL = os.getenv(
-    "STORYBOARD_LLM_MODEL", "openai/gpt-4o-mini"
+    "CONTENT_LLM_MODEL", "openai/gpt-5-mini"
 )  # 分镜规划专用模型
 
 # 全局客户端（懒加载）

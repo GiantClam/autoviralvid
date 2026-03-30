@@ -1,0 +1,3032 @@
+{
+  "title": "202X年度工作总结PPT",
+  "author": "第一PPT市场部门",
+  "theme": {
+    "palette": "business_authority",
+    "style": "sharp"
+  },
+  "template_family": "auto",
+  "template_id": "auto",
+  "skill_profile": "auto",
+  "hardness_profile": "balanced",
+  "schema_profile": "auto",
+  "contract_profile": "default",
+  "quality_profile": "default",
+  "design_spec": {
+    "colors": {
+      "primary": "C41E3A",
+      "secondary": "8B0000",
+      "accent": "FFFFFF",
+      "background": "DC143C"
+    },
+    "typography": {},
+    "spacing": {},
+    "visual": {
+      "style_recipe": "sharp",
+      "visual_priority": true,
+      "visual_density": "balanced"
+    }
+  },
+  "visual_priority": true,
+  "visual_preset": "executive_brief",
+  "visual_density": "balanced",
+  "constraint_hardness": "balanced",
+  "svg_mode": "auto",
+  "verbatim_content": false,
+  "original_style": false,
+  "disable_local_style_rewrite": false,
+  "deck_id": "",
+  "deck_style": "",
+  "style": "",
+  "minimax_palette_key": "business_authority",
+  "minimax_style_variant": "sharp",
+  "retry_scope": "deck",
+  "retry_hint": "",
+  "idempotency_key": "",
+  "target_slide_ids": "",
+  "target_block_ids": "",
+  "slides": [
+    {
+      "page_number": 1,
+      "slide_id": "slide-001",
+      "id": "slide-001",
+      "slide_type": "cover",
+      "page_type": "cover",
+      "pageType": "cover",
+      "slideType": "cover",
+      "subtype": "cover",
+      "layout_grid": "grid_2",
+      "layout": "grid_2",
+      "template_family": "hero_tech_cover",
+      "template_id": "hero_tech_cover",
+      "skill_profile": "cover-storytelling",
+      "hardness_profile": "strict",
+      "schema_profile": "ppt-template/v2-hero-tech",
+      "contract_profile": "cover_meta_required",
+      "quality_profile": "default",
+      "template_lock": false,
+      "render_path": "pptxgenjs",
+      "bg_style": "light",
+      "content_density": "sparse",
+      "force_bento": false,
+      "title": "2O2X",
+      "narration": "欢迎各位，接下来我将为大家介绍2O2X。本报告将从多个维度进行全面分析。",
+      "speaker_notes": "欢迎各位，接下来我将为大家介绍2O2X。本报告将从多个维度进行全面分析。",
+      "speakerNotes": "欢迎各位，接下来我将为大家介绍2O2X。本报告将从多个维度进行全面分析。",
+      "duration": 8,
+      "narration_audio_url": "",
+      "narrationAudioUrl": "",
+      "script": [
+        {
+          "role": "host",
+          "text": "欢迎各位，接下来我将为大家介绍2O2X。本报告将从多个维度进行全面分析。"
+        }
+      ],
+      "text_constraints": {
+        "bullet_max_items": 6,
+        "bullet_max_chars_cjk": 30,
+        "min_body_font_pt": 11,
+        "min_title_font_pt": 20,
+        "subtitle_max_lines": 2,
+        "subtitle_max_chars_cjk": 80,
+        "subtitle_min_font_pt": 13,
+        "bullet_auto_split": true
+      },
+      "markdown": "# 2O2X\n- BUSINESS COMPANY WORK REPORT\n- DEPARTMENT SUMMARY",
+      "imageUrl": "",
+      "key_points": [
+        "BUSINESS COMPANY WORK REPORT",
+        "DEPARTMENT SUMMARY"
+      ],
+      "bullets": [
+        "BUSINESS COMPANY WORK REPORT",
+        "DEPARTMENT SUMMARY"
+      ],
+      "image_keywords": [
+        "business",
+        "work",
+        "report",
+        "summary",
+        "corporate"
+      ],
+      "blocks": [
+        {
+          "block_type": "title",
+          "type": "title",
+          "card_id": "card-1",
+          "id": "card-1",
+          "content": "2O2X",
+          "emphasis": []
+        },
+        {
+          "block_type": "subtitle",
+          "type": "subtitle",
+          "card_id": "card-2",
+          "id": "card-2",
+          "content": "工作总结PPT"
+        },
+        {
+          "block_type": "body",
+          "type": "body",
+          "card_id": "card-3",
+          "id": "card-3",
+          "content": "BUSINESS COMPANY WORK REPORT"
+        }
+      ],
+      "elements": [
+        {
+          "type": "text",
+          "content": "2O2X",
+          "top": 1.77,
+          "left": 1.14,
+          "width": 5.52,
+          "height": 2.42
+        },
+        {
+          "type": "text",
+          "content": "工作总结PPT",
+          "top": 3.06,
+          "left": 1.12,
+          "width": 6.84,
+          "height": 1.38
+        },
+        {
+          "type": "text",
+          "content": "BUSINESS COMPANY WORK REPORT",
+          "top": 4.4,
+          "left": 1.15,
+          "width": 6.68,
+          "height": 0.43
+        },
+        {
+          "type": "text",
+          "content": "your content is entered here, or by copying your text, select paste in this box and choose to retain only text. your content is typed here, or by copying your text, select paste in this box.",
+          "top": 4.84,
+          "left": 1.14,
+          "width": 6.81,
+          "height": 0.56
+        },
+        {
+          "type": "text",
+          "content": "DEPARTMENT SUMMARY",
+          "top": 6.23,
+          "left": 8.74,
+          "width": 3.71,
+          "height": 0.4
+        },
+        {
+          "type": "text",
+          "content": "第一PPT商务办公系列PPT模板",
+          "top": 6.92,
+          "left": 1.24,
+          "width": 3.67,
+          "height": 0.3
+        },
+        {
+          "type": "text",
+          "content": "汇报人：第一PPT市场部门",
+          "top": 5.55,
+          "left": 1.12,
+          "width": 3.16,
+          "height": 0.37
+        }
+      ],
+      "svg_overlay": false,
+      "force_svg_overlay": false,
+      "use_svg_overlay": false,
+      "svg_markup": ""
+    },
+    {
+      "page_number": 2,
+      "slide_id": "slide-002",
+      "id": "slide-002",
+      "slide_type": "toc",
+      "page_type": "toc",
+      "pageType": "toc",
+      "slideType": "toc",
+      "subtype": "toc",
+      "layout_grid": "split_2",
+      "layout": "split_2",
+      "template_family": "dashboard_dark",
+      "template_id": "dashboard_dark",
+      "skill_profile": "dashboard-data",
+      "hardness_profile": "balanced",
+      "schema_profile": "ppt-template/v2-dashboard",
+      "contract_profile": "chart_or_kpi_required",
+      "quality_profile": "default",
+      "template_lock": false,
+      "render_path": "pptxgenjs",
+      "bg_style": "light",
+      "content_density": "balanced",
+      "force_bento": false,
+      "title": "CONTENTS",
+      "narration": "本次汇报主要分为以下几个部分，让我们逐一展开介绍。",
+      "speaker_notes": "本次汇报主要分为以下几个部分，让我们逐一展开介绍。",
+      "speakerNotes": "本次汇报主要分为以下几个部分，让我们逐一展开介绍。",
+      "duration": 12,
+      "narration_audio_url": "",
+      "narrationAudioUrl": "",
+      "script": [
+        {
+          "role": "host",
+          "text": "本次汇报主要分为以下几个部分，让我们逐一展开介绍。"
+        }
+      ],
+      "text_constraints": {
+        "bullet_max_items": 6,
+        "bullet_max_chars_cjk": 30,
+        "min_body_font_pt": 11,
+        "min_title_font_pt": 20,
+        "subtitle_max_lines": 2,
+        "subtitle_max_chars_cjk": 80,
+        "subtitle_min_font_pt": 13,
+        "bullet_auto_split": true
+      },
+      "markdown": "# CONTENTS\n- 目录",
+      "imageUrl": "",
+      "key_points": [
+        "目录"
+      ],
+      "bullets": [
+        "目录"
+      ],
+      "image_keywords": [
+        "business",
+        "work",
+        "report",
+        "summary",
+        "corporate"
+      ],
+      "blocks": [
+        {
+          "block_type": "title",
+          "type": "title",
+          "card_id": "card-1",
+          "id": "card-1",
+          "content": "CONTENTS",
+          "emphasis": []
+        },
+        {
+          "block_type": "list",
+          "type": "list",
+          "card_id": "card-2",
+          "id": "card-2",
+          "content": "目录\nPPT模板 http://www.1ppt.com/moban/"
+        }
+      ],
+      "elements": [
+        {
+          "type": "text",
+          "content": "CONTENTS",
+          "top": 1.97,
+          "left": 4.03,
+          "width": 3.01,
+          "height": 0.7
+        },
+        {
+          "type": "text",
+          "content": "目录",
+          "top": 1.04,
+          "left": 3.97,
+          "width": 2.02,
+          "height": 1.11
+        },
+        {
+          "type": "text",
+          "content": "PPT模板 http://www.1ppt.com/moban/",
+          "top": 0.02,
+          "left": 0.08,
+          "width": 0.59,
+          "height": 0.12
+        }
+      ],
+      "svg_overlay": false,
+      "force_svg_overlay": false,
+      "use_svg_overlay": false,
+      "svg_markup": ""
+    },
+    {
+      "page_number": 3,
+      "slide_id": "slide-003",
+      "id": "slide-003",
+      "slide_type": "divider",
+      "page_type": "divider",
+      "pageType": "divider",
+      "slideType": "divider",
+      "subtype": "divider",
+      "layout_grid": "split_2",
+      "layout": "split_2",
+      "template_family": "quote_hero_dark",
+      "template_id": "quote_hero_dark",
+      "skill_profile": "cover-default",
+      "hardness_profile": "balanced",
+      "schema_profile": "ppt-template/v2-quote-hero",
+      "contract_profile": "cover_meta_required",
+      "quality_profile": "default",
+      "template_lock": false,
+      "render_path": "pptxgenjs",
+      "bg_style": "light",
+      "content_density": "balanced",
+      "force_bento": false,
+      "title": "2O2X",
+      "narration": "接下来我们进入2O2X部分。",
+      "speaker_notes": "接下来我们进入2O2X部分。",
+      "speakerNotes": "接下来我们进入2O2X部分。",
+      "duration": 5,
+      "narration_audio_url": "",
+      "narrationAudioUrl": "",
+      "script": [
+        {
+          "role": "host",
+          "text": "接下来我们进入2O2X部分。"
+        }
+      ],
+      "text_constraints": {
+        "bullet_max_items": 6,
+        "bullet_max_chars_cjk": 30,
+        "min_body_font_pt": 11,
+        "min_title_font_pt": 20,
+        "subtitle_max_lines": 2,
+        "subtitle_max_chars_cjk": 80,
+        "subtitle_min_font_pt": 13,
+        "bullet_auto_split": true
+      },
+      "markdown": "# 2O2X\n- 项目复盘\n- PART ONE",
+      "imageUrl": "",
+      "key_points": [
+        "项目复盘",
+        "PART ONE"
+      ],
+      "bullets": [
+        "项目复盘",
+        "PART ONE"
+      ],
+      "image_keywords": [
+        "business",
+        "work",
+        "report",
+        "summary",
+        "corporate"
+      ],
+      "blocks": [
+        {
+          "block_type": "title",
+          "type": "title",
+          "card_id": "card-1",
+          "id": "card-1",
+          "content": "2O2X",
+          "emphasis": []
+        },
+        {
+          "block_type": "subtitle",
+          "type": "subtitle",
+          "card_id": "card-2",
+          "id": "card-2",
+          "content": "项目复盘"
+        }
+      ],
+      "elements": [
+        {
+          "type": "text",
+          "content": "2O2X",
+          "top": 1.54,
+          "left": 1.14,
+          "width": 5.52,
+          "height": 2.42
+        },
+        {
+          "type": "text",
+          "content": "项目复盘",
+          "top": 2.9,
+          "left": 1.17,
+          "width": 6.62,
+          "height": 1.58
+        },
+        {
+          "type": "text",
+          "content": "YOUR CONTENT IS ENTERED HERE, OR BY COPYING YOUR TEXT, SELECT PASTE IN THIS BOX AND CHOOSE TO RETAIN ONLY TEXT. YOUR CONTENT IS TYPED HERE, OR BY COPYING YOUR TEXT, SELECT PASTE IN THIS BOX.",
+          "top": 4.81,
+          "left": 1.18,
+          "width": 6.12,
+          "height": 0.81
+        },
+        {
+          "type": "text",
+          "content": "PART ONE",
+          "top": 2.28,
+          "left": 1.2,
+          "width": 3.27,
+          "height": 0.84
+        },
+        {
+          "type": "text",
+          "content": "第一PPT商务办公系列PPT模板",
+          "top": 6.92,
+          "left": 1.18,
+          "width": 3.67,
+          "height": 0.3
+        }
+      ],
+      "svg_overlay": false,
+      "force_svg_overlay": false,
+      "use_svg_overlay": false,
+      "svg_markup": ""
+    },
+    {
+      "page_number": 4,
+      "slide_id": "slide-004",
+      "id": "slide-004",
+      "slide_type": "content",
+      "page_type": "content",
+      "pageType": "content",
+      "slideType": "content",
+      "subtype": "content",
+      "layout_grid": "grid_3",
+      "layout": "grid_3",
+      "template_family": "split_media_dark",
+      "template_id": "split_media_dark",
+      "skill_profile": "comparison-general",
+      "hardness_profile": "balanced",
+      "schema_profile": "ppt-template/v2-split-media",
+      "contract_profile": "default",
+      "quality_profile": "default",
+      "template_lock": false,
+      "render_path": "pptxgenjs",
+      "bg_style": "light",
+      "content_density": "balanced",
+      "force_bento": false,
+      "title": "项目复盘",
+      "narration": "关于项目复盘，我们来看具体内容。",
+      "speaker_notes": "关于项目复盘，我们来看具体内容。",
+      "speakerNotes": "关于项目复盘，我们来看具体内容。",
+      "duration": 12,
+      "narration_audio_url": "",
+      "narrationAudioUrl": "",
+      "script": [
+        {
+          "role": "host",
+          "text": "关于项目复盘，我们来看具体内容。"
+        }
+      ],
+      "text_constraints": {
+        "bullet_max_items": 6,
+        "bullet_max_chars_cjk": 30,
+        "min_body_font_pt": 11,
+        "min_title_font_pt": 20,
+        "subtitle_max_lines": 2,
+        "subtitle_max_chars_cjk": 80,
+        "subtitle_min_font_pt": 13,
+        "bullet_auto_split": true
+      },
+      "markdown": "# 项目复盘\n- FILL IN THE TEXT OF THE DOCUMENT TITLE HERE\n- 点击输入简要文字解说，解说文字尽量概括精炼，不用多余的文字修饰简洁精准\n- 标题文字内容\n- 点击输入简要文字解说，解说文字尽量概括精炼，不用多余的文字修饰简洁精准\n- 标题文字内容\n- 点击输入简要文字解说，解说文字尽量概括精炼，不用多余的文字修饰简洁精准",
+      "imageUrl": "",
+      "key_points": [
+        "FILL IN THE TEXT OF THE DOCUMENT TITLE HERE",
+        "点击输入简要文字解说，解说文字尽量概括精炼，不用多余的文字修饰简洁精准",
+        "标题文字内容"
+      ],
+      "bullets": [
+        "FILL IN THE TEXT OF THE DOCUMENT TITLE HERE",
+        "点击输入简要文字解说，解说文字尽量概括精炼，不用多余的文字修饰简洁精准",
+        "标题文字内容",
+        "点击输入简要文字解说，解说文字尽量概括精炼，不用多余的文字修饰简洁精准",
+        "标题文字内容",
+        "点击输入简要文字解说，解说文字尽量概括精炼，不用多余的文字修饰简洁精准"
+      ],
+      "image_keywords": [
+        "business",
+        "work",
+        "report",
+        "summary",
+        "corporate"
+      ],
+      "blocks": [
+        {
+          "block_type": "title",
+          "type": "title",
+          "card_id": "card-1",
+          "id": "card-1",
+          "content": "项目复盘",
+          "emphasis": []
+        },
+        {
+          "block_type": "list",
+          "type": "list",
+          "card_id": "card-2",
+          "id": "card-2",
+          "content": "FILL IN THE TEXT OF THE DOCUMENT TITLE HERE\n点击输入简要文字解说，解说文字尽量概括精炼，不用多余的文字修饰简洁精准\n标题文字内容\n点击输入简要文字解说，解说文字尽量概括精炼，不用多余的文字修饰简洁精准\n标题文字内容\n点击输入简要文字解说，解说文字尽量概括精炼，不用多余的文字修饰简洁精准"
+        }
+      ],
+      "elements": [
+        {
+          "type": "text",
+          "content": "项目复盘",
+          "top": 0.11,
+          "left": 1.01,
+          "width": 2.78,
+          "height": 0.63
+        },
+        {
+          "type": "text",
+          "content": "FILL IN THE TEXT OF THE DOCUMENT TITLE HERE",
+          "top": 0.68,
+          "left": 1.02,
+          "width": 2.76,
+          "height": 0.23
+        },
+        {
+          "type": "text",
+          "content": "点击输入简要文字解说，解说文字尽量概括精炼，不用多余的文字修饰简洁精准",
+          "top": 5.56,
+          "left": 1.44,
+          "width": 2.48,
+          "height": 0.83
+        },
+        {
+          "type": "text",
+          "content": "标题文字内容",
+          "top": 5.26,
+          "left": 1.44,
+          "width": 1.38,
+          "height": 0.33
+        },
+        {
+          "type": "text",
+          "content": "点击输入简要文字解说，解说文字尽量概括精炼，不用多余的文字修饰简洁精准",
+          "top": 5.56,
+          "left": 4.29,
+          "width": 2.48,
+          "height": 0.83
+        },
+        {
+          "type": "text",
+          "content": "标题文字内容",
+          "top": 5.26,
+          "left": 4.29,
+          "width": 1.38,
+          "height": 0.33
+        },
+        {
+          "type": "text",
+          "content": "点击输入简要文字解说，解说文字尽量概括精炼，不用多余的文字修饰简洁精准",
+          "top": 5.56,
+          "left": 7.14,
+          "width": 2.48,
+          "height": 0.83
+        },
+        {
+          "type": "text",
+          "content": "标题文字内容",
+          "top": 5.26,
+          "left": 7.14,
+          "width": 1.38,
+          "height": 0.33
+        }
+      ],
+      "svg_overlay": false,
+      "force_svg_overlay": false,
+      "use_svg_overlay": false,
+      "svg_markup": ""
+    },
+    {
+      "page_number": 5,
+      "slide_id": "slide-005",
+      "id": "slide-005",
+      "slide_type": "content",
+      "page_type": "content",
+      "pageType": "content",
+      "slideType": "content",
+      "subtype": "content",
+      "layout_grid": "grid_3",
+      "layout": "grid_3",
+      "template_family": "split_media_dark",
+      "template_id": "split_media_dark",
+      "skill_profile": "comparison-general",
+      "hardness_profile": "balanced",
+      "schema_profile": "ppt-template/v2-split-media",
+      "contract_profile": "default",
+      "quality_profile": "default",
+      "template_lock": false,
+      "render_path": "pptxgenjs",
+      "bg_style": "light",
+      "content_density": "balanced",
+      "force_bento": false,
+      "title": "项目复盘",
+      "narration": "关于项目复盘，我们来看具体内容。",
+      "speaker_notes": "关于项目复盘，我们来看具体内容。",
+      "speakerNotes": "关于项目复盘，我们来看具体内容。",
+      "duration": 12,
+      "narration_audio_url": "",
+      "narrationAudioUrl": "",
+      "script": [
+        {
+          "role": "host",
+          "text": "关于项目复盘，我们来看具体内容。"
+        }
+      ],
+      "text_constraints": {
+        "bullet_max_items": 6,
+        "bullet_max_chars_cjk": 30,
+        "min_body_font_pt": 11,
+        "min_title_font_pt": 20,
+        "subtitle_max_lines": 2,
+        "subtitle_max_chars_cjk": 80,
+        "subtitle_min_font_pt": 13,
+        "bullet_auto_split": true
+      },
+      "markdown": "# 项目复盘\n- FILL IN THE TEXT OF THE DOCUMENT TITLE HERE\n- 此处输入你的标题\n- BUSINESS TITLE\n- 单击此处输入你的正文，文字是您思想的提炼，为了最终演示发布的良好效果，请尽量言简意赅的阐述观点\n- 输入你的标题\n- 单击此处输入你的正文，文字是您思想的提炼，为了最终演示发布的良好效果，请尽量言简意赅的阐述观点",
+      "imageUrl": "",
+      "key_points": [
+        "FILL IN THE TEXT OF THE DOCUMENT TITLE HERE",
+        "此处输入你的标题",
+        "BUSINESS TITLE"
+      ],
+      "bullets": [
+        "FILL IN THE TEXT OF THE DOCUMENT TITLE HERE",
+        "此处输入你的标题",
+        "BUSINESS TITLE",
+        "单击此处输入你的正文，文字是您思想的提炼，为了最终演示发布的良好效果，请尽量言简意赅的阐述观点",
+        "输入你的标题",
+        "单击此处输入你的正文，文字是您思想的提炼，为了最终演示发布的良好效果，请尽量言简意赅的阐述观点"
+      ],
+      "image_keywords": [
+        "business",
+        "work",
+        "report",
+        "summary",
+        "corporate"
+      ],
+      "blocks": [
+        {
+          "block_type": "title",
+          "type": "title",
+          "card_id": "card-1",
+          "id": "card-1",
+          "content": "项目复盘",
+          "emphasis": []
+        },
+        {
+          "block_type": "list",
+          "type": "list",
+          "card_id": "card-2",
+          "id": "card-2",
+          "content": "FILL IN THE TEXT OF THE DOCUMENT TITLE HERE\n此处输入你的标题\nBUSINESS TITLE\n单击此处输入你的正文，文字是您思想的提炼，为了最终演示发布的良好效果，请尽量言简意赅的阐述观点\n输入你的标题\n单击此处输入你的正文，文字是您思想的提炼，为了最终演示发布的良好效果，请尽量言简意赅的阐述观点"
+        }
+      ],
+      "elements": [
+        {
+          "type": "text",
+          "content": "项目复盘",
+          "top": 0.11,
+          "left": 1.01,
+          "width": 2.78,
+          "height": 0.63
+        },
+        {
+          "type": "text",
+          "content": "FILL IN THE TEXT OF THE DOCUMENT TITLE HERE",
+          "top": 0.68,
+          "left": 1.02,
+          "width": 2.76,
+          "height": 0.23
+        },
+        {
+          "type": "text",
+          "content": "此处输入你的标题",
+          "top": 1.52,
+          "left": 1.1,
+          "width": 2.67,
+          "height": 0.43
+        },
+        {
+          "type": "text",
+          "content": "BUSINESS TITLE",
+          "top": 1.88,
+          "left": 1.06,
+          "width": 3.78,
+          "height": 0.63
+        },
+        {
+          "type": "text",
+          "content": "单击此处输入你的正文，文字是您思想的提炼，为了最终演示发布的良好效果，请尽量言简意赅的阐述观点",
+          "top": 3.29,
+          "left": 4.46,
+          "width": 2.78,
+          "height": 0.76
+        },
+        {
+          "type": "text",
+          "content": "输入你的标题",
+          "top": 3.02,
+          "left": 4.48,
+          "width": 1.48,
+          "height": 0.32
+        },
+        {
+          "type": "text",
+          "content": "单击此处输入你的正文，文字是您思想的提炼，为了最终演示发布的良好效果，请尽量言简意赅的阐述观点",
+          "top": 5.95,
+          "left": 4.46,
+          "width": 2.78,
+          "height": 0.76
+        },
+        {
+          "type": "text",
+          "content": "输入你的标题",
+          "top": 5.67,
+          "left": 4.48,
+          "width": 1.48,
+          "height": 0.32
+        }
+      ],
+      "svg_overlay": false,
+      "force_svg_overlay": false,
+      "use_svg_overlay": false,
+      "svg_markup": ""
+    },
+    {
+      "page_number": 6,
+      "slide_id": "slide-006",
+      "id": "slide-006",
+      "slide_type": "content",
+      "page_type": "content",
+      "pageType": "content",
+      "slideType": "content",
+      "subtype": "content",
+      "layout_grid": "grid_3",
+      "layout": "grid_3",
+      "template_family": "split_media_dark",
+      "template_id": "split_media_dark",
+      "skill_profile": "comparison-general",
+      "hardness_profile": "balanced",
+      "schema_profile": "ppt-template/v2-split-media",
+      "contract_profile": "default",
+      "quality_profile": "default",
+      "template_lock": false,
+      "render_path": "pptxgenjs",
+      "bg_style": "light",
+      "content_density": "balanced",
+      "force_bento": false,
+      "title": "项目复盘",
+      "narration": "关于项目复盘，我们来看具体内容。",
+      "speaker_notes": "关于项目复盘，我们来看具体内容。",
+      "speakerNotes": "关于项目复盘，我们来看具体内容。",
+      "duration": 12,
+      "narration_audio_url": "",
+      "narrationAudioUrl": "",
+      "script": [
+        {
+          "role": "host",
+          "text": "关于项目复盘，我们来看具体内容。"
+        }
+      ],
+      "text_constraints": {
+        "bullet_max_items": 6,
+        "bullet_max_chars_cjk": 30,
+        "min_body_font_pt": 11,
+        "min_title_font_pt": 20,
+        "subtitle_max_lines": 2,
+        "subtitle_max_chars_cjk": 80,
+        "subtitle_min_font_pt": 13,
+        "bullet_auto_split": true
+      },
+      "markdown": "# 项目复盘\n- FILL IN THE TEXT OF THE DOCUMENT TITLE HERE\n- COMPANY\n- REPORT\n- 2O2X\n- BUSINESS\n- SUMMARY",
+      "imageUrl": "",
+      "key_points": [
+        "FILL IN THE TEXT OF THE DOCUMENT TITLE HERE",
+        "COMPANY",
+        "REPORT"
+      ],
+      "bullets": [
+        "FILL IN THE TEXT OF THE DOCUMENT TITLE HERE",
+        "COMPANY",
+        "REPORT",
+        "2O2X",
+        "BUSINESS",
+        "SUMMARY"
+      ],
+      "image_keywords": [
+        "business",
+        "work",
+        "report",
+        "summary",
+        "corporate"
+      ],
+      "blocks": [
+        {
+          "block_type": "title",
+          "type": "title",
+          "card_id": "card-1",
+          "id": "card-1",
+          "content": "项目复盘",
+          "emphasis": []
+        },
+        {
+          "block_type": "list",
+          "type": "list",
+          "card_id": "card-2",
+          "id": "card-2",
+          "content": "FILL IN THE TEXT OF THE DOCUMENT TITLE HERE\nCOMPANY\nREPORT\n2O2X\nBUSINESS\nSUMMARY"
+        }
+      ],
+      "elements": [
+        {
+          "type": "text",
+          "content": "项目复盘",
+          "top": 0.11,
+          "left": 1.01,
+          "width": 2.78,
+          "height": 0.63
+        },
+        {
+          "type": "text",
+          "content": "FILL IN THE TEXT OF THE DOCUMENT TITLE HERE",
+          "top": 0.68,
+          "left": 1.02,
+          "width": 2.76,
+          "height": 0.23
+        },
+        {
+          "type": "text",
+          "content": "COMPANY\nREPORT",
+          "top": 2.65,
+          "left": 3.65,
+          "width": 0.89,
+          "height": 0.45
+        },
+        {
+          "type": "text",
+          "content": "2O2X",
+          "top": 2.63,
+          "left": 1.56,
+          "width": 0.85,
+          "height": 0.4
+        },
+        {
+          "type": "text",
+          "content": "BUSINESS\nSUMMARY",
+          "top": 2.61,
+          "left": 2.61,
+          "width": 0.8,
+          "height": 0.4
+        },
+        {
+          "type": "text",
+          "content": "点击输入简要文字解说，解说文字尽量概括精炼\n不用多余的文字修饰简洁精准\n点击输入简要文字解说，解说文字尽量概括精炼",
+          "top": 3.52,
+          "left": 1.45,
+          "width": 3.09,
+          "height": 1.74
+        },
+        {
+          "type": "text",
+          "content": "COMPANY\nREPORT",
+          "top": 2.65,
+          "left": 7.31,
+          "width": 0.89,
+          "height": 0.45
+        },
+        {
+          "type": "text",
+          "content": "2O2X",
+          "top": 2.63,
+          "left": 5.21,
+          "width": 0.85,
+          "height": 0.4
+        }
+      ],
+      "svg_overlay": false,
+      "force_svg_overlay": false,
+      "use_svg_overlay": false,
+      "svg_markup": ""
+    },
+    {
+      "page_number": 7,
+      "slide_id": "slide-007",
+      "id": "slide-007",
+      "slide_type": "content",
+      "page_type": "content",
+      "pageType": "content",
+      "slideType": "content",
+      "subtype": "content",
+      "layout_grid": "grid_3",
+      "layout": "grid_3",
+      "template_family": "split_media_dark",
+      "template_id": "split_media_dark",
+      "skill_profile": "comparison-general",
+      "hardness_profile": "balanced",
+      "schema_profile": "ppt-template/v2-split-media",
+      "contract_profile": "default",
+      "quality_profile": "default",
+      "template_lock": false,
+      "render_path": "pptxgenjs",
+      "bg_style": "light",
+      "content_density": "balanced",
+      "force_bento": false,
+      "title": "项目复盘",
+      "narration": "关于项目复盘，我们来看具体内容。",
+      "speaker_notes": "关于项目复盘，我们来看具体内容。",
+      "speakerNotes": "关于项目复盘，我们来看具体内容。",
+      "duration": 12,
+      "narration_audio_url": "",
+      "narrationAudioUrl": "",
+      "script": [
+        {
+          "role": "host",
+          "text": "关于项目复盘，我们来看具体内容。"
+        }
+      ],
+      "text_constraints": {
+        "bullet_max_items": 6,
+        "bullet_max_chars_cjk": 30,
+        "min_body_font_pt": 11,
+        "min_title_font_pt": 20,
+        "subtitle_max_lines": 2,
+        "subtitle_max_chars_cjk": 80,
+        "subtitle_min_font_pt": 13,
+        "bullet_auto_split": true
+      },
+      "markdown": "# 项目复盘\n- FILL IN THE TEXT OF THE DOCUMENT TITLE HERE\n- 点击输入简要文字解说，解说文字尽量概括精炼，不用多余的文字修饰\n- 36%\n- 请输入标题文字\n- 点击输入简要文字解说，解说文字尽量概括精炼，不用多余的文字修饰\n- 22%",
+      "imageUrl": "",
+      "key_points": [
+        "FILL IN THE TEXT OF THE DOCUMENT TITLE HERE",
+        "点击输入简要文字解说，解说文字尽量概括精炼，不用多余的文字修饰",
+        "36%"
+      ],
+      "bullets": [
+        "FILL IN THE TEXT OF THE DOCUMENT TITLE HERE",
+        "点击输入简要文字解说，解说文字尽量概括精炼，不用多余的文字修饰",
+        "36%",
+        "请输入标题文字",
+        "点击输入简要文字解说，解说文字尽量概括精炼，不用多余的文字修饰",
+        "22%"
+      ],
+      "image_keywords": [
+        "business",
+        "work",
+        "report",
+        "summary",
+        "corporate"
+      ],
+      "blocks": [
+        {
+          "block_type": "title",
+          "type": "title",
+          "card_id": "card-1",
+          "id": "card-1",
+          "content": "项目复盘",
+          "emphasis": []
+        },
+        {
+          "block_type": "body",
+          "type": "body",
+          "card_id": "card-2",
+          "id": "card-2",
+          "content": "FILL IN THE TEXT OF THE DOCUMENT TITLE HERE"
+        },
+        {
+          "block_type": "body",
+          "type": "body",
+          "card_id": "card-3",
+          "id": "card-3",
+          "content": "点击输入简要文字解说，解说文字尽量概括精炼，不用多余的文字修饰"
+        },
+        {
+          "block_type": "kpi",
+          "type": "kpi",
+          "card_id": "card-4",
+          "id": "card-4",
+          "content": "36%"
+        },
+        {
+          "block_type": "body",
+          "type": "body",
+          "card_id": "card-5",
+          "id": "card-5",
+          "content": "请输入标题文字"
+        }
+      ],
+      "elements": [
+        {
+          "type": "text",
+          "content": "项目复盘",
+          "top": 0.11,
+          "left": 1.01,
+          "width": 2.78,
+          "height": 0.63
+        },
+        {
+          "type": "text",
+          "content": "FILL IN THE TEXT OF THE DOCUMENT TITLE HERE",
+          "top": 0.68,
+          "left": 1.02,
+          "width": 2.76,
+          "height": 0.23
+        },
+        {
+          "type": "text",
+          "content": "点击输入简要文字解说，解说文字尽量概括精炼，不用多余的文字修饰",
+          "top": 5.46,
+          "left": 1.35,
+          "width": 2.2,
+          "height": 0.78
+        },
+        {
+          "type": "text",
+          "content": "36%",
+          "top": 3.8,
+          "left": 1.93,
+          "width": 1.04,
+          "height": 0.57
+        },
+        {
+          "type": "text",
+          "content": "请输入标题文字",
+          "top": 2.28,
+          "left": 1.57,
+          "width": 1.77,
+          "height": 0.37
+        },
+        {
+          "type": "text",
+          "content": "点击输入简要文字解说，解说文字尽量概括精炼，不用多余的文字修饰",
+          "top": 5.46,
+          "left": 4.23,
+          "width": 2.2,
+          "height": 0.78
+        },
+        {
+          "type": "text",
+          "content": "22%",
+          "top": 3.8,
+          "left": 4.81,
+          "width": 1.04,
+          "height": 0.57
+        },
+        {
+          "type": "text",
+          "content": "请输入标题文字",
+          "top": 2.28,
+          "left": 4.45,
+          "width": 1.77,
+          "height": 0.37
+        }
+      ],
+      "svg_overlay": false,
+      "force_svg_overlay": false,
+      "use_svg_overlay": false,
+      "svg_markup": ""
+    },
+    {
+      "page_number": 8,
+      "slide_id": "slide-008",
+      "id": "slide-008",
+      "slide_type": "divider",
+      "page_type": "divider",
+      "pageType": "divider",
+      "slideType": "divider",
+      "subtype": "divider",
+      "layout_grid": "split_2",
+      "layout": "split_2",
+      "template_family": "quote_hero_dark",
+      "template_id": "quote_hero_dark",
+      "skill_profile": "cover-default",
+      "hardness_profile": "balanced",
+      "schema_profile": "ppt-template/v2-quote-hero",
+      "contract_profile": "cover_meta_required",
+      "quality_profile": "default",
+      "template_lock": false,
+      "render_path": "pptxgenjs",
+      "bg_style": "light",
+      "content_density": "balanced",
+      "force_bento": false,
+      "title": "2O2X",
+      "narration": "接下来我们进入2O2X部分。",
+      "speaker_notes": "接下来我们进入2O2X部分。",
+      "speakerNotes": "接下来我们进入2O2X部分。",
+      "duration": 5,
+      "narration_audio_url": "",
+      "narrationAudioUrl": "",
+      "script": [
+        {
+          "role": "host",
+          "text": "接下来我们进入2O2X部分。"
+        }
+      ],
+      "text_constraints": {
+        "bullet_max_items": 6,
+        "bullet_max_chars_cjk": 30,
+        "min_body_font_pt": 11,
+        "min_title_font_pt": 20,
+        "subtitle_max_lines": 2,
+        "subtitle_max_chars_cjk": 80,
+        "subtitle_min_font_pt": 13,
+        "bullet_auto_split": true
+      },
+      "markdown": "# 2O2X\n- 工作进度\n- PART TWO",
+      "imageUrl": "",
+      "key_points": [
+        "工作进度",
+        "PART TWO"
+      ],
+      "bullets": [
+        "工作进度",
+        "PART TWO"
+      ],
+      "image_keywords": [
+        "business",
+        "work",
+        "report",
+        "summary",
+        "corporate"
+      ],
+      "blocks": [
+        {
+          "block_type": "title",
+          "type": "title",
+          "card_id": "card-1",
+          "id": "card-1",
+          "content": "2O2X",
+          "emphasis": []
+        },
+        {
+          "block_type": "subtitle",
+          "type": "subtitle",
+          "card_id": "card-2",
+          "id": "card-2",
+          "content": "工作进度"
+        }
+      ],
+      "elements": [
+        {
+          "type": "text",
+          "content": "2O2X",
+          "top": 1.54,
+          "left": 1.14,
+          "width": 5.52,
+          "height": 2.42
+        },
+        {
+          "type": "text",
+          "content": "工作进度",
+          "top": 2.9,
+          "left": 1.17,
+          "width": 6.62,
+          "height": 1.58
+        },
+        {
+          "type": "text",
+          "content": "YOUR CONTENT IS ENTERED HERE, OR BY COPYING YOUR TEXT, SELECT PASTE IN THIS BOX AND CHOOSE TO RETAIN ONLY TEXT. YOUR CONTENT IS TYPED HERE, OR BY COPYING YOUR TEXT, SELECT PASTE IN THIS BOX.",
+          "top": 4.81,
+          "left": 1.18,
+          "width": 6.12,
+          "height": 0.81
+        },
+        {
+          "type": "text",
+          "content": "PART TWO",
+          "top": 2.28,
+          "left": 1.2,
+          "width": 3.38,
+          "height": 0.84
+        },
+        {
+          "type": "text",
+          "content": "第一PPT商务办公系列PPT模板",
+          "top": 6.92,
+          "left": 1.18,
+          "width": 3.67,
+          "height": 0.3
+        }
+      ],
+      "svg_overlay": false,
+      "force_svg_overlay": false,
+      "use_svg_overlay": false,
+      "svg_markup": ""
+    },
+    {
+      "page_number": 9,
+      "slide_id": "slide-009",
+      "id": "slide-009",
+      "slide_type": "content",
+      "page_type": "content",
+      "pageType": "content",
+      "slideType": "content",
+      "subtype": "content",
+      "layout_grid": "grid_3",
+      "layout": "grid_3",
+      "template_family": "split_media_dark",
+      "template_id": "split_media_dark",
+      "skill_profile": "comparison-general",
+      "hardness_profile": "balanced",
+      "schema_profile": "ppt-template/v2-split-media",
+      "contract_profile": "default",
+      "quality_profile": "default",
+      "template_lock": false,
+      "render_path": "pptxgenjs",
+      "bg_style": "light",
+      "content_density": "balanced",
+      "force_bento": false,
+      "title": "工作进度",
+      "narration": "关于工作进度，我们来看具体内容。",
+      "speaker_notes": "关于工作进度，我们来看具体内容。",
+      "speakerNotes": "关于工作进度，我们来看具体内容。",
+      "duration": 12,
+      "narration_audio_url": "",
+      "narrationAudioUrl": "",
+      "script": [
+        {
+          "role": "host",
+          "text": "关于工作进度，我们来看具体内容。"
+        }
+      ],
+      "text_constraints": {
+        "bullet_max_items": 6,
+        "bullet_max_chars_cjk": 30,
+        "min_body_font_pt": 11,
+        "min_title_font_pt": 20,
+        "subtitle_max_lines": 2,
+        "subtitle_max_chars_cjk": 80,
+        "subtitle_min_font_pt": 13,
+        "bullet_auto_split": true
+      },
+      "markdown": "# 工作进度\n- FILL IN THE TEXT OF THE DOCUMENT TITLE HERE\n- 标题文字内容\n- 点击输入简要文字解说，解说文字尽量概括精炼，不用多余的文字修饰简洁精准。\n- 标题文字内容\n- 点击输入简要文字解说，解说文字尽量概括精炼，不用多余的文字修饰简洁精准。\n- 标题文字内容",
+      "imageUrl": "",
+      "key_points": [
+        "FILL IN THE TEXT OF THE DOCUMENT TITLE HERE",
+        "标题文字内容",
+        "点击输入简要文字解说，解说文字尽量概括精炼，不用多余的文字修饰简洁精准。"
+      ],
+      "bullets": [
+        "FILL IN THE TEXT OF THE DOCUMENT TITLE HERE",
+        "标题文字内容",
+        "点击输入简要文字解说，解说文字尽量概括精炼，不用多余的文字修饰简洁精准。",
+        "标题文字内容",
+        "点击输入简要文字解说，解说文字尽量概括精炼，不用多余的文字修饰简洁精准。",
+        "标题文字内容"
+      ],
+      "image_keywords": [
+        "business",
+        "work",
+        "report",
+        "summary",
+        "corporate"
+      ],
+      "blocks": [
+        {
+          "block_type": "title",
+          "type": "title",
+          "card_id": "card-1",
+          "id": "card-1",
+          "content": "工作进度",
+          "emphasis": []
+        },
+        {
+          "block_type": "list",
+          "type": "list",
+          "card_id": "card-2",
+          "id": "card-2",
+          "content": "FILL IN THE TEXT OF THE DOCUMENT TITLE HERE\n标题文字内容\n点击输入简要文字解说，解说文字尽量概括精炼，不用多余的文字修饰简洁精准。\n标题文字内容\n点击输入简要文字解说，解说文字尽量概括精炼，不用多余的文字修饰简洁精准。\n标题文字内容"
+        }
+      ],
+      "elements": [
+        {
+          "type": "text",
+          "content": "工作进度",
+          "top": 0.11,
+          "left": 1.01,
+          "width": 2.78,
+          "height": 0.63
+        },
+        {
+          "type": "text",
+          "content": "FILL IN THE TEXT OF THE DOCUMENT TITLE HERE",
+          "top": 0.68,
+          "left": 1.02,
+          "width": 2.76,
+          "height": 0.23
+        },
+        {
+          "type": "text",
+          "content": "标题文字内容",
+          "top": 2.17,
+          "left": 7.86,
+          "width": 1.55,
+          "height": 0.33
+        },
+        {
+          "type": "text",
+          "content": "点击输入简要文字解说，解说文字尽量概括精炼，不用多余的文字修饰简洁精准。",
+          "top": 2.41,
+          "left": 7.65,
+          "width": 3.8,
+          "height": 0.54
+        },
+        {
+          "type": "text",
+          "content": "标题文字内容",
+          "top": 3.45,
+          "left": 7.86,
+          "width": 1.55,
+          "height": 0.33
+        },
+        {
+          "type": "text",
+          "content": "点击输入简要文字解说，解说文字尽量概括精炼，不用多余的文字修饰简洁精准。",
+          "top": 3.7,
+          "left": 7.65,
+          "width": 3.8,
+          "height": 0.54
+        },
+        {
+          "type": "text",
+          "content": "标题文字内容",
+          "top": 4.79,
+          "left": 7.86,
+          "width": 1.55,
+          "height": 0.33
+        },
+        {
+          "type": "text",
+          "content": "点击输入简要文字解说，解说文字尽量概括精炼，不用多余的文字修饰简洁精准。",
+          "top": 5.03,
+          "left": 7.65,
+          "width": 3.8,
+          "height": 0.54
+        }
+      ],
+      "svg_overlay": false,
+      "force_svg_overlay": false,
+      "use_svg_overlay": false,
+      "svg_markup": ""
+    },
+    {
+      "page_number": 10,
+      "slide_id": "slide-010",
+      "id": "slide-010",
+      "slide_type": "content",
+      "page_type": "content",
+      "pageType": "content",
+      "slideType": "content",
+      "subtype": "content",
+      "layout_grid": "grid_3",
+      "layout": "grid_3",
+      "template_family": "split_media_dark",
+      "template_id": "split_media_dark",
+      "skill_profile": "comparison-general",
+      "hardness_profile": "balanced",
+      "schema_profile": "ppt-template/v2-split-media",
+      "contract_profile": "default",
+      "quality_profile": "default",
+      "template_lock": false,
+      "render_path": "pptxgenjs",
+      "bg_style": "light",
+      "content_density": "balanced",
+      "force_bento": false,
+      "title": "工作进度",
+      "narration": "关于工作进度，我们来看具体内容。",
+      "speaker_notes": "关于工作进度，我们来看具体内容。",
+      "speakerNotes": "关于工作进度，我们来看具体内容。",
+      "duration": 12,
+      "narration_audio_url": "",
+      "narrationAudioUrl": "",
+      "script": [
+        {
+          "role": "host",
+          "text": "关于工作进度，我们来看具体内容。"
+        }
+      ],
+      "text_constraints": {
+        "bullet_max_items": 6,
+        "bullet_max_chars_cjk": 30,
+        "min_body_font_pt": 11,
+        "min_title_font_pt": 20,
+        "subtitle_max_lines": 2,
+        "subtitle_max_chars_cjk": 80,
+        "subtitle_min_font_pt": 13,
+        "bullet_auto_split": true
+      },
+      "markdown": "# 工作进度\n- FILL IN THE TEXT OF THE DOCUMENT TITLE HERE\n- 项目标题文字\n- 60%\n- 业绩上升\n- 项目标题文字\n- 62%",
+      "imageUrl": "",
+      "key_points": [
+        "FILL IN THE TEXT OF THE DOCUMENT TITLE HERE",
+        "项目标题文字",
+        "60%"
+      ],
+      "bullets": [
+        "FILL IN THE TEXT OF THE DOCUMENT TITLE HERE",
+        "项目标题文字",
+        "60%",
+        "业绩上升",
+        "项目标题文字",
+        "62%"
+      ],
+      "image_keywords": [
+        "business",
+        "work",
+        "report",
+        "summary",
+        "corporate"
+      ],
+      "blocks": [
+        {
+          "block_type": "title",
+          "type": "title",
+          "card_id": "card-1",
+          "id": "card-1",
+          "content": "工作进度",
+          "emphasis": []
+        },
+        {
+          "block_type": "body",
+          "type": "body",
+          "card_id": "card-2",
+          "id": "card-2",
+          "content": "FILL IN THE TEXT OF THE DOCUMENT TITLE HERE"
+        },
+        {
+          "block_type": "body",
+          "type": "body",
+          "card_id": "card-3",
+          "id": "card-3",
+          "content": "项目标题文字"
+        },
+        {
+          "block_type": "kpi",
+          "type": "kpi",
+          "card_id": "card-4",
+          "id": "card-4",
+          "content": "60%"
+        },
+        {
+          "block_type": "body",
+          "type": "body",
+          "card_id": "card-5",
+          "id": "card-5",
+          "content": "业绩上升"
+        }
+      ],
+      "elements": [
+        {
+          "type": "text",
+          "content": "工作进度",
+          "top": 0.11,
+          "left": 1.01,
+          "width": 2.78,
+          "height": 0.63
+        },
+        {
+          "type": "text",
+          "content": "FILL IN THE TEXT OF THE DOCUMENT TITLE HERE",
+          "top": 0.68,
+          "left": 1.02,
+          "width": 2.76,
+          "height": 0.23
+        },
+        {
+          "type": "text",
+          "content": "项目标题文字",
+          "top": 3.18,
+          "left": 1.52,
+          "width": 1.54,
+          "height": 0.37
+        },
+        {
+          "type": "text",
+          "content": "60%",
+          "top": 4.08,
+          "left": 1.66,
+          "width": 1.26,
+          "height": 0.9
+        },
+        {
+          "type": "text",
+          "content": "业绩上升",
+          "top": 5.48,
+          "left": 1.99,
+          "width": 1.07,
+          "height": 0.33
+        },
+        {
+          "type": "text",
+          "content": "项目标题文字",
+          "top": 3.18,
+          "left": 4.11,
+          "width": 1.54,
+          "height": 0.37
+        },
+        {
+          "type": "text",
+          "content": "62%",
+          "top": 4.08,
+          "left": 4.25,
+          "width": 1.26,
+          "height": 0.9
+        },
+        {
+          "type": "text",
+          "content": "稳步上升",
+          "top": 5.48,
+          "left": 4.57,
+          "width": 1.07,
+          "height": 0.33
+        }
+      ],
+      "svg_overlay": false,
+      "force_svg_overlay": false,
+      "use_svg_overlay": false,
+      "svg_markup": ""
+    },
+    {
+      "page_number": 11,
+      "slide_id": "slide-011",
+      "id": "slide-011",
+      "slide_type": "content",
+      "page_type": "content",
+      "pageType": "content",
+      "slideType": "content",
+      "subtype": "content",
+      "layout_grid": "grid_3",
+      "layout": "grid_3",
+      "template_family": "split_media_dark",
+      "template_id": "split_media_dark",
+      "skill_profile": "comparison-general",
+      "hardness_profile": "balanced",
+      "schema_profile": "ppt-template/v2-split-media",
+      "contract_profile": "default",
+      "quality_profile": "default",
+      "template_lock": false,
+      "render_path": "pptxgenjs",
+      "bg_style": "light",
+      "content_density": "balanced",
+      "force_bento": false,
+      "title": "工作进度",
+      "narration": "关于工作进度，我们来看具体内容。",
+      "speaker_notes": "关于工作进度，我们来看具体内容。",
+      "speakerNotes": "关于工作进度，我们来看具体内容。",
+      "duration": 12,
+      "narration_audio_url": "",
+      "narrationAudioUrl": "",
+      "script": [
+        {
+          "role": "host",
+          "text": "关于工作进度，我们来看具体内容。"
+        }
+      ],
+      "text_constraints": {
+        "bullet_max_items": 6,
+        "bullet_max_chars_cjk": 30,
+        "min_body_font_pt": 11,
+        "min_title_font_pt": 20,
+        "subtitle_max_lines": 2,
+        "subtitle_max_chars_cjk": 80,
+        "subtitle_min_font_pt": 13,
+        "bullet_auto_split": true
+      },
+      "markdown": "# 工作进度\n- FILL IN THE TEXT OF THE DOCUMENT TITLE HERE\n- O1\n- 标题文字内容\n- 点击输入简要文字解说，解说文字尽量概括精炼，不用多余的文字修饰简洁精准\n- O2\n- 标题文字内容",
+      "imageUrl": "",
+      "key_points": [
+        "FILL IN THE TEXT OF THE DOCUMENT TITLE HERE",
+        "O1",
+        "标题文字内容"
+      ],
+      "bullets": [
+        "FILL IN THE TEXT OF THE DOCUMENT TITLE HERE",
+        "O1",
+        "标题文字内容",
+        "点击输入简要文字解说，解说文字尽量概括精炼，不用多余的文字修饰简洁精准",
+        "O2",
+        "标题文字内容"
+      ],
+      "image_keywords": [
+        "business",
+        "work",
+        "report",
+        "summary",
+        "corporate"
+      ],
+      "blocks": [
+        {
+          "block_type": "title",
+          "type": "title",
+          "card_id": "card-1",
+          "id": "card-1",
+          "content": "工作进度",
+          "emphasis": []
+        },
+        {
+          "block_type": "list",
+          "type": "list",
+          "card_id": "card-2",
+          "id": "card-2",
+          "content": "FILL IN THE TEXT OF THE DOCUMENT TITLE HERE\nO1\n标题文字内容\n点击输入简要文字解说，解说文字尽量概括精炼，不用多余的文字修饰简洁精准\nO2\n标题文字内容"
+        }
+      ],
+      "elements": [
+        {
+          "type": "text",
+          "content": "工作进度",
+          "top": 0.11,
+          "left": 1.01,
+          "width": 2.78,
+          "height": 0.63
+        },
+        {
+          "type": "text",
+          "content": "FILL IN THE TEXT OF THE DOCUMENT TITLE HERE",
+          "top": 0.68,
+          "left": 1.02,
+          "width": 2.76,
+          "height": 0.23
+        },
+        {
+          "type": "text",
+          "content": "O1",
+          "top": 3.79,
+          "left": 2.76,
+          "width": 0.62,
+          "height": 0.47
+        },
+        {
+          "type": "text",
+          "content": "标题文字内容",
+          "top": 4.96,
+          "left": 2.36,
+          "width": 1.42,
+          "height": 0.33
+        },
+        {
+          "type": "text",
+          "content": "点击输入简要文字解说，解说文字尽量概括精炼，不用多余的文字修饰简洁精准",
+          "top": 5.33,
+          "left": 2.06,
+          "width": 2.02,
+          "height": 0.72
+        },
+        {
+          "type": "text",
+          "content": "O2",
+          "top": 3.79,
+          "left": 5.25,
+          "width": 0.62,
+          "height": 0.47
+        },
+        {
+          "type": "text",
+          "content": "标题文字内容",
+          "top": 4.96,
+          "left": 4.84,
+          "width": 1.42,
+          "height": 0.33
+        },
+        {
+          "type": "text",
+          "content": "点击输入简要文字解说，解说文字尽量概括精炼，不用多余的文字修饰简洁精准",
+          "top": 5.33,
+          "left": 4.54,
+          "width": 2.02,
+          "height": 0.72
+        }
+      ],
+      "svg_overlay": false,
+      "force_svg_overlay": false,
+      "use_svg_overlay": false,
+      "svg_markup": ""
+    },
+    {
+      "page_number": 12,
+      "slide_id": "slide-012",
+      "id": "slide-012",
+      "slide_type": "divider",
+      "page_type": "divider",
+      "pageType": "divider",
+      "slideType": "divider",
+      "subtype": "divider",
+      "layout_grid": "split_2",
+      "layout": "split_2",
+      "template_family": "quote_hero_dark",
+      "template_id": "quote_hero_dark",
+      "skill_profile": "cover-default",
+      "hardness_profile": "balanced",
+      "schema_profile": "ppt-template/v2-quote-hero",
+      "contract_profile": "cover_meta_required",
+      "quality_profile": "default",
+      "template_lock": false,
+      "render_path": "pptxgenjs",
+      "bg_style": "light",
+      "content_density": "balanced",
+      "force_bento": false,
+      "title": "2O2X",
+      "narration": "接下来我们进入2O2X部分。",
+      "speaker_notes": "接下来我们进入2O2X部分。",
+      "speakerNotes": "接下来我们进入2O2X部分。",
+      "duration": 5,
+      "narration_audio_url": "",
+      "narrationAudioUrl": "",
+      "script": [
+        {
+          "role": "host",
+          "text": "接下来我们进入2O2X部分。"
+        }
+      ],
+      "text_constraints": {
+        "bullet_max_items": 6,
+        "bullet_max_chars_cjk": 30,
+        "min_body_font_pt": 11,
+        "min_title_font_pt": 20,
+        "subtitle_max_lines": 2,
+        "subtitle_max_chars_cjk": 80,
+        "subtitle_min_font_pt": 13,
+        "bullet_auto_split": true
+      },
+      "markdown": "# 2O2X\n- 经验分享\n- PART THREE",
+      "imageUrl": "",
+      "key_points": [
+        "经验分享",
+        "PART THREE"
+      ],
+      "bullets": [
+        "经验分享",
+        "PART THREE"
+      ],
+      "image_keywords": [
+        "business",
+        "work",
+        "report",
+        "summary",
+        "corporate"
+      ],
+      "blocks": [
+        {
+          "block_type": "title",
+          "type": "title",
+          "card_id": "card-1",
+          "id": "card-1",
+          "content": "2O2X",
+          "emphasis": []
+        },
+        {
+          "block_type": "subtitle",
+          "type": "subtitle",
+          "card_id": "card-2",
+          "id": "card-2",
+          "content": "经验分享"
+        }
+      ],
+      "elements": [
+        {
+          "type": "text",
+          "content": "2O2X",
+          "top": 1.54,
+          "left": 1.14,
+          "width": 5.52,
+          "height": 2.42
+        },
+        {
+          "type": "text",
+          "content": "经验分享",
+          "top": 2.9,
+          "left": 1.17,
+          "width": 6.62,
+          "height": 1.58
+        },
+        {
+          "type": "text",
+          "content": "YOUR CONTENT IS ENTERED HERE, OR BY COPYING YOUR TEXT, SELECT PASTE IN THIS BOX AND CHOOSE TO RETAIN ONLY TEXT. YOUR CONTENT IS TYPED HERE, OR BY COPYING YOUR TEXT, SELECT PASTE IN THIS BOX.",
+          "top": 4.81,
+          "left": 1.18,
+          "width": 6.12,
+          "height": 0.81
+        },
+        {
+          "type": "text",
+          "content": "PART THREE",
+          "top": 2.28,
+          "left": 1.2,
+          "width": 3.98,
+          "height": 0.84
+        },
+        {
+          "type": "text",
+          "content": "第一PPT商务办公系列PPT模板",
+          "top": 6.92,
+          "left": 1.18,
+          "width": 3.67,
+          "height": 0.3
+        }
+      ],
+      "svg_overlay": false,
+      "force_svg_overlay": false,
+      "use_svg_overlay": false,
+      "svg_markup": ""
+    },
+    {
+      "page_number": 13,
+      "slide_id": "slide-013",
+      "id": "slide-013",
+      "slide_type": "content",
+      "page_type": "content",
+      "pageType": "content",
+      "slideType": "content",
+      "subtype": "content",
+      "layout_grid": "grid_3",
+      "layout": "grid_3",
+      "template_family": "split_media_dark",
+      "template_id": "split_media_dark",
+      "skill_profile": "comparison-general",
+      "hardness_profile": "balanced",
+      "schema_profile": "ppt-template/v2-split-media",
+      "contract_profile": "default",
+      "quality_profile": "default",
+      "template_lock": false,
+      "render_path": "pptxgenjs",
+      "bg_style": "light",
+      "content_density": "balanced",
+      "force_bento": false,
+      "title": "经验分享",
+      "narration": "关于经验分享，我们来看具体内容。",
+      "speaker_notes": "关于经验分享，我们来看具体内容。",
+      "speakerNotes": "关于经验分享，我们来看具体内容。",
+      "duration": 12,
+      "narration_audio_url": "",
+      "narrationAudioUrl": "",
+      "script": [
+        {
+          "role": "host",
+          "text": "关于经验分享，我们来看具体内容。"
+        }
+      ],
+      "text_constraints": {
+        "bullet_max_items": 6,
+        "bullet_max_chars_cjk": 30,
+        "min_body_font_pt": 11,
+        "min_title_font_pt": 20,
+        "subtitle_max_lines": 2,
+        "subtitle_max_chars_cjk": 80,
+        "subtitle_min_font_pt": 13,
+        "bullet_auto_split": true
+      },
+      "markdown": "# 经验分享\n- FILL IN THE TEXT OF THE DOCUMENT TITLE HERE\n- 输入标题文字内容\n- 2O2X\n- 点此输入内容或者复制您的内容在这里，通过复制您的文本后点此输入内容或者复制您的内容在这里\n- 输入标题文字内容\n- 2O27",
+      "imageUrl": "",
+      "key_points": [
+        "FILL IN THE TEXT OF THE DOCUMENT TITLE HERE",
+        "输入标题文字内容",
+        "2O2X"
+      ],
+      "bullets": [
+        "FILL IN THE TEXT OF THE DOCUMENT TITLE HERE",
+        "输入标题文字内容",
+        "2O2X",
+        "点此输入内容或者复制您的内容在这里，通过复制您的文本后点此输入内容或者复制您的内容在这里",
+        "输入标题文字内容",
+        "2O27"
+      ],
+      "image_keywords": [
+        "business",
+        "work",
+        "report",
+        "summary",
+        "corporate"
+      ],
+      "blocks": [
+        {
+          "block_type": "title",
+          "type": "title",
+          "card_id": "card-1",
+          "id": "card-1",
+          "content": "经验分享",
+          "emphasis": []
+        },
+        {
+          "block_type": "list",
+          "type": "list",
+          "card_id": "card-2",
+          "id": "card-2",
+          "content": "FILL IN THE TEXT OF THE DOCUMENT TITLE HERE\n输入标题文字内容\n2O2X\n点此输入内容或者复制您的内容在这里，通过复制您的文本后点此输入内容或者复制您的内容在这里\n输入标题文字内容\n2O27"
+        }
+      ],
+      "elements": [
+        {
+          "type": "text",
+          "content": "经验分享",
+          "top": 0.11,
+          "left": 1.01,
+          "width": 2.78,
+          "height": 0.63
+        },
+        {
+          "type": "text",
+          "content": "FILL IN THE TEXT OF THE DOCUMENT TITLE HERE",
+          "top": 0.68,
+          "left": 1.02,
+          "width": 2.76,
+          "height": 0.23
+        },
+        {
+          "type": "text",
+          "content": "输入标题文字内容",
+          "top": 2.09,
+          "left": 7.68,
+          "width": 1.8,
+          "height": 0.33
+        },
+        {
+          "type": "text",
+          "content": "2O2X",
+          "top": 1.6,
+          "left": 7.7,
+          "width": 1.14,
+          "height": 0.57
+        },
+        {
+          "type": "text",
+          "content": "点此输入内容或者复制您的内容在这里，通过复制您的文本后点此输入内容或者复制您的内容在这里",
+          "top": 1.63,
+          "left": 2.29,
+          "width": 3.54,
+          "height": 0.95
+        },
+        {
+          "type": "text",
+          "content": "输入标题文字内容",
+          "top": 5.64,
+          "left": 7.68,
+          "width": 1.8,
+          "height": 0.33
+        },
+        {
+          "type": "text",
+          "content": "2O27",
+          "top": 5.15,
+          "left": 7.7,
+          "width": 1.14,
+          "height": 0.57
+        },
+        {
+          "type": "text",
+          "content": "点此输入内容或者复制您的内容在这里，通过复制您的文本后点此输入内容或者复制您的内容在这里",
+          "top": 5.18,
+          "left": 2.29,
+          "width": 3.54,
+          "height": 0.95
+        }
+      ],
+      "svg_overlay": false,
+      "force_svg_overlay": false,
+      "use_svg_overlay": false,
+      "svg_markup": ""
+    },
+    {
+      "page_number": 14,
+      "slide_id": "slide-014",
+      "id": "slide-014",
+      "slide_type": "content",
+      "page_type": "content",
+      "pageType": "content",
+      "slideType": "content",
+      "subtype": "content",
+      "layout_grid": "grid_3",
+      "layout": "grid_3",
+      "template_family": "split_media_dark",
+      "template_id": "split_media_dark",
+      "skill_profile": "comparison-general",
+      "hardness_profile": "balanced",
+      "schema_profile": "ppt-template/v2-split-media",
+      "contract_profile": "default",
+      "quality_profile": "default",
+      "template_lock": false,
+      "render_path": "pptxgenjs",
+      "bg_style": "light",
+      "content_density": "balanced",
+      "force_bento": false,
+      "title": "经验分享",
+      "narration": "关于经验分享，我们来看具体内容。",
+      "speaker_notes": "关于经验分享，我们来看具体内容。",
+      "speakerNotes": "关于经验分享，我们来看具体内容。",
+      "duration": 12,
+      "narration_audio_url": "",
+      "narrationAudioUrl": "",
+      "script": [
+        {
+          "role": "host",
+          "text": "关于经验分享，我们来看具体内容。"
+        }
+      ],
+      "text_constraints": {
+        "bullet_max_items": 6,
+        "bullet_max_chars_cjk": 30,
+        "min_body_font_pt": 11,
+        "min_title_font_pt": 20,
+        "subtitle_max_lines": 2,
+        "subtitle_max_chars_cjk": 80,
+        "subtitle_min_font_pt": 13,
+        "bullet_auto_split": true
+      },
+      "markdown": "# 经验分享\n- FILL IN THE TEXT OF THE DOCUMENT TITLE HERE\n- PROJECT TITLE\n- PROJECT TITLE\n- 单击此处输入你的正文，文字是您思想的提炼，为了最终演示发布的良好效果，请尽量言简意赅的阐述观点\n- 输入你的标题\n- 单击此处输入你的正文，文字是您思想的提炼，为了最终演示发布的良好效果，请尽量言简意赅的阐述观点",
+      "imageUrl": "",
+      "key_points": [
+        "FILL IN THE TEXT OF THE DOCUMENT TITLE HERE",
+        "PROJECT TITLE",
+        "PROJECT TITLE"
+      ],
+      "bullets": [
+        "FILL IN THE TEXT OF THE DOCUMENT TITLE HERE",
+        "PROJECT TITLE",
+        "PROJECT TITLE",
+        "单击此处输入你的正文，文字是您思想的提炼，为了最终演示发布的良好效果，请尽量言简意赅的阐述观点",
+        "输入你的标题",
+        "单击此处输入你的正文，文字是您思想的提炼，为了最终演示发布的良好效果，请尽量言简意赅的阐述观点"
+      ],
+      "image_keywords": [
+        "business",
+        "work",
+        "report",
+        "summary",
+        "corporate"
+      ],
+      "blocks": [
+        {
+          "block_type": "title",
+          "type": "title",
+          "card_id": "card-1",
+          "id": "card-1",
+          "content": "经验分享",
+          "emphasis": []
+        },
+        {
+          "block_type": "list",
+          "type": "list",
+          "card_id": "card-2",
+          "id": "card-2",
+          "content": "FILL IN THE TEXT OF THE DOCUMENT TITLE HERE\nPROJECT TITLE\nPROJECT TITLE\n单击此处输入你的正文，文字是您思想的提炼，为了最终演示发布的良好效果，请尽量言简意赅的阐述观点\n输入你的标题\n单击此处输入你的正文，文字是您思想的提炼，为了最终演示发布的良好效果，请尽量言简意赅的阐述观点"
+        }
+      ],
+      "elements": [
+        {
+          "type": "text",
+          "content": "经验分享",
+          "top": 0.11,
+          "left": 1.01,
+          "width": 2.78,
+          "height": 0.63
+        },
+        {
+          "type": "text",
+          "content": "FILL IN THE TEXT OF THE DOCUMENT TITLE HERE",
+          "top": 0.68,
+          "left": 1.02,
+          "width": 2.76,
+          "height": 0.23
+        },
+        {
+          "type": "text",
+          "content": "PROJECT TITLE",
+          "top": 2.96,
+          "left": 5.89,
+          "width": 2.12,
+          "height": 0.4
+        },
+        {
+          "type": "text",
+          "content": "PROJECT TITLE",
+          "top": 4.46,
+          "left": 5.58,
+          "width": 2.12,
+          "height": 0.4
+        },
+        {
+          "type": "text",
+          "content": "单击此处输入你的正文，文字是您思想的提炼，为了最终演示发布的良好效果，请尽量言简意赅的阐述观点",
+          "top": 2.44,
+          "left": 9.3,
+          "width": 2.86,
+          "height": 0.76
+        },
+        {
+          "type": "text",
+          "content": "输入你的标题",
+          "top": 2.17,
+          "left": 9.33,
+          "width": 1.48,
+          "height": 0.32
+        },
+        {
+          "type": "text",
+          "content": "单击此处输入你的正文，文字是您思想的提炼，为了最终演示发布的良好效果，请尽量言简意赅的阐述观点",
+          "top": 5.46,
+          "left": 9.3,
+          "width": 2.86,
+          "height": 0.76
+        },
+        {
+          "type": "text",
+          "content": "输入你的标题",
+          "top": 5.18,
+          "left": 9.33,
+          "width": 1.48,
+          "height": 0.32
+        }
+      ],
+      "svg_overlay": false,
+      "force_svg_overlay": false,
+      "use_svg_overlay": false,
+      "svg_markup": ""
+    },
+    {
+      "page_number": 15,
+      "slide_id": "slide-015",
+      "id": "slide-015",
+      "slide_type": "content",
+      "page_type": "content",
+      "pageType": "content",
+      "slideType": "content",
+      "subtype": "content",
+      "layout_grid": "grid_3",
+      "layout": "grid_3",
+      "template_family": "split_media_dark",
+      "template_id": "split_media_dark",
+      "skill_profile": "comparison-general",
+      "hardness_profile": "balanced",
+      "schema_profile": "ppt-template/v2-split-media",
+      "contract_profile": "default",
+      "quality_profile": "default",
+      "template_lock": false,
+      "render_path": "pptxgenjs",
+      "bg_style": "light",
+      "content_density": "balanced",
+      "force_bento": false,
+      "title": "经验分享",
+      "narration": "关于经验分享，我们来看具体内容。",
+      "speaker_notes": "关于经验分享，我们来看具体内容。",
+      "speakerNotes": "关于经验分享，我们来看具体内容。",
+      "duration": 12,
+      "narration_audio_url": "",
+      "narrationAudioUrl": "",
+      "script": [
+        {
+          "role": "host",
+          "text": "关于经验分享，我们来看具体内容。"
+        }
+      ],
+      "text_constraints": {
+        "bullet_max_items": 6,
+        "bullet_max_chars_cjk": 30,
+        "min_body_font_pt": 11,
+        "min_title_font_pt": 20,
+        "subtitle_max_lines": 2,
+        "subtitle_max_chars_cjk": 80,
+        "subtitle_min_font_pt": 13,
+        "bullet_auto_split": true
+      },
+      "markdown": "# 经验分享\n- FILL IN THE TEXT OF THE DOCUMENT TITLE HERE\n- 1\n- 2O2X\n- PROJECT - 01\n- 点击输入简要文字解说，解说文字尽量概括精炼，不用多余的文字修饰简洁精准\n- 2",
+      "imageUrl": "",
+      "key_points": [
+        "FILL IN THE TEXT OF THE DOCUMENT TITLE HERE",
+        "1",
+        "2O2X"
+      ],
+      "bullets": [
+        "FILL IN THE TEXT OF THE DOCUMENT TITLE HERE",
+        "1",
+        "2O2X",
+        "PROJECT - 01",
+        "点击输入简要文字解说，解说文字尽量概括精炼，不用多余的文字修饰简洁精准",
+        "2"
+      ],
+      "image_keywords": [
+        "business",
+        "work",
+        "report",
+        "summary",
+        "corporate"
+      ],
+      "blocks": [
+        {
+          "block_type": "title",
+          "type": "title",
+          "card_id": "card-1",
+          "id": "card-1",
+          "content": "经验分享",
+          "emphasis": []
+        },
+        {
+          "block_type": "list",
+          "type": "list",
+          "card_id": "card-2",
+          "id": "card-2",
+          "content": "FILL IN THE TEXT OF THE DOCUMENT TITLE HERE\n1\n2O2X\nPROJECT - 01\n点击输入简要文字解说，解说文字尽量概括精炼，不用多余的文字修饰简洁精准\n2"
+        }
+      ],
+      "elements": [
+        {
+          "type": "text",
+          "content": "经验分享",
+          "top": 0.11,
+          "left": 1.01,
+          "width": 2.78,
+          "height": 0.63
+        },
+        {
+          "type": "text",
+          "content": "FILL IN THE TEXT OF THE DOCUMENT TITLE HERE",
+          "top": 0.68,
+          "left": 1.02,
+          "width": 2.76,
+          "height": 0.23
+        },
+        {
+          "type": "text",
+          "content": "1",
+          "top": 3.18,
+          "left": 1.94,
+          "width": 0.37,
+          "height": 0.37
+        },
+        {
+          "type": "text",
+          "content": "2O2X",
+          "top": 1.57,
+          "left": 3.39,
+          "width": 1.35,
+          "height": 0.63
+        },
+        {
+          "type": "text",
+          "content": "PROJECT - 01",
+          "top": 2.76,
+          "left": 3.35,
+          "width": 1.25,
+          "height": 0.3
+        },
+        {
+          "type": "text",
+          "content": "点击输入简要文字解说，解说文字尽量概括精炼，不用多余的文字修饰简洁精准",
+          "top": 3.14,
+          "left": 2.49,
+          "width": 3.1,
+          "height": 0.55
+        },
+        {
+          "type": "text",
+          "content": "2",
+          "top": 4.52,
+          "left": 1.94,
+          "width": 0.37,
+          "height": 0.37
+        },
+        {
+          "type": "text",
+          "content": "PROJECT - 02",
+          "top": 4.11,
+          "left": 3.35,
+          "width": 1.25,
+          "height": 0.3
+        }
+      ],
+      "svg_overlay": false,
+      "force_svg_overlay": false,
+      "use_svg_overlay": false,
+      "svg_markup": ""
+    },
+    {
+      "page_number": 16,
+      "slide_id": "slide-016",
+      "id": "slide-016",
+      "slide_type": "divider",
+      "page_type": "divider",
+      "pageType": "divider",
+      "slideType": "divider",
+      "subtype": "divider",
+      "layout_grid": "split_2",
+      "layout": "split_2",
+      "template_family": "quote_hero_dark",
+      "template_id": "quote_hero_dark",
+      "skill_profile": "cover-default",
+      "hardness_profile": "balanced",
+      "schema_profile": "ppt-template/v2-quote-hero",
+      "contract_profile": "cover_meta_required",
+      "quality_profile": "default",
+      "template_lock": false,
+      "render_path": "pptxgenjs",
+      "bg_style": "light",
+      "content_density": "balanced",
+      "force_bento": false,
+      "title": "2O2X",
+      "narration": "接下来我们进入2O2X部分。",
+      "speaker_notes": "接下来我们进入2O2X部分。",
+      "speakerNotes": "接下来我们进入2O2X部分。",
+      "duration": 5,
+      "narration_audio_url": "",
+      "narrationAudioUrl": "",
+      "script": [
+        {
+          "role": "host",
+          "text": "接下来我们进入2O2X部分。"
+        }
+      ],
+      "text_constraints": {
+        "bullet_max_items": 6,
+        "bullet_max_chars_cjk": 30,
+        "min_body_font_pt": 11,
+        "min_title_font_pt": 20,
+        "subtitle_max_lines": 2,
+        "subtitle_max_chars_cjk": 80,
+        "subtitle_min_font_pt": 13,
+        "bullet_auto_split": true
+      },
+      "markdown": "# 2O2X\n- 下步目标\n- PART FOUR",
+      "imageUrl": "",
+      "key_points": [
+        "下步目标",
+        "PART FOUR"
+      ],
+      "bullets": [
+        "下步目标",
+        "PART FOUR"
+      ],
+      "image_keywords": [
+        "business",
+        "work",
+        "report",
+        "summary",
+        "corporate"
+      ],
+      "blocks": [
+        {
+          "block_type": "title",
+          "type": "title",
+          "card_id": "card-1",
+          "id": "card-1",
+          "content": "2O2X",
+          "emphasis": []
+        },
+        {
+          "block_type": "subtitle",
+          "type": "subtitle",
+          "card_id": "card-2",
+          "id": "card-2",
+          "content": "下步目标"
+        }
+      ],
+      "elements": [
+        {
+          "type": "text",
+          "content": "2O2X",
+          "top": 1.54,
+          "left": 1.14,
+          "width": 5.52,
+          "height": 2.42
+        },
+        {
+          "type": "text",
+          "content": "下步目标",
+          "top": 2.9,
+          "left": 1.17,
+          "width": 6.62,
+          "height": 1.58
+        },
+        {
+          "type": "text",
+          "content": "YOUR CONTENT IS ENTERED HERE, OR BY COPYING YOUR TEXT, SELECT PASTE IN THIS BOX AND CHOOSE TO RETAIN ONLY TEXT. YOUR CONTENT IS TYPED HERE, OR BY COPYING YOUR TEXT, SELECT PASTE IN THIS BOX.",
+          "top": 4.81,
+          "left": 1.18,
+          "width": 6.12,
+          "height": 0.81
+        },
+        {
+          "type": "text",
+          "content": "PART FOUR",
+          "top": 2.28,
+          "left": 1.2,
+          "width": 3.67,
+          "height": 0.84
+        },
+        {
+          "type": "text",
+          "content": "第一PPT商务办公系列PPT模板",
+          "top": 6.92,
+          "left": 1.18,
+          "width": 3.67,
+          "height": 0.3
+        }
+      ],
+      "svg_overlay": false,
+      "force_svg_overlay": false,
+      "use_svg_overlay": false,
+      "svg_markup": ""
+    },
+    {
+      "page_number": 17,
+      "slide_id": "slide-017",
+      "id": "slide-017",
+      "slide_type": "content",
+      "page_type": "content",
+      "pageType": "content",
+      "slideType": "content",
+      "subtype": "content",
+      "layout_grid": "grid_3",
+      "layout": "grid_3",
+      "template_family": "split_media_dark",
+      "template_id": "split_media_dark",
+      "skill_profile": "comparison-general",
+      "hardness_profile": "balanced",
+      "schema_profile": "ppt-template/v2-split-media",
+      "contract_profile": "default",
+      "quality_profile": "default",
+      "template_lock": false,
+      "render_path": "pptxgenjs",
+      "bg_style": "light",
+      "content_density": "balanced",
+      "force_bento": false,
+      "title": "下步目标",
+      "narration": "关于下步目标，我们来看具体内容。",
+      "speaker_notes": "关于下步目标，我们来看具体内容。",
+      "speakerNotes": "关于下步目标，我们来看具体内容。",
+      "duration": 12,
+      "narration_audio_url": "",
+      "narrationAudioUrl": "",
+      "script": [
+        {
+          "role": "host",
+          "text": "关于下步目标，我们来看具体内容。"
+        }
+      ],
+      "text_constraints": {
+        "bullet_max_items": 6,
+        "bullet_max_chars_cjk": 30,
+        "min_body_font_pt": 11,
+        "min_title_font_pt": 20,
+        "subtitle_max_lines": 2,
+        "subtitle_max_chars_cjk": 80,
+        "subtitle_min_font_pt": 13,
+        "bullet_auto_split": true
+      },
+      "markdown": "# 下步目标\n- FILL IN THE TEXT OF THE DOCUMENT TITLE HERE\n- 业务\n- 模块\n- XX项目\n- XX项目\n- XX项目",
+      "imageUrl": "",
+      "key_points": [
+        "FILL IN THE TEXT OF THE DOCUMENT TITLE HERE",
+        "业务",
+        "模块"
+      ],
+      "bullets": [
+        "FILL IN THE TEXT OF THE DOCUMENT TITLE HERE",
+        "业务",
+        "模块",
+        "XX项目",
+        "XX项目",
+        "XX项目"
+      ],
+      "image_keywords": [
+        "business",
+        "work",
+        "report",
+        "summary",
+        "corporate"
+      ],
+      "blocks": [
+        {
+          "block_type": "title",
+          "type": "title",
+          "card_id": "card-1",
+          "id": "card-1",
+          "content": "下步目标",
+          "emphasis": []
+        },
+        {
+          "block_type": "list",
+          "type": "list",
+          "card_id": "card-2",
+          "id": "card-2",
+          "content": "FILL IN THE TEXT OF THE DOCUMENT TITLE HERE\n业务\n模块\nXX项目\nXX项目\nXX项目"
+        }
+      ],
+      "elements": [
+        {
+          "type": "text",
+          "content": "下步目标",
+          "top": 0.11,
+          "left": 1.01,
+          "width": 2.78,
+          "height": 0.63
+        },
+        {
+          "type": "text",
+          "content": "FILL IN THE TEXT OF THE DOCUMENT TITLE HERE",
+          "top": 0.68,
+          "left": 1.02,
+          "width": 2.76,
+          "height": 0.23
+        },
+        {
+          "type": "text",
+          "content": "业务\n模块",
+          "top": 2.8,
+          "left": 6.3,
+          "width": 1.09,
+          "height": 1.17
+        },
+        {
+          "type": "text",
+          "content": "XX项目",
+          "top": 2.51,
+          "left": 9.9,
+          "width": 1.31,
+          "height": 0.4
+        },
+        {
+          "type": "text",
+          "content": "XX项目",
+          "top": 3.73,
+          "left": 9.27,
+          "width": 1.31,
+          "height": 0.4
+        },
+        {
+          "type": "text",
+          "content": "XX项目",
+          "top": 4.95,
+          "left": 8.61,
+          "width": 1.31,
+          "height": 0.4
+        },
+        {
+          "type": "text",
+          "content": "XX项目",
+          "top": 2.51,
+          "left": 2.51,
+          "width": 1.31,
+          "height": 0.4
+        },
+        {
+          "type": "text",
+          "content": "XX项目",
+          "top": 3.73,
+          "left": 2.91,
+          "width": 1.31,
+          "height": 0.4
+        }
+      ],
+      "svg_overlay": false,
+      "force_svg_overlay": false,
+      "use_svg_overlay": false,
+      "svg_markup": ""
+    },
+    {
+      "page_number": 18,
+      "slide_id": "slide-018",
+      "id": "slide-018",
+      "slide_type": "content",
+      "page_type": "content",
+      "pageType": "content",
+      "slideType": "content",
+      "subtype": "content",
+      "layout_grid": "grid_3",
+      "layout": "grid_3",
+      "template_family": "split_media_dark",
+      "template_id": "split_media_dark",
+      "skill_profile": "comparison-general",
+      "hardness_profile": "balanced",
+      "schema_profile": "ppt-template/v2-split-media",
+      "contract_profile": "default",
+      "quality_profile": "default",
+      "template_lock": false,
+      "render_path": "pptxgenjs",
+      "bg_style": "light",
+      "content_density": "balanced",
+      "force_bento": false,
+      "title": "下步目标",
+      "narration": "关于下步目标，我们来看具体内容。",
+      "speaker_notes": "关于下步目标，我们来看具体内容。",
+      "speakerNotes": "关于下步目标，我们来看具体内容。",
+      "duration": 12,
+      "narration_audio_url": "",
+      "narrationAudioUrl": "",
+      "script": [
+        {
+          "role": "host",
+          "text": "关于下步目标，我们来看具体内容。"
+        }
+      ],
+      "text_constraints": {
+        "bullet_max_items": 6,
+        "bullet_max_chars_cjk": 30,
+        "min_body_font_pt": 11,
+        "min_title_font_pt": 20,
+        "subtitle_max_lines": 2,
+        "subtitle_max_chars_cjk": 80,
+        "subtitle_min_font_pt": 13,
+        "bullet_auto_split": true
+      },
+      "markdown": "# 下步目标\n- FILL IN THE TEXT OF THE DOCUMENT TITLE HERE\n- 2O2X\n- 点击输入简要文字解说，解说文字尽量概括精炼，不用多余的文字修饰简洁精准\n- 2O24\n- 点击输入简要文字解说，解说文字尽量概括精炼，不用多余的文字修饰简洁精准\n- 点击输入简要文字解说，解说文字尽量概括精炼。",
+      "imageUrl": "",
+      "key_points": [
+        "FILL IN THE TEXT OF THE DOCUMENT TITLE HERE",
+        "2O2X",
+        "点击输入简要文字解说，解说文字尽量概括精炼，不用多余的文字修饰简洁精准"
+      ],
+      "bullets": [
+        "FILL IN THE TEXT OF THE DOCUMENT TITLE HERE",
+        "2O2X",
+        "点击输入简要文字解说，解说文字尽量概括精炼，不用多余的文字修饰简洁精准",
+        "2O24",
+        "点击输入简要文字解说，解说文字尽量概括精炼，不用多余的文字修饰简洁精准",
+        "点击输入简要文字解说，解说文字尽量概括精炼。"
+      ],
+      "image_keywords": [
+        "business",
+        "work",
+        "report",
+        "summary",
+        "corporate"
+      ],
+      "blocks": [
+        {
+          "block_type": "title",
+          "type": "title",
+          "card_id": "card-1",
+          "id": "card-1",
+          "content": "下步目标",
+          "emphasis": []
+        },
+        {
+          "block_type": "list",
+          "type": "list",
+          "card_id": "card-2",
+          "id": "card-2",
+          "content": "FILL IN THE TEXT OF THE DOCUMENT TITLE HERE\n2O2X\n点击输入简要文字解说，解说文字尽量概括精炼，不用多余的文字修饰简洁精准\n2O24\n点击输入简要文字解说，解说文字尽量概括精炼，不用多余的文字修饰简洁精准\n点击输入简要文字解说，解说文字尽量概括精炼。"
+        }
+      ],
+      "elements": [
+        {
+          "type": "text",
+          "content": "下步目标",
+          "top": 0.11,
+          "left": 1.01,
+          "width": 2.78,
+          "height": 0.63
+        },
+        {
+          "type": "text",
+          "content": "FILL IN THE TEXT OF THE DOCUMENT TITLE HERE",
+          "top": 0.68,
+          "left": 1.02,
+          "width": 2.76,
+          "height": 0.23
+        },
+        {
+          "type": "text",
+          "content": "2O2X",
+          "top": 2.32,
+          "left": 6.43,
+          "width": 1.5,
+          "height": 0.7
+        },
+        {
+          "type": "text",
+          "content": "点击输入简要文字解说，解说文字尽量概括精炼，不用多余的文字修饰简洁精准",
+          "top": 2.96,
+          "left": 6.41,
+          "width": 2.92,
+          "height": 0.53
+        },
+        {
+          "type": "text",
+          "content": "2O24",
+          "top": 4.09,
+          "left": 4.62,
+          "width": 1.48,
+          "height": 0.7
+        },
+        {
+          "type": "text",
+          "content": "点击输入简要文字解说，解说文字尽量概括精炼，不用多余的文字修饰简洁精准",
+          "top": 4.73,
+          "left": 4.61,
+          "width": 2.92,
+          "height": 0.53
+        },
+        {
+          "type": "text",
+          "content": "点击输入简要文字解说，解说文字尽量概括精炼。\n点击输入简要文字解说，解说文字尽量概括精炼，不用多余的文字修饰简洁精准。",
+          "top": 4.16,
+          "left": 9.55,
+          "width": 2.75,
+          "height": 1.71
+        },
+        {
+          "type": "text",
+          "content": "请输入项目名称",
+          "top": 3.86,
+          "left": 9.74,
+          "width": 1.77,
+          "height": 0.37
+        }
+      ],
+      "svg_overlay": false,
+      "force_svg_overlay": false,
+      "use_svg_overlay": false,
+      "svg_markup": ""
+    },
+    {
+      "page_number": 19,
+      "slide_id": "slide-019",
+      "id": "slide-019",
+      "slide_type": "content",
+      "page_type": "content",
+      "pageType": "content",
+      "slideType": "content",
+      "subtype": "content",
+      "layout_grid": "grid_3",
+      "layout": "grid_3",
+      "template_family": "split_media_dark",
+      "template_id": "split_media_dark",
+      "skill_profile": "comparison-general",
+      "hardness_profile": "balanced",
+      "schema_profile": "ppt-template/v2-split-media",
+      "contract_profile": "default",
+      "quality_profile": "default",
+      "template_lock": false,
+      "render_path": "pptxgenjs",
+      "bg_style": "light",
+      "content_density": "balanced",
+      "force_bento": false,
+      "title": "下步目标",
+      "narration": "关于下步目标，我们来看具体内容。",
+      "speaker_notes": "关于下步目标，我们来看具体内容。",
+      "speakerNotes": "关于下步目标，我们来看具体内容。",
+      "duration": 12,
+      "narration_audio_url": "",
+      "narrationAudioUrl": "",
+      "script": [
+        {
+          "role": "host",
+          "text": "关于下步目标，我们来看具体内容。"
+        }
+      ],
+      "text_constraints": {
+        "bullet_max_items": 6,
+        "bullet_max_chars_cjk": 30,
+        "min_body_font_pt": 11,
+        "min_title_font_pt": 20,
+        "subtitle_max_lines": 2,
+        "subtitle_max_chars_cjk": 80,
+        "subtitle_min_font_pt": 13,
+        "bullet_auto_split": true
+      },
+      "markdown": "# 下步目标\n- FILL IN THE TEXT OF THE DOCUMENT TITLE HERE\n- 2O2X\n- 2O2X\n- 2O27\n- 2O28\n- 标题内容",
+      "imageUrl": "",
+      "key_points": [
+        "FILL IN THE TEXT OF THE DOCUMENT TITLE HERE",
+        "2O2X",
+        "2O2X"
+      ],
+      "bullets": [
+        "FILL IN THE TEXT OF THE DOCUMENT TITLE HERE",
+        "2O2X",
+        "2O2X",
+        "2O27",
+        "2O28",
+        "标题内容"
+      ],
+      "image_keywords": [
+        "business",
+        "work",
+        "report",
+        "summary",
+        "corporate"
+      ],
+      "blocks": [
+        {
+          "block_type": "title",
+          "type": "title",
+          "card_id": "card-1",
+          "id": "card-1",
+          "content": "下步目标",
+          "emphasis": []
+        },
+        {
+          "block_type": "list",
+          "type": "list",
+          "card_id": "card-2",
+          "id": "card-2",
+          "content": "FILL IN THE TEXT OF THE DOCUMENT TITLE HERE\n2O2X\n2O2X\n2O27\n2O28\n标题内容"
+        }
+      ],
+      "elements": [
+        {
+          "type": "text",
+          "content": "下步目标",
+          "top": 0.11,
+          "left": 1.01,
+          "width": 2.78,
+          "height": 0.63
+        },
+        {
+          "type": "text",
+          "content": "FILL IN THE TEXT OF THE DOCUMENT TITLE HERE",
+          "top": 0.68,
+          "left": 1.02,
+          "width": 2.76,
+          "height": 0.23
+        },
+        {
+          "type": "text",
+          "content": "2O2X",
+          "top": 2.94,
+          "left": 2.33,
+          "width": 1.14,
+          "height": 0.53
+        },
+        {
+          "type": "text",
+          "content": "2O2X",
+          "top": 2.94,
+          "left": 5.09,
+          "width": 1.14,
+          "height": 0.53
+        },
+        {
+          "type": "text",
+          "content": "2O27",
+          "top": 2.94,
+          "left": 7.85,
+          "width": 1.12,
+          "height": 0.53
+        },
+        {
+          "type": "text",
+          "content": "2O28",
+          "top": 2.94,
+          "left": 10.62,
+          "width": 1.12,
+          "height": 0.53
+        },
+        {
+          "type": "text",
+          "content": "标题内容",
+          "top": 3.98,
+          "left": 2.08,
+          "width": 1.21,
+          "height": 0.4
+        },
+        {
+          "type": "text",
+          "content": "点击输入简要文字解说，解说文字尽量概括精炼",
+          "top": 4.38,
+          "left": 1.64,
+          "width": 2.09,
+          "height": 0.6
+        }
+      ],
+      "svg_overlay": false,
+      "force_svg_overlay": false,
+      "use_svg_overlay": false,
+      "svg_markup": ""
+    },
+    {
+      "page_number": 20,
+      "slide_id": "slide-020",
+      "id": "slide-020",
+      "slide_type": "summary",
+      "page_type": "summary",
+      "pageType": "summary",
+      "slideType": "summary",
+      "subtype": "summary",
+      "layout_grid": "grid_2",
+      "layout": "grid_2",
+      "template_family": "hero_dark",
+      "template_id": "hero_dark",
+      "skill_profile": "cover-default",
+      "hardness_profile": "balanced",
+      "schema_profile": "ppt-template/v2-hero",
+      "contract_profile": "default",
+      "quality_profile": "default",
+      "template_lock": false,
+      "render_path": "pptxgenjs",
+      "bg_style": "light",
+      "content_density": "balanced",
+      "force_bento": false,
+      "title": "2O2X",
+      "narration": "以上就是本次汇报的主要内容，感谢各位的聆听。",
+      "speaker_notes": "以上就是本次汇报的主要内容，感谢各位的聆听。",
+      "speakerNotes": "以上就是本次汇报的主要内容，感谢各位的聆听。",
+      "duration": 8,
+      "narration_audio_url": "",
+      "narrationAudioUrl": "",
+      "script": [
+        {
+          "role": "host",
+          "text": "以上就是本次汇报的主要内容，感谢各位的聆听。"
+        }
+      ],
+      "text_constraints": {
+        "bullet_max_items": 6,
+        "bullet_max_chars_cjk": 30,
+        "min_body_font_pt": 11,
+        "min_title_font_pt": 20,
+        "subtitle_max_lines": 2,
+        "subtitle_max_chars_cjk": 80,
+        "subtitle_min_font_pt": 13,
+        "bullet_auto_split": true
+      },
+      "markdown": "# 2O2X\n- 感谢您的观看\n- BUSINESS COMPANY WORK REPORT\n- DEPARTMENT SUMMARY",
+      "imageUrl": "",
+      "key_points": [
+        "感谢您的观看",
+        "BUSINESS COMPANY WORK REPORT",
+        "DEPARTMENT SUMMARY"
+      ],
+      "bullets": [
+        "感谢您的观看",
+        "BUSINESS COMPANY WORK REPORT",
+        "DEPARTMENT SUMMARY"
+      ],
+      "image_keywords": [
+        "business",
+        "work",
+        "report",
+        "summary",
+        "corporate"
+      ],
+      "blocks": [
+        {
+          "block_type": "title",
+          "type": "title",
+          "card_id": "card-1",
+          "id": "card-1",
+          "content": "2O2X",
+          "emphasis": []
+        },
+        {
+          "block_type": "list",
+          "type": "list",
+          "card_id": "card-2",
+          "id": "card-2",
+          "content": "感谢您的观看\nBUSINESS COMPANY WORK REPORT\nDEPARTMENT SUMMARY"
+        }
+      ],
+      "elements": [
+        {
+          "type": "text",
+          "content": "2O2X",
+          "top": 1.77,
+          "left": 1.14,
+          "width": 5.52,
+          "height": 2.42
+        },
+        {
+          "type": "text",
+          "content": "感谢您的观看",
+          "top": 3.06,
+          "left": 1.12,
+          "width": 6.84,
+          "height": 1.38
+        },
+        {
+          "type": "text",
+          "content": "BUSINESS COMPANY WORK REPORT",
+          "top": 4.4,
+          "left": 1.15,
+          "width": 6.68,
+          "height": 0.43
+        },
+        {
+          "type": "text",
+          "content": "your content is entered here, or by copying your text, select paste in this box and choose to retain only text. your content is typed here, or by copying your text, select paste in this box.",
+          "top": 4.84,
+          "left": 1.14,
+          "width": 6.81,
+          "height": 0.56
+        },
+        {
+          "type": "text",
+          "content": "DEPARTMENT SUMMARY",
+          "top": 6.23,
+          "left": 8.74,
+          "width": 3.71,
+          "height": 0.4
+        },
+        {
+          "type": "text",
+          "content": "第一PPT商务办公系列PPT模板",
+          "top": 6.92,
+          "left": 1.24,
+          "width": 3.67,
+          "height": 0.3
+        },
+        {
+          "type": "text",
+          "content": "汇报人：第一PPT市场部门",
+          "top": 5.55,
+          "left": 1.12,
+          "width": 3.2,
+          "height": 0.37
+        }
+      ],
+      "svg_overlay": false,
+      "force_svg_overlay": false,
+      "use_svg_overlay": false,
+      "svg_markup": ""
+    }
+  ]
+}

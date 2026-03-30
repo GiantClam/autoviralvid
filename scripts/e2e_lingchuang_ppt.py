@@ -1,11 +1,11 @@
-"""
-LingChuang PPT-only E2E script.
+﻿"""
+LingChuang PPT full-flow E2E script.
 
 Flow:
-1. Build fixed outline (no video stage).
+1. Simulate user input via `/api/v1/ppt/outline` using a long requirement text.
 2. Generate slide content via `/api/v1/ppt/content`.
-3. Export PPT via `scripts/generate-pptx-minimax.mjs`.
-4. Save outputs for quality harness consumption.
+3. Export PPT via `/api/v1/ppt/export` (main Python orchestration path).
+4. Download PPTX and persist artifacts for quality harness consumption.
 """
 
 from __future__ import annotations
@@ -22,123 +22,119 @@ from typing import Any, Dict, List
 
 RENDERER_BASE = os.getenv("RENDERER_BASE", "http://127.0.0.1:8124")
 OUTPUT_DIR = Path("test_outputs/lingchuang_ppt")
-SLIDES_PER_BATCH = 3
 CURL_BIN = shutil.which("curl.exe") or shutil.which("curl") or "curl"
 
-OUTLINE_SLIDES = [
-    {
-        "id": "lc-cover",
-        "order": 1,
-        "title": "封面｜灵创智能企业介绍",
-        "description": "封面页，突出品牌定位与核心价值主张。",
-        "key_points": ["灵创智能", "AI营销", "数字人增长引擎"],
-    },
-    {
-        "id": "lc-intro",
-        "order": 2,
-        "title": "公司概况与战略定位",
-        "description": "说明公司定位、核心能力、增长方向与客户价值。",
-        "key_points": [
-            "服务品牌客户超120家，覆盖消费、制造、教育三大行业",
-            "自主研发AI内容与投放系统，支持多渠道一体化运营",
-            "形成“策略-素材-投放-复盘”全链路营销闭环",
-        ],
-    },
-    {
-        "id": "lc-tech",
-        "order": 3,
-        "title": "技术体系与能力栈",
-        "description": "介绍模型能力、数据中台与自动化内容生产链路。",
-        "key_points": [
-            "大模型驱动创意生成，单日可产出300+条投放素材",
-            "数据中台接入12类行为指标，实现人群分层与实时优化",
-            "自动化A/B实验体系让素材迭代周期缩短至24小时",
-        ],
-    },
-    {
-        "id": "lc-products",
-        "order": 4,
-        "title": "产品矩阵与应用场景",
-        "description": "展示核心产品形态以及典型业务场景。",
-        "key_points": [
-            "数字人直播：支持7x24小时多平台讲解与互动",
-            "智能投放：自动分配预算并根据ROI实时调优",
-            "创意工厂：脚本、口播、短视频素材自动化生成",
-        ],
-    },
-    {
-        "id": "lc-value",
-        "order": 5,
-        "title": "业务价值与ROI提升",
-        "description": "量化展示效率、成本与转化层面的直接收益。",
-        "key_points": [
-            "内容生产成本平均下降42%，人工编辑时间减少60%",
-            "投放点击率平均提升28%，线索转化率提升19%",
-            "运营流程标准化后，跨团队协作效率提升35%",
-        ],
-    },
-    {
-        "id": "lc-cases",
-        "order": 6,
-        "title": "行业案例与落地成效",
-        "description": "展示不同行业客户的典型成果与可复用方法。",
-        "key_points": [
-            "消费品牌：双11期间GMV同比增长31%，退货率下降8%",
-            "制造企业：线索获客成本下降26%，销售跟进时效提升40%",
-            "教育服务：私域咨询转化率提升22%，留资率提升18%",
-        ],
-    },
-    {
-        "id": "lc-market",
-        "order": 7,
-        "title": "市场机会与增长空间",
-        "description": "分析行业增量、预算迁移趋势与结构性机会。",
-        "key_points": [
-            "AI营销预算连续3年增长，年复合增速预计超35%",
-            "企业从“流量采购”转向“内容+投放一体化”模式",
-            "数字人商业化进入规模期，渗透率持续上升",
-        ],
-    },
-    {
-        "id": "lc-plan",
-        "order": 8,
-        "title": "实施路线图（Roadmap）",
-        "description": "分阶段推进，从诊断试点到规模化复制。",
-        "key_points": [
-            "第1阶段（2周）：业务诊断与数据基线建立",
-            "第2阶段（4周）：小范围试点并验证投放模型",
-            "第3阶段（8周）：跨业务线复制与组织协同落地",
-        ],
-    },
-    {
-        "id": "lc-roadmap",
-        "order": 9,
-        "title": "未来规划与生态合作",
-        "description": "规划产品升级方向和生态伙伴协同机制。",
-        "key_points": [
-            "产品升级：引入多模态创意理解与自动脚本评估",
-            "生态合作：联合渠道、SaaS与媒体平台共建方案",
-            "国际化布局：优先拓展东南亚与中东市场",
-        ],
-    },
-    {
-        "id": "lc-summary",
-        "order": 10,
-        "title": "总结与合作建议",
-        "description": "回顾核心优势，给出可执行的合作方案。",
-        "key_points": [
-            "灵创智能已形成可复制的AI营销增长方法论",
-            "建议先以单业务线试点，4周内完成效果验证",
-            "通过季度共创机制持续提升投放效率与增长质量",
-        ],
-    },
-]
+DEFAULT_REQUIREMENT = """灵创智能：引领数控加工新未来 —— 企业介绍PPT大纲
+封面页
+主标题： 灵创智能企业推介
+
+副标题： 精准智造，赋能工业新未来
+
+视觉元素： 公司Logo、极具科技感的高端数控机床实景图或3D渲染图。
+
+演讲人/日期
+
+第一部分：走进灵创智能（企业概况）
+幻灯片 1：企业简介
+
+公司定位：致力于高端智能数控机床的研发、生产与销售。
+
+发展历程：成立年份、关键里程碑、所获荣誉（如高新技术企业、专精特新等）。
+
+幻灯片 2：核心研发与生产实力
+
+工厂规模与产能。
+
+研发团队背景及核心专利（强调“智能”与“灵创”属性，如自研数控系统或高精度主轴技术）。
+
+第二部分：匠心智造（企业产品与解决方案）
+幻灯片 3：核心产品矩阵
+
+高精度数控车床/铣床： 介绍加工精度、稳定性及适用基础零部件加工的优势。
+
+高端五轴联动加工中心： 突出复杂曲面加工能力（适用于航空航天、医疗器械等高精尖领域）。
+
+数控专用机床与复合机床： 车铣复合等高效加工设备。
+
+幻灯片 4：产品核心技术优势
+
+“精”： 微米级加工精度，高刚性床身设计。
+
+“智”： 搭载智能化数控系统，支持物联网（IoT）接入，实现设备状态监控与故障预警。
+
+“效”： 高效的排屑、冷却系统及自动化上下料接口。
+
+幻灯片 5：行业应用案例（解决方案）
+
+展示产品在新能源汽车（如压铸件加工）、3C电子、航空航天、模具制造等具体行业的成功应用。
+
+第三部分：蓝海启航（市场规模与发展前景）
+幻灯片 6：宏观市场机遇（广阔的市场规模）
+
+全球与国内市场盘点： 引用最新行业数据（如：千亿级甚至万亿级的机床市场规模），说明数控机床作为“工业母机”的刚性需求。
+
+国产替代浪潮： 分析当前高端数控机床国产化率的提升空间，强调国内品牌的巨大机遇。
+
+幻灯片 7：驱动增长的核心动能
+
+下游产业升级： 新能源汽车轻量化、5G通讯、自动化生产线对高端机床的爆发式需求。
+
+政策红利： 国家对“智能制造”、“工业4.0”及设备更新换代的政策支持。
+
+灵创智能的市场占位： 公司在特定细分市场的占有率及未来增长预测。
+
+第四部分：携手共赢（多元化合作模式）
+幻灯片 8：灵活的商业合作模式
+
+区域代理与经销经销： 诚招各地代理商，提供完善的渠道保护、利润空间及市场支持。
+
+大客户直采/集采： 针对大型制造企业提供批量采购优惠及驻厂售后保障。
+
+设备融资租赁： 联合金融机构推出租赁模式，降低客户初期资金门槛，助力中小企业轻松升级设备。
+
+幻灯片 9：深度技术与生态合作
+
+OEM/ODM代工与定制研发： 根据客户特定工艺需求，提供非标机床或柔性生产线的定制开发。
+
+产学研联合与“交钥匙”工程： 为客户提供从设备选型、工艺规划、夹具设计到打样生产的全套解决方案。
+
+第五部分：未来展望与联系我们
+幻灯片 10：企业愿景
+
+短期与长期战略目标。
+
+承诺：做最懂客户的数控机床合作伙伴，持续为中国智造贡献力量。
+
+封底页：联系方式
+
+公司地址、官方网址、联系人电话、微信公众号/销售微信二维码。
+
+结语： 感谢聆听，期待合作！"""
 
 
-def call_api(method: str, path: str, body: Dict[str, Any] | None = None) -> Dict[str, Any]:
+def call_api(
+    method: str,
+    path: str,
+    body: Dict[str, Any] | None = None,
+    *,
+    timeout_sec: int = 600,
+) -> Dict[str, Any]:
+    def _decode(raw: bytes | str | None) -> str:
+        if raw is None:
+            return ""
+        if isinstance(raw, bytes):
+            return raw.decode("utf-8", errors="replace").strip()
+        return str(raw).strip()
+
     if body is None:
         cmd = [CURL_BIN, "-s", "-X", method, f"{RENDERER_BASE}{path}"]
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300, check=False)
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=False,
+            timeout=max(5, int(timeout_sec)),
+            check=False,
+        )
     else:
         with tempfile.NamedTemporaryFile(
             mode="w", suffix=".json", delete=False, encoding="utf-8"
@@ -157,12 +153,18 @@ def call_api(method: str, path: str, body: Dict[str, Any] | None = None) -> Dict
                 "-d",
                 f"@{payload_path}",
             ]
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=300, check=False)
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=False,
+                timeout=max(5, int(timeout_sec)),
+                check=False,
+            )
         finally:
             Path(payload_path).unlink(missing_ok=True)
 
-    raw = (result.stdout or "").strip()
-    stderr = (result.stderr or "").strip()
+    raw = _decode(result.stdout)
+    stderr = _decode(result.stderr)
     if result.returncode != 0:
         return {
             "success": False,
@@ -176,152 +178,179 @@ def call_api(method: str, path: str, body: Dict[str, Any] | None = None) -> Dict
         return {"success": False, "error": (raw or stderr)[:500]}
 
 
-def build_outline_payload() -> Dict[str, Any]:
+def expect_success(resp: Dict[str, Any], stage: str) -> Dict[str, Any]:
+    if resp.get("success") and isinstance(resp.get("data"), dict):
+        return resp["data"]
+    raise RuntimeError(f"{stage} failed: {json.dumps(resp, ensure_ascii=False)[:1000]}")
+
+
+def build_outline_request(requirement: str, num_slides: int) -> Dict[str, Any]:
     return {
-        "id": "lingchuang-2026-ppt-only",
-        "title": "灵创智能：AI营销与数字人增长引擎",
-        "theme": "professional",
+        "requirement": requirement,
+        "language": "zh-CN",
+        "num_slides": num_slides,
         "style": "professional",
-        "slides": OUTLINE_SLIDES,
-        "total_duration": 8 * len(OUTLINE_SLIDES),
+        "purpose": "企业介绍/商务合作路演",
     }
 
 
-def generate_slides(outline: Dict[str, Any]) -> List[Dict[str, Any]]:
-    total = len(OUTLINE_SLIDES)
-    generated: List[Dict[str, Any]] = []
-    for start in range(0, total, SLIDES_PER_BATCH):
-        end = min(start + SLIDES_PER_BATCH, total)
-        batch = OUTLINE_SLIDES[start:end]
-        req = {"outline": {**outline, "slides": batch}, "language": "zh-CN"}
-        resp = call_api("POST", "/api/v1/ppt/content", req)
-        if resp.get("success") and isinstance(resp.get("data"), list):
-            generated.extend(resp["data"])
-        else:
-            raise RuntimeError(
-                f"Content API degraded/fallback detected for batch {start}-{end}: "
-                f"{json.dumps(resp, ensure_ascii=False)[:600]}"
-            )
-    return generated
-
-
-def export_ppt(slides: List[Dict[str, Any]], title: str, output_dir: Path) -> Dict[str, Any]:
-    export_req = {
+def build_export_request(
+    slides: List[Dict[str, Any]],
+    title: str,
+    *,
+    route_mode: str = "refine",
+    quality_profile: str = "high_density_consulting",
+) -> Dict[str, Any]:
+    return {
         "slides": slides,
         "title": title,
         "author": "灵创智能",
         "generator_mode": "official",
-        "original_style": True,
-        "disable_local_style_rewrite": True,
+        "route_mode": str(route_mode or "refine"),
+        "quality_profile": str(quality_profile or "high_density_consulting"),
+        "original_style": False,
+        "disable_local_style_rewrite": False,
         "visual_priority": True,
         "visual_preset": "tech_cinematic",
         "visual_density": "balanced",
-        "constraint_hardness": "minimal",
+        "constraint_hardness": "balanced",
+        "svg_mode": "on",
+        "template_family": "auto",
     }
-    req_path = output_dir / "export_req.json"
+
+
+def download_file(url: str, output_path: Path) -> bool:
+    if not url:
+        return False
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    cmd = [CURL_BIN, "-L", "-s", "-o", str(output_path), url]
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=600, check=False)
+    return result.returncode == 0 and output_path.exists() and output_path.stat().st_size > 0
+
+
+def write_render_surrogate(
+    output_dir: Path,
+    *,
+    outline_data: Dict[str, Any],
+    slides: List[Dict[str, Any]],
+    export_data: Dict[str, Any],
+) -> Path:
     render_path = output_dir / "lingchuang_ppt.render.json"
-    pptx_path = output_dir / "lingchuang_ppt.pptx"
-    req_path.write_text(json.dumps(export_req, ensure_ascii=False, indent=2), encoding="utf-8")
-
-    node = shutil.which("node") or "node"
-    cmd = [
-        node,
-        "scripts/generate-pptx-minimax.mjs",
-        "--input",
-        str(req_path),
-        "--output",
-        str(pptx_path),
-        "--render-output",
-        str(render_path),
-        "--generator-mode",
-        "official",
-        "--visual-priority",
-        "--visual-preset",
-        "tech_cinematic",
-        "--visual-density",
-        "balanced",
-        "--constraint-hardness",
-        "minimal",
-    ]
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=120, check=False)
-    if result.returncode != 0:
-        raise RuntimeError(f"PPT export failed: {(result.stderr or result.stdout)[:600]}")
-
-    meta: Dict[str, Any] = {}
-    for line in reversed((result.stdout or "").splitlines()):
-        line = line.strip()
-        if not line.startswith("{"):
-            continue
-        try:
-            parsed = json.loads(line)
-        except Exception:
-            continue
-        if isinstance(parsed, dict):
-            meta = parsed
-            break
-    return {
-        "pptx_path": str(pptx_path),
-        "render_path": str(render_path),
-        "meta": meta,
+    render_payload = {
+        "mode": export_data.get("video_mode") or "mainflow_export",
+        "generator_mode": export_data.get("generator_mode") or "official",
+        "route_mode": export_data.get("route_mode") or "refine",
+        "quality_profile": export_data.get("quality_profile") or "high_density_consulting",
+        "quality_score": export_data.get("quality_score"),
+        "visual_qa": export_data.get("visual_qa"),
+        "official_input": {
+            "title": str(outline_data.get("title") or "灵创智能企业推介"),
+            "author": "灵创智能",
+            "slides": slides,
+        },
+        "slides": export_data.get("video_slides") if isinstance(export_data.get("video_slides"), list) else [],
     }
-
-
-def evaluate_render_metrics(render_path: Path, output_dir: Path) -> Dict[str, Any]:
-    node = shutil.which("node") or "node"
-    report_path = output_dir / "render_metrics.json"
-    cmd = [
-        node,
-        "scripts/tests/validate-render-metrics.mjs",
-        str(render_path),
-        "--report-path",
-        str(report_path),
-    ]
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=120, check=False)
-    report: Dict[str, Any] = {
-        "ok": result.returncode == 0,
-        "report_path": str(report_path),
-        "stdout": (result.stdout or "").strip()[:2000],
-        "stderr": (result.stderr or "").strip()[:2000],
-    }
-    if report_path.exists():
-        try:
-            report["report"] = json.loads(report_path.read_text(encoding="utf-8"))
-        except Exception:
-            report["report"] = {}
-    return report
+    render_path.write_text(json.dumps(render_payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    return render_path
 
 
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--output-dir", default=str(OUTPUT_DIR))
-    parser.add_argument(
-        "--skip-render-metrics",
-        action="store_true",
-        help="Skip validate-render-metrics after export.",
-    )
+    parser.add_argument("--requirement-file", default="")
+    parser.add_argument("--num-slides", type=int, default=12)
+    parser.add_argument("--route-mode", default="refine")
+    parser.add_argument("--quality-profile", default="high_density_consulting")
+    parser.add_argument("--export-timeout", type=int, default=1800)
     args = parser.parse_args()
 
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
-    outline = build_outline_payload()
-    slides = generate_slides(outline)
-    (output_dir / "outline.json").write_text(json.dumps(outline, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    requirement_text = (
+        Path(args.requirement_file).read_text(encoding="utf-8")
+        if args.requirement_file
+        else DEFAULT_REQUIREMENT
+    )
+
+    outline_req = build_outline_request(requirement_text, max(3, min(50, int(args.num_slides))))
+    (output_dir / "requirement.txt").write_text(requirement_text, encoding="utf-8")
+    (output_dir / "outline_req.json").write_text(
+        json.dumps(outline_req, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+
+    outline_resp = call_api("POST", "/api/v1/ppt/outline", outline_req)
+    outline_data = expect_success(outline_resp, "outline")
+    (output_dir / "outline.json").write_text(
+        json.dumps(outline_data, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+
+    content_req = {"outline": outline_data, "language": "zh-CN"}
+    (output_dir / "content_req.json").write_text(
+        json.dumps(content_req, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    content_resp = call_api("POST", "/api/v1/ppt/content", content_req)
+    if not (content_resp.get("success") and isinstance(content_resp.get("data"), list)):
+        raise RuntimeError(f"content failed: {json.dumps(content_resp, ensure_ascii=False)[:1000]}")
+    slides: List[Dict[str, Any]] = [item for item in content_resp["data"] if isinstance(item, dict)]
     (output_dir / "slides.json").write_text(json.dumps(slides, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    export_info = export_ppt(slides, outline["title"], output_dir)
-    metrics = (
-        {"ok": True, "skipped": True}
-        if args.skip_render_metrics
-        else evaluate_render_metrics(Path(export_info["render_path"]), output_dir)
+    export_req = build_export_request(
+        slides,
+        str(outline_data.get("title") or "灵创智能企业推介"),
+        route_mode=args.route_mode,
+        quality_profile=args.quality_profile,
     )
+    (output_dir / "export_req.json").write_text(
+        json.dumps(export_req, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    export_resp = call_api(
+        "POST",
+        "/api/v1/ppt/export",
+        export_req,
+        timeout_sec=max(30, int(args.export_timeout)),
+    )
+    export_data = expect_success(export_resp, "export")
+    (output_dir / "export_result.json").write_text(
+        json.dumps(export_data, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+
+    pptx_url = str(export_data.get("url") or "").strip()
+    pptx_path = output_dir / "lingchuang_ppt.pptx"
+    downloaded = download_file(pptx_url, pptx_path)
+
+    render_path = write_render_surrogate(
+        output_dir,
+        outline_data=outline_data,
+        slides=slides,
+        export_data=export_data,
+    )
+
+    quality_obj = export_data.get("quality_score") if isinstance(export_data.get("quality_score"), dict) else {}
+    quality_passed = bool(quality_obj.get("passed"))
+    alerts = export_data.get("alerts") if isinstance(export_data.get("alerts"), list) else []
+    blocking_alerts = [
+        item
+        for item in alerts
+        if isinstance(item, dict) and str(item.get("severity") or "").strip().lower() in {"high", "critical"}
+    ]
+
     summary = {
-        "success": bool(metrics.get("ok", True)),
-        "slide_count": len(slides),
+        "success": downloaded and bool(slides) and quality_passed and (len(blocking_alerts) == 0),
         "output_dir": str(output_dir),
-        "pptx_path": export_info["pptx_path"],
-        "render_path": export_info["render_path"],
-        "generator_meta": export_info["meta"],
-        "render_metrics": metrics,
+        "renderer_base": RENDERER_BASE,
+        "slide_count": len(slides),
+        "outline_title": outline_data.get("title"),
+        "pptx_url": pptx_url,
+        "pptx_path": str(pptx_path) if downloaded else "",
+        "render_path": str(render_path),
+        "route_mode": export_data.get("route_mode"),
+        "quality_profile": export_data.get("quality_profile"),
+        "quality_score": export_data.get("quality_score"),
+        "quality_passed": quality_passed,
+        "visual_qa": export_data.get("visual_qa"),
+        "alerts": alerts,
+        "blocking_alerts": blocking_alerts,
     }
     (output_dir / "summary.json").write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps(summary, ensure_ascii=False))

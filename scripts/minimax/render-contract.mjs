@@ -7,6 +7,7 @@ export const RENDER_INPUT_SCHEMA = {
     palette: "string",
     style: "string",
   },
+  design_spec: "object",
   template_id: "string",
   skill_profile: "string",
   hardness_profile: "string",
@@ -24,6 +25,7 @@ export const RENDER_INPUT_SCHEMA = {
       schema_profile: "string",
       contract_profile: "string",
       quality_profile: "string",
+      render_path: "string",
       blocks: [
         {
           block_type: "string",
@@ -44,6 +46,36 @@ function asText(value, fallback = "") {
 
 function asArray(value) {
   return Array.isArray(value) ? value : [];
+}
+
+function normalizeRenderPath(value) {
+  const normalized = asText(value, "").toLowerCase();
+  if (["pptxgenjs", "svg", "png_fallback"].includes(normalized)) return normalized;
+  return "pptxgenjs";
+}
+
+function normalizeDesignSpec(payload, theme) {
+  const raw = payload?.design_spec;
+  if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+    return {
+      ...raw,
+      colors: raw.colors && typeof raw.colors === "object" ? raw.colors : {},
+      typography: raw.typography && typeof raw.typography === "object" ? raw.typography : {},
+      spacing: raw.spacing && typeof raw.spacing === "object" ? raw.spacing : {},
+      visual: raw.visual && typeof raw.visual === "object" ? raw.visual : {},
+    };
+  }
+  const styleRecipe = asText(theme?.style, "soft").toLowerCase();
+  return {
+    colors: {},
+    typography: {},
+    spacing: {},
+    visual: {
+      style_recipe: styleRecipe,
+      visual_priority: true,
+      visual_density: asText(payload?.visual_density, "balanced"),
+    },
+  };
 }
 
 function normalizeTheme(payload) {
@@ -77,6 +109,19 @@ function inferSlideType(raw, idx, total) {
 function inferLayoutGrid(raw, slideType) {
   const explicit = asText(raw?.layout_grid ?? raw?.layout, "");
   if (explicit) return explicit;
+  const typeHint = asText(slideType, "").toLowerCase();
+  if ([
+    "split_2",
+    "asymmetric_2",
+    "grid_2",
+    "grid_3",
+    "grid_4",
+    "bento_5",
+    "bento_6",
+    "timeline",
+  ].includes(typeHint)) {
+    return typeHint;
+  }
   if (slideType === "cover" || slideType === "summary") return "hero_1";
   return "split_2";
 }
@@ -114,6 +159,7 @@ function normalizeSlide(raw, idx, total, deckTemplateId = "auto", deckDesiredDen
     quality_profile: templateLock
       ? asText(source.quality_profile, profiles.quality_profile)
       : profiles.quality_profile,
+    render_path: normalizeRenderPath(source.render_path),
     blocks,
     bg_style: asText(source.bg_style, "light"),
     image_keywords: asArray(source.image_keywords).map((v) => asText(v)).filter(Boolean),
@@ -228,6 +274,7 @@ export function normalizeRenderInput(input) {
   const payload = input && typeof input === "object" ? { ...input } : {};
   const slides = asArray(payload.slides);
   const theme = normalizeTheme(payload);
+  const designSpec = normalizeDesignSpec(payload, theme);
   const requestedDeckTemplate = asText(payload.template_family ?? payload.template_id, "auto");
   const deckTemplateProfiles = getTemplateProfiles(requestedDeckTemplate);
   const normalizedSlides = slides.map((slide, idx) =>
@@ -252,6 +299,7 @@ export function normalizeRenderInput(input) {
     schema_profile: asText(payload.schema_profile, deckTemplateProfiles.schema_profile),
     contract_profile: asText(payload.contract_profile, deckTemplateProfiles.contract_profile),
     quality_profile: asText(payload.quality_profile, deckTemplateProfiles.quality_profile),
+    design_spec: designSpec,
     slides: normalizedSlides,
   };
 }
@@ -281,6 +329,22 @@ export function validateRenderInput(payload) {
   if (!asText(payload.schema_profile)) errors.push("schema_profile is required");
   if (!asText(payload.contract_profile)) errors.push("contract_profile is required");
   if (!asText(payload.quality_profile)) errors.push("quality_profile is required");
+  if (!payload.design_spec || typeof payload.design_spec !== "object" || Array.isArray(payload.design_spec)) {
+    errors.push("design_spec must be an object");
+  } else {
+    if (!payload.design_spec.colors || typeof payload.design_spec.colors !== "object") {
+      errors.push("design_spec.colors must be an object");
+    }
+    if (!payload.design_spec.typography || typeof payload.design_spec.typography !== "object") {
+      errors.push("design_spec.typography must be an object");
+    }
+    if (!payload.design_spec.spacing || typeof payload.design_spec.spacing !== "object") {
+      errors.push("design_spec.spacing must be an object");
+    }
+    if (!payload.design_spec.visual || typeof payload.design_spec.visual !== "object") {
+      errors.push("design_spec.visual must be an object");
+    }
+  }
 
   payload.slides.forEach((slide, idx) => {
     if (!slide || typeof slide !== "object") {
@@ -317,6 +381,10 @@ export function validateRenderInput(payload) {
     }
     if (!asText(slide.quality_profile)) {
       errors.push(`slides[${idx}].quality_profile is required`);
+    }
+    const renderPath = asText(slide.render_path, "pptxgenjs").toLowerCase();
+    if (!["pptxgenjs", "svg", "png_fallback"].includes(renderPath)) {
+      errors.push(`slides[${idx}].render_path must be pptxgenjs|svg|png_fallback`);
     }
     if (!hasRenderableContent(slide)) {
       errors.push(`slides[${idx}] must include blocks, elements, markdown, or imageUrl`);

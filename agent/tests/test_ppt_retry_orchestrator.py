@@ -1,4 +1,9 @@
-from src.ppt_retry_orchestrator import build_retry_hint, make_retry_decision, should_retry
+from src.ppt_retry_orchestrator import (
+    build_retry_hint,
+    compute_render_path_downgrade,
+    make_retry_decision,
+    should_retry,
+)
 
 
 def test_non_retryable_fails_fast():
@@ -27,3 +32,26 @@ def test_build_retry_hint_contains_scope():
     assert "scope=slide" in hint
     assert "s2" in hint
 
+
+def test_compute_render_path_downgrade_promotes_to_svg():
+    next_path = compute_render_path_downgrade(
+        current_render_path="pptxgenjs",
+        failure_code="schema_invalid",
+    )
+    assert next_path == "svg"
+
+
+def test_compute_render_path_downgrade_promotes_to_png_fallback():
+    next_path = compute_render_path_downgrade(
+        current_render_path="svg",
+        failure_code="schema_invalid",
+    )
+    assert next_path == "png_fallback"
+
+
+def test_compute_render_path_downgrade_ignores_non_render_failures():
+    next_path = compute_render_path_downgrade(
+        current_render_path="pptxgenjs",
+        failure_code="layout_homogeneous",
+    )
+    assert next_path is None

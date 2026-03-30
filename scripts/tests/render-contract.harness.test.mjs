@@ -29,6 +29,20 @@ const basePayload = normalizeRenderInput({
 }
 
 {
+  const payload = normalizeRenderInput({
+    title: "Layout Hint",
+    slides: [
+      {
+        page_number: 1,
+        slide_type: "grid_4",
+        blocks: [{ block_type: "body", card_id: "b1", content: "Signal 1" }],
+      },
+    ],
+  });
+  assert(payload.slides[0].layout_grid === "grid_4", "layout_grid should inherit from slide_type hint");
+}
+
+{
   const payload = JSON.parse(JSON.stringify(basePayload));
   payload.slides[0].contract_profile = "default";
   payload.slides[0].blocks = [

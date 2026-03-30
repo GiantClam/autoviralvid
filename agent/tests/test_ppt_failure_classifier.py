@@ -12,3 +12,8 @@ def test_auth_invalid_is_terminal():
     assert c.code == "auth_invalid"
     assert c.retryable is False
 
+
+def test_quality_score_low_is_retryable():
+    c = classify_failure("quality_score_low: weighted_score=66.0 < threshold=72.0")
+    assert c.code == "quality_score_low"
+    assert c.retryable is True

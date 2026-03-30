@@ -1,0 +1,174 @@
+{
+  "title": "工作总结PPT",
+  "author": "第一PPT市场部门",
+  
+  "slides": [
+    {
+      "slide_id": "cover-1",
+      "page_number": 1,
+      "slide_type": "cover",
+      
+      "markdown": "# 2O2X 工作总结PPT\n\nBUSINESS COMPANY WORK REPORT\n\n> 回顾成就，分析不足，规划未来\n\n---\n\n**汇报人**：第一PPT市场部门\n\n**部门**：DEPARTMENT SUMMARY",
+      
+      "script": [
+        {
+          "role": "host",
+          "text": "各位领导、同事，大家好。欢迎参加本次工作总结汇报，接下来我将从工作成就、不足分析和未来规划三个维度进行分享。"
+        }
+      ],
+      
+      "duration": 5,
+      "narration_audio_url": "",
+      
+      "actions": [
+        {"type": "highlight", "keyword": "工作总结", "startFrame": 30},
+        {"type": "appear_items", "items": ["2O2X", "工作总结PPT"], "startFrame": 20}
+      ],
+      
+      "template_id": "hero_tech_cover",
+      "template_family": "hero_dark",
+      "layout_grid": "hero_1",
+      
+      "design_spec": {
+        "colors": {
+          "primary": "C41E3A",
+          "secondary": "8B0000",
+          "accent": "FFFFFF",
+          "background": "DC143C"
+        },
+        "typography": {},
+        "spacing": {},
+        "visual": {
+          "style_recipe": "sharp",
+          "visual_priority": true,
+          "visual_density": "sparse"
+        }
+      },
+      
+      "content": {
+        "title": "2O2X 工作总结PPT",
+        "subtitle": "BUSINESS COMPANY WORK REPORT",
+        "body_items": [
+          "回顾成就，分析不足，规划未来"
+        ],
+        "footer": "第一PPT商务办公系列PPT模板",
+        "presenter": "汇报人：第一PPT市场部门",
+        "department": "DEPARTMENT SUMMARY"
+      },
+      
+      "elements": [
+        {
+          "id": "cover-year",
+          "block_id": "cover-year",
+          "type": "text",
+          "top": 1.77,
+          "left": 1.14,
+          "width": 5.52,
+          "height": 2.42,
+          "content": "2O2X",
+          "style": {
+            "fontSize": 72,
+            "fontWeight": "bold",
+            "color": "FFFFFF"
+          }
+        },
+        {
+          "id": "cover-title",
+          "block_id": "cover-title",
+          "type": "text",
+          "top": 3.06,
+          "left": 1.12,
+          "width": 6.84,
+          "height": 1.38,
+          "content": "工作总结PPT",
+          "style": {
+            "fontSize": 48,
+            "fontWeight": "bold",
+            "color": "FFFFFF"
+          }
+        },
+        {
+          "id": "cover-subtitle-en",
+          "block_id": "cover-subtitle-en",
+          "type": "text",
+          "top": 4.4,
+          "left": 1.15,
+          "width": 6.68,
+          "height": 0.43,
+          "content": "BUSINESS COMPANY WORK REPORT",
+          "style": {
+            "fontSize": 14,
+            "color": "FFFFFF"
+          }
+        },
+        {
+          "id": "cover-desc",
+          "block_id": "cover-desc",
+          "type": "text",
+          "top": 4.84,
+          "left": 1.14,
+          "width": 6.81,
+          "height": 0.56,
+          "content": "your content is entered here",
+          "style": {
+            "fontSize": 12,
+            "color": "FFFFFF"
+          }
+        },
+        {
+          "id": "cover-presenter",
+          "block_id": "cover-presenter",
+          "type": "text",
+          "top": 5.55,
+          "left": 1.12,
+          "width": 3.16,
+          "height": 0.37,
+          "content": "汇报人：第一PPT市场部门",
+          "style": {
+            "fontSize": 12,
+            "color": "FFFFFF"
+          }
+        },
+        {
+          "id": "cover-department",
+          "block_id": "cover-department",
+          "type": "text",
+          "top": 6.23,
+          "left": 8.74,
+          "width": 3.71,
+          "height": 0.4,
+          "content": "DEPARTMENT SUMMARY",
+          "style": {
+            "fontSize": 12,
+            "color": "FFFFFF"
+          }
+        },
+        {
+          "id": "cover-footer",
+          "block_id": "cover-footer",
+          "type": "text",
+          "top": 6.92,
+          "left": 1.24,
+          "width": 3.67,
+          "height": 0.3,
+          "content": "第一PPT商务办公系列PPT模板",
+          "style": {
+            "fontSize": 10,
+            "color": "FFFFFF"
+          }
+        },
+        {
+          "id": "cover-image",
+          "block_id": "cover-image",
+          "type": "image",
+          "top": 0.0,
+          "left": 8.4,
+          "width": 4.38,
+          "height": 5.74,
+          "content": "商业高楼建筑图片",
+          "keywords": ["business", "building", "skyscraper", "corporate", "现代建筑", "城市天际线"]
+        }
+      ]
+    }
+  ]
+}
