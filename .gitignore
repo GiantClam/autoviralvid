@@ -82,9 +82,14 @@ test_reports/
 
 # local agent/workflow tooling
 .agent/
+.omx/
 .claude/
 .opencode/
 task_plan.md
 findings.md
 progress.md
 nul
+
+output/
+test_outputs/
+test_inputs/
