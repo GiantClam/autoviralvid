@@ -153,4 +153,38 @@ for (const templateFamily of [
   assertNoMojibake(slide.texts);
 }
 
+{
+  const slide = makeFakeSlide();
+  const ok = renderTemplateContent({
+    templateFamily: "comparison_cards_light",
+    slide,
+    title: "方案对比",
+    bullets: ["人工交接多", "响应链路长", "自动编排", "上线更快"],
+    pageNumber: 3,
+    theme,
+    style: "soft",
+    helpers,
+    sourceSlide: {
+      title: "传统方案 vs 智能代理方案",
+      blocks: [
+        {
+          block_type: "comparison",
+          content: {
+            left_title: "传统方案",
+            left_items: ["人工交接多", "响应链路长"],
+            right_title: "智能代理方案",
+            right_items: ["自动编排", "上线更快"],
+            summary: "效率提升 80%",
+          },
+        },
+      ],
+    },
+  });
+  assert(ok, "comparison structured renderer should return true");
+  const joined = slide.texts.map((item) => item.text).join(" | ");
+  assert(joined.includes("传统方案"), "comparison renderer should include left title");
+  assert(joined.includes("智能代理方案"), "comparison renderer should include right title");
+  assert(joined.includes("效率提升 80%"), "comparison renderer should include synthesis summary");
+}
+
 console.log("template-renderers harness passed");

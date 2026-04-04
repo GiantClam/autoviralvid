@@ -426,6 +426,45 @@ function mergePlainObjects(base, patch) {
   return target;
 }
 
+const VISUAL_IDENTITY_LOCK_KEYS = [
+  "template_family",
+  "template_id",
+  "style_variant",
+  "palette_key",
+  "skill_profile",
+  "hardness_profile",
+  "schema_profile",
+  "contract_profile",
+  "quality_profile",
+];
+
+function sanitizeSubagentPatch(moduleRow, patch) {
+  const safePatch = patch && typeof patch === "object" && !Array.isArray(patch)
+    ? { ...patch }
+    : {};
+  if (!Object.keys(safePatch).length) return safePatch;
+
+  const slideData = moduleRow?.slide_data && typeof moduleRow.slide_data === "object"
+    ? moduleRow.slide_data
+    : {};
+  const templateLocked = Boolean(slideData?.template_lock);
+  if (!templateLocked) return safePatch;
+
+  for (const key of VISUAL_IDENTITY_LOCK_KEYS) {
+    if (!(key in safePatch)) continue;
+    const incoming = normalizeText(safePatch[key], "");
+    const existing = normalizeText(slideData[key] ?? moduleRow?.[key], "");
+    if (!incoming) {
+      delete safePatch[key];
+      continue;
+    }
+    if (existing && incoming.toLowerCase() !== existing.toLowerCase()) {
+      delete safePatch[key];
+    }
+  }
+  return safePatch;
+}
+
 function applyRenderedSlidesToModules(manifestObj, slideResults = [], baseSlides = []) {
   const modules = asArray(manifestObj?.modules);
   if (!modules.length) {
@@ -511,33 +550,142 @@ function countNonVisualTextBlocks(slide) {
   }).length;
 }
 
+function textKey(value) {
+  return normalizeText(value, "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .replace(/[^0-9a-z\u4e00-\u9fff%+.# -]/g, "")
+    .trim();
+}
+
+function splitText(value, max = 6) {
+  const chunks = String(value || "")
+    .split(/[;；,\n，。.!?]+/)
+    .map((item) => normalizeText(item, ""))
+    .filter(Boolean);
+  return chunks.slice(0, max);
+}
+
+function blockText(block) {
+  if (!block || typeof block !== "object") return "";
+  const content = block.content;
+  if (typeof content === "string") return normalizeText(content, "");
+  if (content && typeof content === "object") {
+    const parts = [];
+    for (const key of ["title", "body", "text", "label", "caption", "description"]) {
+      const text = normalizeText(content[key], "");
+      if (text) parts.push(text);
+    }
+    if (parts.length) return parts.join(" ");
+  }
+  const data = block.data;
+  if (data && typeof data === "object") {
+    for (const key of ["title", "label", "description"]) {
+      const text = normalizeText(data[key], "");
+      if (text) return text;
+    }
+  }
+  return "";
+}
+
+function collectSlideTextCandidates(slide, max = 12) {
+  const out = [];
+  const seen = new Set();
+  const push = (value) => {
+    const text = normalizeText(value, "");
+    if (!text) return;
+    const key = textKey(text);
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    out.push(text);
+  };
+
+  push(slide?.title);
+  push(slide?.narration);
+  push(slide?.speaker_notes);
+  for (const block of ensureBlocksArray(slide)) {
+    push(blockText(block));
+    for (const piece of splitText(blockText(block), 4)) push(piece);
+    if (out.length >= max) break;
+  }
+  return out.slice(0, max);
+}
+
+function pickDerivedText(slide, { index = 0, existing = [] } = {}) {
+  const candidates = collectSlideTextCandidates(slide, 12);
+  const blocked = new Set(asArray(existing).map((item) => textKey(item)).filter(Boolean));
+  for (let offset = 0; offset < candidates.length; offset += 1) {
+    const candidate = candidates[(Number(index) + offset) % candidates.length];
+    const key = textKey(candidate);
+    if (candidate && key && !blocked.has(key)) return candidate;
+  }
+  const base = normalizeText(slide?.title, "") || normalizeText(slide?.slide_id, "") || "slide";
+  let seq = Math.max(1, Number(index) + 1);
+  let fallback = `${base} #${seq}`;
+  while (blocked.has(textKey(fallback))) {
+    seq += 1;
+    fallback = `${base} #${seq}`;
+  }
+  return fallback;
+}
+
+function extractNumericValues(slide) {
+  const bag = collectSlideTextCandidates(slide, 24).join(" ");
+  const matches = bag.match(/-?\d+(?:\.\d+)?/g) || [];
+  return matches
+    .map((raw) => Number(raw))
+    .filter((num) => Number.isFinite(num));
+}
+
+function buildChartDataFromSlide(slide) {
+  const labels = collectSlideTextCandidates(slide, 6)
+    .map((item) => String(item || "").slice(0, 14))
+    .filter(Boolean);
+  while (labels.length < 3) {
+    labels.push(`item ${labels.length + 1}`);
+  }
+  const numbers = extractNumericValues(slide)
+    .filter((num) => Math.abs(num) > 0.000001)
+    .slice(0, labels.length);
+  while (numbers.length < labels.length) {
+    numbers.push(numbers.length + 1);
+  }
+  const datasetLabel = normalizeText(slide?.title, "") || normalizeText(slide?.slide_id, "") || "metric";
+  return {
+    labels: labels.slice(0, 4),
+    datasets: [{ label: datasetLabel, data: numbers.slice(0, 4) }],
+  };
+}
+
 function fallbackBodyText(slide, suffix = 1) {
-  const title = normalizeText(slide?.title, "Content");
-  return `${title}: key point ${suffix}`;
+  return pickDerivedText(slide, { index: Math.max(0, Number(suffix) - 1) });
 }
 
 function pushBodyBlock(slide, suffix = 1) {
   const blocks = ensureBlocksArray(slide);
+  const existing = blocks.map((block) => blockText(block));
+  const content = pickDerivedText(slide, { index: Math.max(0, Number(suffix) - 1), existing });
+  const emphasis = [String(content).split(/[;；,\n，。.!?]+/)[0]].filter(Boolean);
   blocks.push({
     block_type: "body",
     card_id: `contract_text_fix_${suffix}`,
     position: "left",
-    content: fallbackBodyText(slide, suffix),
-    emphasis: [String(suffix)],
+    content,
+    emphasis,
   });
 }
 
 function pushChartBlock(slide, suffix = 1) {
   const blocks = ensureBlocksArray(slide);
+  const chartData = buildChartDataFromSlide(slide);
+  const firstNumber = asArray(chartData?.datasets?.[0]?.data)[0];
   blocks.push({
     block_type: "chart",
     card_id: `contract_chart_fix_${suffix}`,
     position: "right",
-    content: {
-      labels: ["A", "B", "C"],
-      datasets: [{ label: "Metric", data: [58, 69, 80] }],
-    },
-    emphasis: ["58"],
+    content: chartData,
+    data: chartData,
+    emphasis: [String(firstNumber ?? "")].filter(Boolean),
   });
 }
 
@@ -548,7 +696,10 @@ function addEmphasisSignal(slide) {
     if (!bt || bt === "title") continue;
     const current = asArray(block?.emphasis).map((item) => normalizeText(item, "")).filter(Boolean);
     if (current.length > 0) return;
-    block.emphasis = ["focus 1"];
+    const text = blockText(block);
+    const numeric = String(text || "").match(/-?\d+(?:\.\d+)?%?/);
+    const firstChunk = normalizeText(String(text || "").split(/[;；,\n，。.!?]+/)[0], "");
+    block.emphasis = [numeric?.[0] || firstChunk || pickDerivedText(slide, { index: 0 })].filter(Boolean);
     return;
   }
 }
@@ -964,7 +1115,7 @@ export async function renderSlideModulesInParallel({
         : (executed?.slide_data_patch && typeof executed.slide_data_patch === "object"
           ? executed.slide_data_patch
           : {});
-      const safePatch = { ...patch };
+      const safePatch = sanitizeSubagentPatch(moduleRow, patch);
       const currentTitle = normalizeText(moduleRow?.slide_data?.title, "");
       const patchedTitle = normalizeText(safePatch?.title, "");
       if (patchedTitle && isGenericSlideTitle(patchedTitle) && currentTitle && !isGenericSlideTitle(currentTitle)) {

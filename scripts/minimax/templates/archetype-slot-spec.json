@@ -1,0 +1,57 @@
+{
+  "default": {
+    "text_slots": 2,
+    "min_text_blocks": 1,
+    "max_text_blocks": 4,
+    "char_capacity_per_slot": 90
+  },
+  "cover_hero": {
+    "text_slots": 1,
+    "min_text_blocks": 1,
+    "max_text_blocks": 2,
+    "char_capacity_per_slot": 80
+  },
+  "toc_compact": {
+    "text_slots": 2,
+    "min_text_blocks": 2,
+    "max_text_blocks": 6,
+    "char_capacity_per_slot": 85
+  },
+  "thesis_assertion": {
+    "text_slots": 2,
+    "min_text_blocks": 1,
+    "max_text_blocks": 3,
+    "char_capacity_per_slot": 100
+  },
+  "evidence_cards_3": {
+    "text_slots": 3,
+    "min_text_blocks": 2,
+    "max_text_blocks": 5,
+    "char_capacity_per_slot": 95
+  },
+  "comparison_2col": {
+    "text_slots": 2,
+    "min_text_blocks": 2,
+    "max_text_blocks": 4,
+    "char_capacity_per_slot": 95
+  },
+  "timeline_horizontal": {
+    "text_slots": 3,
+    "min_text_blocks": 2,
+    "max_text_blocks": 6,
+    "char_capacity_per_slot": 80
+  },
+  "dashboard_kpi_4": {
+    "text_slots": 4,
+    "min_text_blocks": 2,
+    "max_text_blocks": 6,
+    "char_capacity_per_slot": 70
+  },
+  "summary_action": {
+    "text_slots": 2,
+    "min_text_blocks": 1,
+    "max_text_blocks": 4,
+    "char_capacity_per_slot": 95
+  }
+}
+

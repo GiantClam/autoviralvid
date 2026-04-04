@@ -32,6 +32,22 @@ def test_slide_and_block_ids_are_stable_defaults():
     assert slide.elements[0].block_id == slide.elements[0].id
 
 
+def test_slide_content_preserves_extra_render_contract_fields():
+    slide = SlideContent(
+        title="Legislation process",
+        narration="classroom",
+        slide_type="content",
+        layout_grid="split_2",
+        template_family="split_media_dark",
+        blocks=[{"block_type": "title", "content": "Legislation process"}],
+    )
+    dumped = slide.model_dump()
+    assert dumped.get("slide_type") == "content"
+    assert dumped.get("layout_grid") == "split_2"
+    assert dumped.get("template_family") == "split_media_dark"
+    assert isinstance(dumped.get("blocks"), list)
+
+
 def test_export_request_template_file_url_validation():
     req = ExportRequest(slides=[], title="t", author="a", template_file_url="https://example.com/template.pptx")
     assert req.template_file_url == "https://example.com/template.pptx"
@@ -44,11 +60,17 @@ def test_minimax_payload_contains_theme_contract():
         author="bot",
         style_variant="soft",
         palette_key="slate_minimal",
+        theme_recipe="consulting_clean",
+        tone="light",
     )
     assert payload["theme"]["style"] == "soft"
     assert payload["theme"]["palette"] == "slate_minimal"
+    assert payload["theme"]["theme_recipe"] == "consulting_clean"
+    assert payload["theme"]["tone"] == "light"
     assert payload["minimax_style_variant"] == "soft"
     assert payload["minimax_palette_key"] == "slate_minimal"
+    assert payload["theme_recipe"] == "consulting_clean"
+    assert payload["tone"] == "light"
     assert payload["template_id"]
     assert payload["skill_profile"]
     assert payload["schema_profile"]

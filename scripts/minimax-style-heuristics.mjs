@@ -3,7 +3,7 @@
  * Keep this module deterministic so it can be tested via harness.
  */
 
-import { getTemplateCatalog } from "./minimax/templates/template-catalog.mjs";
+import { canonicalizePaletteKey as canonicalizePaletteFromCatalog, getTemplateCatalog } from "./minimax/templates/template-catalog.mjs";
 
 export function normalizeKey(value) {
   return String(value || "")
@@ -111,7 +111,9 @@ export function selectStyle(styleInput, styleHint, topicText, preserveOriginal =
 
 export function selectPalette(paletteInput, topicText, preserveOriginal = false) {
   const normalized = normalizeKey(paletteInput);
-  if (normalized && normalized !== "auto") return normalized;
+  if (normalized && normalized !== "auto") {
+    return canonicalizePaletteFromCatalog(normalized, topicText);
+  }
   if (preserveOriginal) return "business_authority";
 
   const catalog = getTemplateCatalog();
@@ -123,7 +125,7 @@ export function selectPalette(paletteInput, topicText, preserveOriginal = false)
     if (!pattern || !palette) continue;
     try {
       if (new RegExp(String(pattern), "i").test(topic)) {
-        return String(palette);
+        return canonicalizePaletteFromCatalog(String(palette), topic);
       }
     } catch {
       // ignore invalid custom regex and continue fallback matching
@@ -136,5 +138,5 @@ export function selectPalette(paletteInput, topicText, preserveOriginal = false)
   if (/(eco|forest|\u73af\u5883|esg)/.test(topic)) return "forest_eco";
   if (/(luxury|\u9ad8\u7aef|premium)/.test(topic)) return "platinum_white_gold";
   if (/(ai|cloud|tech|\u79d1\u6280)/.test(topic)) return "pure_tech_blue";
-  return "luxury_mysterious";
+  return canonicalizePaletteFromCatalog("business_authority", topic);
 }

@@ -1,0 +1,49 @@
+{
+  "version": "v2",
+  "archetypes": [
+    "cover_hero",
+    "toc_compact",
+    "section_divider",
+    "thesis_assertion",
+    "evidence_cards_3",
+    "comparison_2col",
+    "process_flow_4step",
+    "timeline_horizontal",
+    "matrix_2x2",
+    "dashboard_kpi_4",
+    "chart_single_focus",
+    "chart_dual_compare",
+    "media_showcase_1p2s",
+    "quote_hero",
+    "risk_mitigation",
+    "summary_action"
+  ],
+  "role_defaults": {
+    "cover": "cover_hero",
+    "toc": "toc_compact",
+    "divider": "section_divider",
+    "summary": "summary_action",
+    "content": "thesis_assertion"
+  },
+  "layout_overrides": {
+    "hero_1": "cover_hero",
+    "split_2": "comparison_2col",
+    "asymmetric_2": "comparison_2col",
+    "grid_3": "evidence_cards_3",
+    "grid_4": "dashboard_kpi_4",
+    "bento_5": "media_showcase_1p2s",
+    "bento_6": "dashboard_kpi_4",
+    "timeline": "timeline_horizontal",
+    "matrix_2x2": "matrix_2x2"
+  },
+  "semantic_overrides": {
+    "workflow": "process_flow_4step",
+    "diagram": "process_flow_4step",
+    "roadmap": "timeline_horizontal",
+    "data_visualization": "chart_single_focus",
+    "comparison": "chart_dual_compare",
+    "showcase": "media_showcase_1p2s",
+    "quote": "quote_hero",
+    "risk": "risk_mitigation"
+  }
+}

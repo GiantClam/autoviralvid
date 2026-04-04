@@ -2,8 +2,8 @@
 
 > Use this plan to execute the work task-by-task with tight verification after each step.
 
-**Goal:** 鍦ㄧ幇鏈?MiniMax PPT 鐢熸垚閾捐矾涓紩鍏?ppt-master 椋庢牸鐨?`design_spec + 鍙岃建娓叉煋 + 鍒嗙骇闄嶇骇`锛屽苟淇濊瘉姣忛樁娈靛彲娴嬭瘯銆佸彲鍥炲綊銆?
-**Architecture:** 淇濇寔 Python 缂栨帓 + Node 娓叉煋涓诲共涓嶅彉锛屽湪 Python 渚ф柊澧?`design_spec` 涓?`render_path` 鍐崇瓥锛屽湪 Node 渚ф柊澧?`SVG -> PptxGenJS(Custom Geometry)` 娓叉煋鍣紝骞跺湪閲嶈瘯缂栨帓灞傝ˉ榻愯法璺緞闄嶇骇銆傛瘡涓樁娈甸兘浠ユ祴璇曞厛琛岋紝鍏堣ˉ澶辫触娴嬭瘯锛屽啀瀹炵幇鏈€灏忔敼鍔ㄤ娇鍏堕€氳繃銆?
+**Goal:** 在现有 MiniMax PPT 生成链路中引入 ppt-master 风格的 `design_spec + 双轨渲染 + 分级降级`，并保证每阶段可测试、可回归。
+**Architecture:** 保持 Python 编排 + Node 渲染主干不变，在 Python 侧新增 `design_spec` 与 `render_path` 决策，在 Node 侧新增 `SVG -> PptxGenJS(Custom Geometry)` 渲染器，并在重试编排层补齐跨路径降级。每个阶段都以测试先行，先补失败测试，再实现最小改动使其通过。
 **Tech Stack:** Python(FastAPI/pytest), Node.js(PptxGenJS/node:test), template-catalog contract
 
 ---
@@ -39,7 +39,10 @@ Expected: FAIL with missing `design_spec` / `render_path`.
 
 **Step 3: Write minimal implementation**
 
-- 鏂板 `build_design_spec(...)` 涓?`choose_render_path(...)`锛屽皢鑹插僵/瀛椾綋/闂磋窛/瑙嗚閰嶇疆缁撴瀯鍖栥€?- `_apply_visual_orchestration()` 鍐欏叆 deck 绾?`design_spec`锛屽苟缁欐瘡椤垫墦 `render_path`銆?- `build_payload()` 閫忎紶 `design_spec` 涓庢瘡椤?`render_path`銆?- `normalizeRenderInput()` 淇濈暀骞惰鑼冨寲 `design_spec` 涓?`render_path`銆?
+- 新增 `build_design_spec(...)` 与 `choose_render_path(...)`，将色彩/字体/间距/视觉配置结构化。
+- `_apply_visual_orchestration()` 写入 deck 级 `design_spec`，并给每页打 `render_path`。
+- `build_payload()` 透传 `design_spec` 与每页 `render_path`。
+- `normalizeRenderInput()` 保留并规范化 `design_spec` 与 `render_path`。
 **Step 4: Run tests to verify pass**
 
 Run: `cd agent && uv run pytest tests/test_exporter_official_mode.py tests/test_ppt_contract.py -k "design_spec or render_path" -q`
@@ -83,7 +86,10 @@ Expected: FAIL with missing module or assertions.
 
 **Step 3: Write minimal implementation**
 
-- 瀹炵幇 SVG 瀛愰泦瑙ｆ瀽锛歚rect/circle/ellipse/line/text/path`銆?- `path` 杞崲涓?`pptx.shapes.CUSTOM_GEOMETRY + points`锛堟渶灏忔敮鎸?`M/L/C/Q/Z`锛夈€?- 鐢熸垚鍣ㄥ湪 `render_path=svg` 鏃朵紭鍏堣皟鐢ㄦ柊娓叉煋鍣紱澶辫触鏃堕€€鍥炴棫鐨?SVG image overlay銆?- 灏嗘瘡椤垫覆鏌撳厓鏁版嵁鍐欏叆 `render_output`锛堜緥濡?`svg_render_mode`锛夈€?
+- 实现 SVG 子集解析：`rect/circle/ellipse/line/text/path`。
+- `path` 转换为 `pptx.shapes.CUSTOM_GEOMETRY + points`（最小支持 `M/L/C/Q/Z`）。
+- 生成器在 `render_path=svg` 时优先调用新渲染器；失败时回退到旧的 SVG image overlay。
+- 将每页渲染元数据写入 `render_output`（例如 `svg_render_mode`）。
 **Step 4: Run tests to verify pass**
 
 Run: `node --test scripts/tests/svg-slide-renderer.harness.test.mjs scripts/tests/generate-pptx-minimax.harness.test.mjs`
@@ -121,7 +127,9 @@ Expected: FAIL due to missing downgrade behavior.
 
 **Step 3: Write minimal implementation**
 
-- 鍦?orchestrator 涓柊澧?`compute_render_path_downgrade(...)`銆?- 鍦?`ppt_service` 閲嶈瘯鍒嗘敮閲屾牴鎹け璐ョ爜鏇存柊鐩爣 slide 鐨?`render_path` / `svg_fallback_png`銆?- 璁板綍璇婃柇瀛楁锛屼究浜庡悗缁娴嬨€?
+- 在 orchestrator 中新增 `compute_render_path_downgrade(...)`。
+- 在 `ppt_service` 重试分支里根据失败码更新目标 slide 的 `render_path` / `svg_fallback_png`。
+- 记录诊断字段，便于后续观测。
 **Step 4: Run tests to verify pass**
 
 Run: `cd agent && uv run pytest tests/test_ppt_retry_orchestrator.py tests/test_ppt_export_retry_flow.py -k "degrade or render_path" -q`
@@ -140,7 +148,7 @@ git commit -m "feat(ppt): add staged render-path downgrade for retry loop"
 
 **Files:**
 - Modify: `docs/plans/2026-03-29-ppt-master-phased-refactor.md`
-- Optional: `docs/runbooks/*`锛堜粎褰撳彂鐜板繀瑕佽繍缁磋鏄庣己鍙ｏ級
+- Optional: `docs/runbooks/*`（仅当发现必要运维说明缺口）
 
 **Step 1: Run full targeted suites**
 
@@ -153,10 +161,10 @@ Expected: PASS with no regression in modified areas.
 **Step 2: Smoke export**
 
 Run: `node scripts/generate-pptx-minimax.mjs --input <fixture.json> --output <tmp.pptx> --render-output <tmp.render.json>`
-Expected: 鎴愬姛浜у嚭 `pptx` 涓?`render_output` 甯?`design_spec/render_path/svg_render_mode`銆?
+Expected: 成功产出 `pptx` 与 `render_output`，且包含 `design_spec/render_path/svg_render_mode`。
 **Step 3: Capture acceptance notes**
 
-- 璁板綍姣忛樁娈垫祴璇曠粨鏋溿€佸け璐ヤ慨澶嶇偣銆佸凡鐭ラ檺鍒讹紙渚嬪 SVG path 楂樼骇鍛戒护瑕嗙洊鑼冨洿锛夈€?
+- 记录每阶段测试结果、失败修复点、已知限制（例如 SVG path 高级命令覆盖范围）。
 **Step 4: Commit**
 
 ```bash
@@ -198,7 +206,9 @@ Expected: FAIL because `A/S/T` were not mapped to curve geometry.
 
 **Step 3: Write minimal implementation**
 
-- 鎵╁睍 path tokenizer 鏀寔 `A/S/T`锛堝苟琛ラ綈 `H/V`锛夈€?- 瀹炵幇 SVG Arc endpoint-parameterization 鍒?cubic Bezier 娈佃繎浼艰浆鎹€?- 瀹炵幇骞虫粦鏇茬嚎 `S/T` 鐨勬帶鍒剁偣鍙嶅皠閫昏緫骞跺啓鍏?`points`銆?
+- 扩展 path tokenizer 支持 `A/S/T`（并补齐 `H/V`）。
+- 实现 SVG Arc endpoint-parameterization 到 cubic Bezier 段的近似转换。
+- 实现平滑曲线 `S/T` 的控制点反射逻辑并写入 `points`。
 **Step 4: Run tests to verify pass**
 
 Run:
@@ -224,9 +234,10 @@ Expected: PASS.
 
 - `Phase 3` status: completed
 - `Phase 3` implementation:
-  - 鏂板 `compute_render_path_downgrade(...)`锛屾寜 `pptxgenjs -> svg -> png_fallback` 鍒嗙骇闄嶇骇
-  - 鍦?`ppt_service` 閲嶈瘯鍒嗘敮鎸夊け璐ョ爜瀵圭洰鏍?slide 鏇存柊 `render_path/svg_fallback_png`
-  - 灏嗛檷绾ц涓哄啓鍏?`diagnostics`锛坄render_path_downgrade`锛?- `Phase 3` verification:
+  - 新增 `compute_render_path_downgrade(...)`，按 `pptxgenjs -> svg -> png_fallback` 分级降级
+  - 在 `ppt_service` 重试分支按失败码对目标 slide 更新 `render_path/svg_fallback_png`。
+  - 将降级行为写入 `diagnostics`（`render_path_downgrade`）。
+  - `Phase 3` verification:
   - `cd agent && uv run pytest tests/test_ppt_retry_orchestrator.py tests/test_ppt_export_retry_flow.py -k "degrade or render_path" -q`
   - result: `4 passed`
 
@@ -242,15 +253,15 @@ Expected: PASS.
 
 - `Phase 5` status: completed
 - `Phase 5` implementation:
-  - `svg-slide-renderer` 鏂板 `A/a` 寮х嚎鍛戒护鍒?cubic Bezier 杩戜技杞崲
-  - 鏂板 `S/s` 涓?`T/t` 骞虫粦鏇茬嚎鎺у埗鐐瑰弽灏勯€昏緫
-  - tokenizer 鎵╁睍鑷?`M/L/H/V/C/S/Q/T/A/Z` 瀛愰泦
+  - `svg-slide-renderer` 新增 `A/a` 弧线命令到 cubic Bezier 的近似转换。
+  - 新增 `S/s` 与 `T/t` 平滑曲线控制点反射逻辑。
+  - tokenizer 扩展支持 `M/L/H/V/C/S/Q/T/A/Z` 子集。
 - `Phase 5` verification:
   - `node --test scripts/tests/svg-slide-renderer.harness.test.mjs` -> `5 passed`
   - `node --test scripts/tests/svg-slide-renderer.harness.test.mjs scripts/tests/generate-pptx-minimax.harness.test.mjs scripts/tests/generate-pptx-minimax-svg-route.harness.test.mjs` -> `7 passed`
 
 - known limitations:
-  - 褰撳墠 `svg path` 宸叉敮鎸?`M/L/H/V/C/S/Q/T/A/Z`锛屼絾浠嶆槸宸ョ▼杩戜技瀹炵幇锛涙瀬绔姬绾垮弬鏁板満鏅渶缁х画鍋氳瑙夊洖褰掓娊妫€銆?
+  - 当前 `svg path` 已支持 `M/L/H/V/C/S/Q/T/A/Z`，但仍是工程近似实现；极端弧线参数场景需继续做视觉回归抽检。
 - `Phase 6` status: completed
 - `Phase 6` scope: local template renderer extension for bento-family templates and render metadata disambiguation
 - `Phase 6` implementation:
@@ -768,7 +779,7 @@ Expected: PASS.
   - `scripts/minimax/icon-factory.mjs`
     - added Chinese keyword contains-mapping table for high-frequency business/ppt terms.
     - added Chinese semantic fallback in `resolvePptMasterByKeyword(...)` after exact token lookup.
-    - priority tuned so `鐩爣/鎸囨爣` semantics resolve before `璺緞/娴佺▼`.
+    - priority tuned so `目标/指标` semantics resolve before `路径/流程`.
   - tests:
     - `scripts/tests/icon-factory.harness.test.mjs`
       - added `icon factory resolves chinese semantic keywords to ppt-master icons`.
@@ -967,3 +978,268 @@ Expected: PASS.
   - `node --test scripts/tests/slide-module-orchestrator.harness.test.mjs scripts/tests/orchestrate-pptx-modules.harness.test.mjs`
   - result: `10 passed`
 
+---
+
+---
+
+## 分阶段闭环交付计划（2026-03-31 增补，重构版）
+
+目标：基于“官方 + 社区”最佳实践，把当前新增方案升级为**评测驱动（EDD）+ 渐进发布 + 可回滚**的最优执行闭环。
+
+适用范围：本节仅覆盖新增分阶段方案，不改动前文已完成历史记录。
+
+---
+
+## 0. 总体原则（重构后）
+
+- 评测先行：每次改动必须先定义可量化评测，再允许代码变更。
+- 双集防过拟合：开发集（dev set）用于迭代；保留集（holdout）仅用于阶段验收。
+- 单变量优化：同一轮只改一个主变量，避免“多改动导致归因失败”。
+- 硬门禁优先：图片、主题、页数、PSNR 走 hard gate；其余指标走 soft gate。
+- 渐进发布：按 canary 比例放量（10% -> 25% -> 50% -> 100%），每级可回滚。
+- 开关治理：所有新能力必须挂 feature flag，包含 owner 与过期时间（TTL）。
+- 错误预算：连续超出失败阈值立即冻结发布，先修复再继续迭代。
+
+---
+
+## 1. 通用验收契约（所有阶段统一）
+
+### 1.1 必交付产物
+
+- 代码变更（仅限本阶段范围）
+- 测试证据（命令 + 通过数 + 失败数）
+- 真实样例：`output/regression/generated.<phase>.pptx`
+- 对比报告：`output/regression/issues.<phase>.json`
+- 变更记录：`output/regression/fix_record.json`
+- 阶段结论：`go/no-go` + 回滚命令
+
+### 1.2 统一评分协议（强约束）
+
+- 主分：`score = min(structural_score, psnr_score)`
+- Hard fail 条件（任一命中即失败）：
+  - 图片覆盖率低于阈值
+  - 主题一致性低于阈值
+  - 页数不一致（22/20 等）
+  - PSNR 低于阈值
+- Soft fail 条件：布局节奏、图表语义、文案覆盖不足等
+- 失败必须输出可定位字段：`slide_id`、`issue_code`、`retry_scope`、`retry_target_ids`
+
+### 1.3 数据集与防过拟合
+
+- `dev_set`：用于日常调参与快速迭代
+- `holdout_set`：阶段验收专用，不参与日常调参
+- `challenge_set`：极端案例（图形复杂、媒体密集、多语种）
+- 规则：连续 3 轮只涨 dev 不涨 holdout，判定为过拟合并触发策略重置
+
+### 1.4 发布门禁与冻结策略
+
+- 门禁通过条件：
+  - 单测/集成测试全绿
+  - holdout_set 达到阶段目标
+  - 无新增高严重告警
+- 冻结触发条件：
+  - 连续 2 轮 hard fail
+  - canary 错误率超过阈值
+  - 关键指标回退超过阈值（如 score 回退 > 5 分）
+
+---
+
+## 2. 分阶段执行（自闭环、可测试、可发布）
+
+### Phase 0 - 基线冻结（0.5 天）
+
+目标：建立可信对照组。
+
+实施：
+- 固化 `pipeline-only` / `reconstruct` / `source-replay` 三条基线
+- 固化三套数据集（dev/holdout/challenge）
+- 固化当前 hard/soft gate 阈值
+
+验收：
+- 基线报告可复现（同输入、同版本、同结果）
+- 评分与问题桶统计入库
+
+---
+
+### Phase 1 - 输入保真与合同加固（1-2 天）
+
+目标：消除 extraction -> planning -> render 的信息损失。
+
+主改文件：
+- `scripts/extract_to_minimax_json.py`
+- `scripts/generate_ppt_from_desc.py`
+- `agent/src/ppt_service.py`
+
+关键动作：
+- 去除硬编码文案兜底，统一改为“输入派生兜底”
+- 强制透传 `required_facts/anchors/theme/media_manifest`
+- 新增 payload 完整性校验（缺字段直接 fail-fast）
+
+验收：
+- 合同字段完整率 100%
+- 关键锚点命中率达到阈值
+
+---
+
+### Phase 2 - 设计合同 V2 与 Archetype 编排（2 天）
+
+目标：建立稳定视觉语法，减少“每页临场发挥”。
+
+主改文件：
+- `agent/src/ppt_service.py`
+- `scripts/minimax/render-contract.mjs`
+- `scripts/minimax/templates/archetype-catalog.json`
+
+关键动作：
+- 引入 `PresentationDesignContractV2`（deck token + slide spec）
+- 建立“页面角色 -> archetype”映射（cover/toc/section/content/summary）
+- 增加模板能力约束校验，避免误用 fallback
+
+验收：
+- 20 页样例 archetype 覆盖 >= 6
+- 模板能力冲突全部可诊断（非静默）
+
+---
+
+### Phase 3 - Skill 治理与单写者策略（1-2 天）
+
+目标：解决多 skill 相互覆盖与风格漂移。
+
+主改文件：
+- `agent/src/installed_skill_executor.py`
+- `agent/src/ppt_service.py`
+
+关键动作：
+- 增加 `skill_write_policy`（字段所有权矩阵）
+- 增加 `skill_write_conflict` 诊断
+- `dev_strict` 下：越权写入直接失败
+
+验收：
+- 越权覆盖为 0
+- 冲突诊断可追溯到 skill、字段、slide
+
+---
+
+### Phase 4 - 主题/媒体强对齐（2 天）
+
+目标：优先修复当前最大扣分项（theme/media）。
+
+主改文件：
+- `scripts/extract_to_minimax_json.py`
+- `scripts/generate-pptx-minimax.mjs`
+- `agent/src/minimax_exporter.py`
+- `scripts/compare_ppt_visual.py`
+
+关键动作：
+- 抽取并透传主题 token（主色/辅色/字体/字号层级）
+- 抽取并透传媒体清单（含 base64/hash/位置）
+- 本地重建链路强制执行媒体插入与主题色落地
+
+验收（hard gate）：
+- 主题一致性 >= 阈值
+- 媒体覆盖率 >= 阈值（建议 >= 70%）
+- 缺图缺色直接 fail
+
+---
+
+### Phase 5 - 评分器升级与门禁重平衡（1-2 天）
+
+目标：让分数真实反映视觉质量，避免“高分低质”。
+
+主改文件：
+- `scripts/compare_ppt_visual.py`
+- `agent/src/ppt_quality_gate.py`
+
+关键动作：
+- 强制 PSNR 必跑
+- 加入“页数明确扣分”（如 22/20）
+- 对 image/theme 增加 hard penalty 与 hard fail
+- 输出结构化失败原因，直接驱动下一轮修复
+
+验收：
+- 评分报告可解释（结构分/PSNR/扣分项）
+- 不再出现“缺图缺色但高分通过”
+
+---
+
+### Phase 6 - 优化循环工程化（2-3 天）
+
+目标：把“像训练模型一样迭代优化”制度化。
+
+关键动作：
+- 引入 champion/challenger 机制（旧策略 vs 新策略）
+- 单变量实验协议（每轮仅一个主改动）
+- 自动生成 `fix_plan.json`，并把失败类型映射到固定修复策略
+- 每轮写入 `fix_record.json`，沉淀可复用经验
+
+验收：
+- holdout_set 中位分持续提升
+- 修复策略命中率持续提升
+- 回归次数下降
+
+---
+
+### Phase 7 - 渐进发布与可观测加固（1 天）
+
+目标：确保上线安全，问题可快速发现与回滚。
+
+主改文件：
+- `agent/src/ppt_routes.py`
+- `agent/src/ppt_service.py`
+- runbook 文档
+
+关键动作：
+- 开关化发布：`PPT_PHASE_*`, `PPT_DEV_STRICT`, `PPT_GATE_STRICT`
+- canary 放量策略：10% -> 25% -> 50% -> 100%
+- 每个开关强制配置 owner + TTL + 清理任务
+- 建立告警面板（score、hard_fail_rate、fallback_ratio）
+
+验收：
+- 任一阶段可一键回滚
+- canary 指标异常可在 SLA 时间内告警并回滚
+
+---
+
+## 3. 阶段执行矩阵（升级版）
+
+每个阶段固定记录以下字段：
+- `baseline_score`
+- `after_score`
+- `delta`
+- `hard_fail_rate`
+- `main_bucket_improvement`（content/layout/theme/media/geometry）
+- `release_decision`（go/no-go）
+- `rollback_verified`（yes/no）
+
+模板：
+
+| Phase | Baseline | After | Delta | Hard Fail Rate | Main Bucket Improvement | Test Status | Release | Rollback Verified |
+|------|----------|-------|-------|----------------|--------------------------|-------------|---------|-------------------|
+| P0 | - | - | - | - | baseline only | pass | n/a | yes |
+| P1 | | | | | | | | |
+| P2 | | | | | | | | |
+| P3 | | | | | | | | |
+| P4 | | | | | | | | |
+| P5 | | | | | | | | |
+| P6 | | | | | | | | |
+| P7 | | | | | | | | |
+
+---
+
+## 4. 参考依据（官方 + 社区）
+
+### 官方
+- OpenAI：Evaluation best practices（评测驱动、自动化评测、与人工评估对齐、持续迭代）  
+  https://platform.openai.com/docs/guides/evaluation-best-practices
+- OpenAI：Evals drive next chapter of AI（持续评测与改进）  
+  https://openai.com/index/evals-drive-next-chapter-of-ai/
+- Google：Rules of ML（数据与特征优先、迭代与系统化评测）  
+  https://developers.google.com/machine-learning/guides/rules-of-ml
+- GitLab Handbook：Feature flags usage in dev and ops（开关治理、发布控制）  
+  https://handbook.gitlab.com/handbook/engineering/architecture/design-documents/feature_flags_usage_in_dev_and_ops/
+
+### 社区
+- Martin Fowler：Feature Toggles（开关分类、生命周期与治理）  
+  https://martinfowler.com/articles/feature-toggles.html
+- GitHub Engineering：Ship code faster, safer with feature flags（工程落地与发布治理实践）  
+  https://github.blog/engineering/infrastructure/ship-code-faster-safer-feature-flags/

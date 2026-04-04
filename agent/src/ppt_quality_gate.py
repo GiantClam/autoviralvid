@@ -10,6 +10,7 @@ from typing import Any, Dict, List, Optional
 
 from src.ppt_template_catalog import (
     quality_profile as load_quality_profile,
+    template_capabilities as template_catalog_capabilities,
     template_profiles as template_catalog_profiles,
 )
 
@@ -87,6 +88,21 @@ def _slide_id(slide: Dict[str, Any], index: int) -> str:
         if key:
             return key
     return f"slide-{index + 1}"
+
+
+def _slide_supports_image_block(slide: Dict[str, Any]) -> bool:
+    template_id = str(slide.get("template_family") or slide.get("template_id") or "").strip().lower()
+    if not template_id:
+        return True
+    capabilities = template_catalog_capabilities(template_id)
+    supported = {
+        str(item or "").strip().lower()
+        for item in (capabilities.get("supported_block_types") or [])
+        if str(item or "").strip()
+    }
+    if not supported:
+        return True
+    return "image" in supported
 
 
 def _text_values(slide: Dict[str, Any]) -> List[str]:
@@ -633,7 +649,12 @@ def validate_slide(
             else {}
         )
         strict_image_anchor = bool(orchestration.get("require_image_anchor", False))
-        if strict_image_anchor and slide_type == "content" and not image_blocks:
+        if (
+            strict_image_anchor
+            and slide_type == "content"
+            and _slide_supports_image_block(slide)
+            and not image_blocks
+        ):
             issues.append(
                 QualityIssue(
                     slide_id=sid,

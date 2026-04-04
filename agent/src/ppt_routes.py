@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import json
 import uuid
+import os
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -179,9 +181,37 @@ async def run_pipeline(
             f"[ppt_routes:{rid}] pipeline run user={user.id} topic={req.topic[:80]} pages={req.total_pages} export={req.with_export}"
         )
         svc = _get_service()
-        result = await svc.run_ppt_pipeline(req)
+        timeout_raw = str(os.getenv("PPT_PIPELINE_REQUEST_TIMEOUT_SEC", "570")).strip()
+        try:
+            request_timeout = max(30, min(1800, int(timeout_raw)))
+        except ValueError:
+            request_timeout = 570
+        try:
+            result = await asyncio.wait_for(
+                svc.run_ppt_pipeline(req),
+                timeout=request_timeout,
+            )
+        except asyncio.TimeoutError as exc:
+            logger.error(
+                f"[ppt_routes:{rid}] pipeline timeout after {request_timeout}s",
+                exc_info=True,
+            )
+            raise HTTPException(
+                status_code=504,
+                detail=f"pipeline timeout after {request_timeout}s",
+            ) from exc
         return ApiResponse(success=True, data=result.model_dump())
     except Exception as e:
+        from src.minimax_exporter import MiniMaxExportError
+
+        if isinstance(e, MiniMaxExportError):
+            logger.error(f"[ppt_routes:{rid}] pipeline failed classified: {e}", exc_info=True)
+            detail = e.to_dict()
+            return ApiResponse(
+                success=False,
+                error=json.dumps(detail, ensure_ascii=False),
+                data={"failure": detail},
+            )
         logger.error(f"[ppt_routes:{rid}] pipeline failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 

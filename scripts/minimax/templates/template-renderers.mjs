@@ -23,15 +23,43 @@ function clampRect(x, y, w, h, inset = 0) {
 
 function truncate(text, max = 80) {
   const s = String(text || "").trim();
-  if (s.length <= max) return s;
-  return `${s.slice(0, max - 1)}...`;
+  const budget = Math.max(6, Number(max) || 80);
+  if (!s) return "";
+  if (estimateVisualUnits(s) <= budget) return s;
+  const suffix = "...";
+  const keepBudget = Math.max(1, budget - estimateVisualUnits(suffix));
+  let used = 0;
+  let out = "";
+  for (const ch of s) {
+    const unit = charVisualUnits(ch);
+    if ((used + unit) > keepBudget) break;
+    out += ch;
+    used += unit;
+  }
+  out = out.trim().replace(/[ ,，；;。.!?！？:：-]+$/u, "");
+  return out ? `${out}${suffix}` : suffix;
 }
 
 function fitFont(base, text, min = 12) {
-  const len = String(text || "").trim().length;
-  if (len <= 24) return base;
-  const shrink = Math.ceil((len - 24) / 10);
+  const units = estimateVisualUnits(String(text || "").trim());
+  if (units <= 24) return base;
+  const shrink = Math.ceil((units - 24) / 8);
   return Math.max(min, base - shrink);
+}
+
+function charVisualUnits(ch) {
+  const s = String(ch || "");
+  if (!s) return 0;
+  if (/\s/u.test(s)) return 0.5;
+  if (/[\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af]/u.test(s)) return 2;
+  if (/[A-Z0-9]/u.test(s)) return 1.1;
+  return 1;
+}
+
+function estimateVisualUnits(text) {
+  let total = 0;
+  for (const ch of String(text || "")) total += charVisualUnits(ch);
+  return total;
 }
 
 function splitText(value, max = 8) {
@@ -57,6 +85,89 @@ function normalizeTextKey(value) {
     .toLowerCase()
     .replace(/\s+/g, " ")
     .replace(/[^0-9a-z\u4e00-\u9fff%+.-]/g, "");
+}
+
+function hasCjk(text) {
+  return /[\u4e00-\u9fff]/.test(String(text || ""));
+}
+
+function inferPreferZh(sourceSlide = {}, extras = []) {
+  const samples = [
+    sourceSlide?.title,
+    sourceSlide?.narration,
+    sourceSlide?.speaker_notes,
+    sourceSlide?.slide_id,
+    ...extras,
+  ].map((v) => String(v || "").trim()).filter(Boolean);
+  return samples.some((item) => hasCjk(item));
+}
+
+function isPlaceholderLike(text) {
+  const value = String(text || "").trim();
+  if (!value) return true;
+  const lowered = value.toLowerCase();
+  if (/(?:^|[\s:：-])(todo|tbd|placeholder|lorem ipsum)(?:$|[\s:：-])/.test(lowered)) return true;
+  if (/[?？]{2,}/.test(value)) return true;
+  if (/\b(?:item|module|section|chapter|part|region|highlight|step|layer|perspective|scenario|node)\s*\d+\b/i.test(value)) return true;
+  if (/\boption\s*[a-z]\b/i.test(value)) return true;
+  if (/\b(?:table of contents|monitoring view|thank you)\b/i.test(value)) return true;
+  if (/^(?:execution path defined|key evidence shows|conclusion validated|core claim)[:：\s-]/i.test(value)) return true;
+  return false;
+}
+
+function stripBoilerplatePrefix(text) {
+  const raw = String(text || "").trim();
+  if (!raw) return "";
+  return raw
+    .replace(/^(?:execution path defined|key evidence shows|conclusion validated|core claim)\s*[:：-]\s*/i, "")
+    .replace(/^(?:推进路径明确|关键证据显示|结论已验证|核心观点)\s*[:：-]\s*/, "")
+    .trim();
+}
+
+function semanticFallbackBullets({ base = "", preferZh = true, max = 8 }) {
+  const topic = stripBoilerplatePrefix(base) || String(base || "").trim();
+  const zhSeeds = ["背景", "机制", "关键环节", "影响", "案例", "启示", "结论", "行动建议"];
+  const enSeeds = ["Background", "Mechanism", "Key Steps", "Impact", "Case", "Insight", "Conclusion", "Action"];
+  const seeds = preferZh ? zhSeeds : enSeeds;
+  const out = [];
+  const used = new Set();
+  for (let i = 0; i < max; i += 1) {
+    const seed = seeds[i % seeds.length];
+    const item = topic ? (preferZh ? `${topic}${seed}` : `${seed}: ${topic}`) : seed;
+    const key = normalizeTextKey(item);
+    if (!key || used.has(key)) continue;
+    used.add(key);
+    out.push(item);
+    if (out.length >= max) break;
+  }
+  return out;
+}
+
+function semanticSequenceLabel({
+  points = [],
+  index = 0,
+  preferZh = true,
+  fallbackBase = "",
+  maxChars = 18,
+}) {
+  const direct = String(points[index] || "").trim();
+  if (direct && !isPlaceholderLike(direct)) return truncate(stripBoilerplatePrefix(direct) || direct, maxChars);
+  for (const item of points) {
+    const text = String(item || "").trim();
+    if (!text || isPlaceholderLike(text)) continue;
+    return truncate(stripBoilerplatePrefix(text) || text, maxChars);
+  }
+  const cleanedBase = stripBoilerplatePrefix(fallbackBase);
+  const seeds = preferZh
+    ? ["背景", "机制", "关键点", "影响", "结论"]
+    : ["Background", "Mechanism", "Key Point", "Impact", "Conclusion"];
+  const seed = seeds[Math.max(0, Number(index) || 0) % seeds.length];
+  if (cleanedBase) {
+    return preferZh
+      ? truncate(`${cleanedBase}${seed}`, maxChars)
+      : truncate(`${seed}: ${cleanedBase}`, maxChars);
+  }
+  return truncate(seed, maxChars);
 }
 
 function pickSecondaryHeading(primary, points = [], fallback = "Focus") {
@@ -100,6 +211,7 @@ function safeBulletsFromArgs(args, max = 12) {
   const explicit = Array.isArray(args?.bullets) ? args.bullets : [];
   const sourceSlide = args?.sourceSlide && typeof args.sourceSlide === "object" ? args.sourceSlide : {};
   const blocks = Array.isArray(sourceSlide.blocks) ? sourceSlide.blocks : [];
+  const preferZh = inferPreferZh(sourceSlide, explicit);
   const fromBlocks = blocks
     .filter((block) => ["body", "list", "quote", "icon_text", "subtitle"].includes(blockType(block)))
     .flatMap((block) => splitText(blockText(block), 4));
@@ -108,19 +220,58 @@ function safeBulletsFromArgs(args, max = 12) {
   const seen = new Set();
   for (const item of merged) {
     if (!item) continue;
-    const key = item.toLowerCase();
+    if (isPlaceholderLike(item)) continue;
+    const key = normalizeTextKey(item);
     if (seen.has(key)) continue;
     seen.add(key);
     out.push(item);
     if (out.length >= max) break;
   }
-  return out.length ? out : ["Core point", "Supporting evidence", "Execution action"];
+  if (out.length < max) {
+    const fallbackBase = stripBoilerplatePrefix(String(sourceSlide?.title || sourceSlide?.slide_id || "").trim());
+    const generated = semanticFallbackBullets({
+      base: fallbackBase,
+      preferZh,
+      max: Math.max(3, max),
+    });
+    for (const item of generated) {
+      const key = normalizeTextKey(item);
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      out.push(item);
+      if (out.length >= max) break;
+    }
+  }
+  return out.slice(0, max);
 }
 
 function findFirstBlock(sourceSlide, acceptedTypes) {
   const blocks = Array.isArray(sourceSlide?.blocks) ? sourceSlide.blocks : [];
   const accepted = new Set(acceptedTypes.map((v) => String(v).toLowerCase()));
   return blocks.find((block) => accepted.has(blockType(block))) || null;
+}
+
+function findBlocks(sourceSlide, acceptedTypes) {
+  const blocks = Array.isArray(sourceSlide?.blocks) ? sourceSlide.blocks : [];
+  const accepted = new Set(acceptedTypes.map((v) => String(v).toLowerCase()));
+  return blocks.filter((block) => accepted.has(blockType(block)));
+}
+
+function blockTextList(sourceSlide, acceptedTypes, maxItems = 6) {
+  const out = [];
+  const seen = new Set();
+  for (const block of findBlocks(sourceSlide, acceptedTypes)) {
+    for (const item of splitText(blockText(block), 6)) {
+      const text = String(item || "").trim();
+      if (!text) continue;
+      const key = normalizeTextKey(text);
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      out.push(text);
+      if (out.length >= maxItems) return out;
+    }
+  }
+  return out;
 }
 
 function normalizeImageDataForPptx(rawInput) {
@@ -177,6 +328,117 @@ function extractKpi(sourceSlide, bullets = []) {
     unit: String(payload.unit || "%"),
     label: truncate(String(payload.label || blockText(kpiBlock) || bullets[0] || "KPI"), 36),
     trend,
+  };
+}
+
+function extractKpiCards(sourceSlide, bullets = [], count = 3) {
+  const out = [];
+  const seen = new Set();
+  const pushItem = (item) => {
+    if (!item || item.number === undefined || item.number === null) return;
+    const label = truncate(String(item.label || "KPI"), 28);
+    const key = normalizeTextKey(`${label}:${item.number}:${item.unit || ""}`);
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    out.push({
+      number: item.number,
+      unit: String(item.unit || ""),
+      label,
+      trend: Number.isFinite(Number(item.trend)) ? Number(item.trend) : 0,
+    });
+  };
+
+  for (const block of findBlocks(sourceSlide, ["kpi"])) {
+    const payload = block?.data && typeof block.data === "object" ? block.data : {};
+    pushItem({
+      number: payload.number,
+      unit: payload.unit || "%",
+      label: payload.label || blockText(block) || bullets[0] || "KPI",
+      trend: payload.trend,
+    });
+    if (out.length >= count) return out.slice(0, count);
+  }
+
+  const series = extractChartSeries(sourceSlide, bullets);
+  if (series.length) {
+    const latest = series[series.length - 1];
+    const first = series[0];
+    const peak = [...series].sort((a, b) => Number(b.value || 0) - Number(a.value || 0))[0];
+    pushItem({
+      number: latest.value,
+      unit: "",
+      label: latest.label || bullets[0] || "Latest",
+      trend: Number(latest.value || 0) - Number(first?.value || 0),
+    });
+    pushItem({
+      number: peak.value,
+      unit: "",
+      label: peak.label || bullets[1] || "Peak",
+      trend: Number(peak.value || 0) - Number(first?.value || 0),
+    });
+  }
+
+  const fallbackPrimary = extractKpi(sourceSlide, bullets);
+  pushItem(fallbackPrimary);
+  while (out.length < count) {
+    const seed = bullets[out.length] || bullets[0] || `Metric ${out.length + 1}`;
+    pushItem({
+      number: Number.isFinite(Number(fallbackPrimary.number)) ? Number(fallbackPrimary.number) + out.length * 7 : out.length + 1,
+      unit: String(fallbackPrimary.unit || "%"),
+      label: seed,
+      trend: Number(fallbackPrimary.trend || 0) + out.length * 2,
+    });
+    if (out.length >= count) break;
+  }
+  return out.slice(0, count);
+}
+
+function normalizeStringList(value, max = 3) {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => String(item || "").trim())
+      .filter(Boolean)
+      .slice(0, max);
+  }
+  return splitText(String(value || ""), max);
+}
+
+function extractComparisonModel(sourceSlide, fallback = []) {
+  const preferZh = inferPreferZh(sourceSlide, fallback);
+  const block = findFirstBlock(sourceSlide, ["comparison"]);
+  const content = block?.content && typeof block.content === "object" ? block.content : {};
+  const data = block?.data && typeof block.data === "object" ? block.data : {};
+  const read = (...keys) => {
+    for (const key of keys) {
+      const value = String(content?.[key] || data?.[key] || "").trim();
+      if (value) return value;
+    }
+    return "";
+  };
+  const leftTitle = read("left_title", "leftTitle", "before_title", "beforeTitle")
+    || (preferZh ? "当前方案" : "Current model");
+  const rightTitle = read("right_title", "rightTitle", "after_title", "afterTitle")
+    || (preferZh ? "目标方案" : "Target model");
+  const leftItems = normalizeStringList(
+    content.left_items || content.leftItems || data.left_items || data.leftItems || content.left || data.left,
+    3,
+  );
+  const rightItems = normalizeStringList(
+    content.right_items || content.rightItems || data.right_items || data.rightItems || content.right || data.right,
+    3,
+  );
+  const fallbackLeft = fallback.slice(0, 2);
+  const fallbackRight = fallback.slice(2, 4);
+  const summary = read("summary", "takeaway", "decision", "verdict")
+    || fallback[4]
+    || fallback[fallback.length - 1]
+    || (preferZh ? "形成明确迁移建议" : "Converge on a clear migration choice");
+  return {
+    leftTitle,
+    leftItems: leftItems.length ? leftItems : (fallbackLeft.length ? fallbackLeft : [leftTitle]),
+    rightTitle,
+    rightItems: rightItems.length ? rightItems : (fallbackRight.length ? fallbackRight : [rightTitle]),
+    summary,
   };
 }
 
@@ -305,6 +567,8 @@ function renderArchitectureDarkPanelTemplate(slide, bullets, pageNumber, theme, 
   const { FONT_ZH, addPageBadge } = helpers;
   const spec = getTemplateSpec("architecture_dark_panel");
   const points = safeBulletsFromArgs({ bullets, sourceSlide }, 8);
+  const seedTitle = truncate(stripBoilerplatePrefix(String(sourceSlide?.title || sourceSlide?.slide_id || "slide")) || String(sourceSlide?.slide_id || "slide"), 24);
+  const preferZh = inferPreferZh(sourceSlide, points);
   const rows = [points.slice(0, 2), points.slice(2, 4), points.slice(4, 6)].map((arr) => arr.filter(Boolean));
 
   addPanel(slide, spec.board, theme, { radius: spec.board.radius, fill: theme.cardBg, transparency: 8, border: theme.borderColor, pt: spec.board.borderWidth });
@@ -324,7 +588,14 @@ function renderArchitectureDarkPanelTemplate(slide, bullets, pageNumber, theme, 
       border: theme.accentStrong || theme.accent,
       pt: 0,
     });
-    addSlideText(slide, `Layer ${idx + 1}`, {
+    const rowLabel = semanticSequenceLabel({
+      points,
+      index: idx,
+      preferZh,
+      fallbackBase: seedTitle,
+      maxChars: 16,
+    });
+    addSlideText(slide, rowLabel, {
       x: spec.board.x + spec.rowTitle.xOffset,
       y: y + spec.rowTitle.yOffset,
       w: spec.rowTitle.w,
@@ -336,7 +607,13 @@ function renderArchitectureDarkPanelTemplate(slide, bullets, pageNumber, theme, 
       color: theme.accentStrong || theme.accent,
       maxChars: 16,
     });
-    addSlideText(slide, group.join(" 路 ") || "Core capability", {
+    addSlideText(slide, group.join(" 路 ") || semanticSequenceLabel({
+      points,
+      index: idx + 1,
+      preferZh,
+      fallbackBase: seedTitle,
+      maxChars: 34,
+    }), {
       x: spec.board.x + spec.rowBody.xOffset,
       y: y + spec.rowBody.yOffset,
       w: spec.rowBody.w,
@@ -445,7 +722,15 @@ function renderEcosystemOrangeTemplate(slide, bullets, pageNumber, theme, style,
     maxChars: 28,
   });
 
-  const nodeLabels = [points[0] || "People", points[1] || "Vehicle", points[2] || "Home"];
+  const preferZh = inferPreferZh(sourceSlide, points);
+  const nodeSeed = stripBoilerplatePrefix(String(sourceSlide?.title || sourceSlide?.slide_id || "node").trim()) || "node";
+  const nodeLabels = [0, 1, 2].map((idx) => semanticSequenceLabel({
+    points,
+    index: idx,
+    preferZh,
+    fallbackBase: nodeSeed,
+    maxChars: 8,
+  }));
   spec.nodes.forEach((node, idx) => {
     slide.addShape("ellipse", {
       x: node.x,
@@ -470,8 +755,8 @@ function renderEcosystemOrangeTemplate(slide, bullets, pageNumber, theme, style,
     });
   });
 
-  slide.addShape("line", { x: 6.5, y: 2.25, w: 0, h: -0.2, line: { color: theme.primary, pt: 1.05, dash: "dot" } });
-  slide.addShape("line", { x: 5.36, y: 2.52, w: -0.3, h: 0.74, line: { color: theme.primary, pt: 1.05, dash: "dot" } });
+  slide.addShape("line", { x: 6.5, y: 2.05, w: 0, h: 0.2, line: { color: theme.primary, pt: 1.05, dash: "dot" } });
+  slide.addShape("line", { x: 5.06, y: 2.52, w: 0.3, h: 0.74, line: { color: theme.primary, pt: 1.05, dash: "dot" } });
   slide.addShape("line", { x: 7.65, y: 2.52, w: 0.3, h: 0.74, line: { color: theme.primary, pt: 1.05, dash: "dot" } });
 
   const bottomItemW = (spec.bottomStrip.w - spec.bottomStrip.itemGap * 2) / 3;
@@ -524,14 +809,14 @@ function renderNeuralBlueprintLightTemplate(slide, bullets, pageNumber, theme, s
       w: 1.2,
       h: 0.5,
     }, theme, { radius: 0.06, fill: bgAlt, transparency: 0, border, pt: 0.4 });
-    addSlideText(slide, points[i] || `Module ${i + 1}`, {
+    addSlideText(slide, points[i], {
       x: spec.left.x + 0.26 + col * 1.38,
       y: spec.left.y + 0.62 + row * 0.62,
       w: 1.03,
       h: 0.24,
     }, {
       fontFace: FONT_ZH,
-      fontSize: fitFont(12, points[i] || `Module ${i + 1}`, 10),
+      fontSize: fitFont(12, points[i], 10),
       bold: true,
       color: text,
       align: "center",
@@ -553,7 +838,7 @@ function renderNeuralBlueprintLightTemplate(slide, bullets, pageNumber, theme, s
       w: spec.right.w - 0.46,
       h: 1.68,
     }, theme, { radius: 0.06, fill: bgAlt, transparency: 18, border, pt: 0.5 });
-    const fallbackTitle = truncate(sourceSlide?.title || "Visual workflow focus", 38);
+    const fallbackTitle = truncate(sourceSlide?.title || points[0] || sourceSlide?.slide_id || (inferPreferZh(sourceSlide, points) ? "主题" : "Topic"), 38);
     addSlideText(slide, fallbackTitle, {
       x: spec.right.x + 0.28,
       y: spec.right.y + 0.52,
@@ -567,7 +852,8 @@ function renderNeuralBlueprintLightTemplate(slide, bullets, pageNumber, theme, s
       maxChars: 42,
     });
     points.slice(0, 3).forEach((line, idx) => {
-      addSlideText(slide, `• ${truncate(line || "Detail", 36)}`, {
+      const fallbackLine = line || points[idx + 1] || fallbackTitle;
+      addSlideText(slide, `• ${truncate(fallbackLine, 36)}`, {
         x: spec.right.x + 0.28,
         y: spec.right.y + 0.84 + idx * 0.34,
         w: spec.right.w - 0.56,
@@ -600,7 +886,10 @@ function renderOpsLifecycleLightTemplate(slide, bullets, pageNumber, theme, styl
   const accent = "2F67E8";
   const points = safeBulletsFromArgs({ bullets, sourceSlide }, 10);
 
-  const cardTitles = [points[0], points[1], points[2], points[3]].map((v, idx) => v || `Section ${idx + 1}`);
+  const preferZh = inferPreferZh(sourceSlide, points);
+  const titleBase = truncate(sourceSlide?.title || sourceSlide?.slide_id || (preferZh ? "主题" : "Topic"), 24);
+  const titleSeeds = preferZh ? ["背景", "机制", "要点", "影响"] : ["Background", "Mechanism", "Key Point", "Impact"];
+  const cardTitles = [points[0], points[1], points[2], points[3]].map((v, idx) => v || `${titleBase}${titleSeeds[idx] || ""}`);
   const cardBodies = [
     points.slice(4, 7),
     points.slice(5, 8),
@@ -630,7 +919,7 @@ function renderOpsLifecycleLightTemplate(slide, bullets, pageNumber, theme, styl
         w: spec.badge.w,
         h: spec.badge.h,
       }, theme, { radius: spec.badge.radius, fill: "E9F0FC", border: "E9F0FC", pt: 0, transparency: 0 });
-      addSlideText(slide, truncate(points[4] || "Efficiency uplift", 20), {
+      addSlideText(slide, truncate(points[4] || titleBase, 20), {
         x: card.x + spec.badge.xOffset,
         y: card.y + spec.badge.yOffset + 0.08,
         w: spec.badge.w,
@@ -659,7 +948,7 @@ function renderOpsLifecycleLightTemplate(slide, bullets, pageNumber, theme, styl
         pt: spec.dashedBox.borderWidth,
         dash: "dash",
       });
-      addSlideText(slide, cardBodies[idx][0] || "Monitoring view", {
+      addSlideText(slide, cardBodies[idx][0] || points[idx] || titleBase, {
         x: card.x + 0.42,
         y: card.y + 1.29,
         w: card.w - 0.84,
@@ -673,7 +962,8 @@ function renderOpsLifecycleLightTemplate(slide, bullets, pageNumber, theme, styl
       });
     } else {
       cardBodies[idx].slice(0, 3).forEach((line, lineIdx) => {
-        addSlideText(slide, `• ${line || "Detail"}`, {
+        const fallbackLine = line || points[lineIdx] || titleBase;
+        addSlideText(slide, `• ${fallbackLine}`, {
           x: card.x + spec.list.xOffset,
           y: card.y + spec.list.yOffset + lineIdx * spec.list.step,
           w: card.w - spec.list.wPad,
@@ -701,10 +991,13 @@ function renderConsultingWarmLightTemplate(slide, bullets, pageNumber, theme, st
   const muted = "7F6B5D";
   const accent = "9B3B2E";
   const points = safeBulletsFromArgs({ bullets, sourceSlide }, 10);
+  const bodyPoints = blockTextList(sourceSlide, ["body"], 6);
+  const listPoints = blockTextList(sourceSlide, ["list", "quote", "icon_text"], 6);
+  const topPoints = [...bodyPoints, ...listPoints, ...points].slice(0, 10);
   const imageData = pickImageSource(sourceSlide);
 
   addPanel(slide, spec.heroRule, theme, { radius: spec.heroRule.radius, fill: bgCard, transparency: 0, border, pt: 0.6 });
-  const ruleHeading = pickSecondaryHeading(sourceSlide?.title, points, "Recommendation rule");
+  const ruleHeading = pickSecondaryHeading(sourceSlide?.title, topPoints, "Recommendation rule");
   addSlideText(slide, truncate(ruleHeading, 60), {
     x: 0.78,
     y: 1.13,
@@ -721,14 +1014,14 @@ function renderConsultingWarmLightTemplate(slide, bullets, pageNumber, theme, st
   for (let i = 0; i < 4; i += 1) {
     const x = spec.topGrid.x + i * (spec.topGrid.cardW + spec.topGrid.gap);
     addPanel(slide, { x, y: spec.topGrid.y, w: spec.topGrid.cardW, h: spec.topGrid.cardH }, theme, { radius: 0.06, fill: bgCard, border, pt: 0.5, transparency: 0 });
-    addSlideText(slide, points[i] || `Region ${i + 1}`, {
+    addSlideText(slide, topPoints[i] || points[i] || ruleHeading, {
       x: x + 0.12,
       y: spec.topGrid.y + 0.2,
       w: spec.topGrid.cardW - 0.24,
       h: 0.3,
     }, {
       fontFace: FONT_ZH,
-      fontSize: fitFont(16, points[i] || `Region ${i + 1}`, 12),
+      fontSize: fitFont(16, topPoints[i] || points[i] || ruleHeading, 12),
       bold: true,
       color: accent,
       align: "center",
@@ -746,15 +1039,16 @@ function renderConsultingWarmLightTemplate(slide, bullets, pageNumber, theme, st
     });
   });
 
-  addBulletList(slide, points.slice(0, 3), spec.bottomCards[0].x + 0.2, spec.bottomCards[0].y + 0.36, spec.bottomCards[0].w - 0.4, 1.06, { ...theme, darkText: text, mutedText: muted, primary: accent }, style, 3);
-  addBulletList(slide, points.slice(3, 6), spec.bottomCards[1].x + 0.2, spec.bottomCards[1].y + 0.36, spec.bottomCards[1].w - 0.4, 1.06, { ...theme, darkText: text, mutedText: muted, primary: accent }, style, 3);
+  addBulletList(slide, (bodyPoints.length ? bodyPoints : topPoints).slice(0, 3), spec.bottomCards[0].x + 0.2, spec.bottomCards[0].y + 0.36, spec.bottomCards[0].w - 0.4, 1.06, { ...theme, darkText: text, mutedText: muted, primary: accent }, style, 3);
+  addBulletList(slide, (listPoints.length ? listPoints : topPoints.slice(3, 6)).slice(0, 3), spec.bottomCards[1].x + 0.2, spec.bottomCards[1].y + 0.36, spec.bottomCards[1].w - 0.4, 1.06, { ...theme, darkText: text, mutedText: muted, primary: accent }, style, 3);
   if (imageData) {
     slide.addImage({
       data: imageData,
       ...clampRect(spec.bottomCards[2].x + 0.08, spec.bottomCards[2].y + 0.08, spec.bottomCards[2].w - 0.16, spec.bottomCards[2].h - 0.16, 0.02),
     });
   } else {
-    addSlideText(slide, truncate(points[6] || "Execution highlight", 40), {
+    const highlight = listPoints[0] || bodyPoints[0] || topPoints[6] || topPoints[0] || sourceSlide?.title || sourceSlide?.slide_id || "slide";
+    addSlideText(slide, truncate(highlight, 40), {
       x: spec.bottomCards[2].x + 0.12,
       y: spec.bottomCards[2].y + 0.14,
       w: spec.bottomCards[2].w - 0.24,
@@ -766,8 +1060,9 @@ function renderConsultingWarmLightTemplate(slide, bullets, pageNumber, theme, st
       align: "left",
       maxChars: 34,
     });
-    points.slice(3, 6).forEach((item, idx) => {
-      addSlideText(slide, `• ${truncate(item || "Detail", 28)}`, {
+    (listPoints.length ? listPoints : topPoints.slice(3, 6)).forEach((item, idx) => {
+      const fallbackItem = item || topPoints[idx] || highlight;
+      addSlideText(slide, `• ${truncate(fallbackItem, 28)}`, {
         x: spec.bottomCards[2].x + 0.14,
         y: spec.bottomCards[2].y + 0.48 + idx * 0.3,
         w: spec.bottomCards[2].w - 0.28,
@@ -814,11 +1109,12 @@ function extractChartSeries(sourceSlide, fallback = []) {
     if (fallbackValues.length >= 5) break;
   }
   if (fallbackValues.length) return fallbackValues;
+  const seed = truncate(String(sourceSlide?.title || sourceSlide?.slide_id || (inferPreferZh(sourceSlide, fallback) ? "主题" : "Topic")).trim() || "topic", 14);
   return [
-    { label: "Q1", value: 100 },
-    { label: "Q2", value: 128 },
-    { label: "Q3", value: 154 },
-    { label: "Q4", value: 176 },
+    { label: inferPreferZh(sourceSlide, fallback) ? `${seed}背景` : `Background: ${seed}`, value: 1 },
+    { label: inferPreferZh(sourceSlide, fallback) ? `${seed}机制` : `Mechanism: ${seed}`, value: 2 },
+    { label: inferPreferZh(sourceSlide, fallback) ? `${seed}影响` : `Impact: ${seed}`, value: 3 },
+    { label: inferPreferZh(sourceSlide, fallback) ? `${seed}结论` : `Conclusion: ${seed}`, value: 4 },
   ];
 }
 
@@ -826,8 +1122,13 @@ function renderSplitMediaDarkTemplate(slide, bullets, pageNumber, theme, style, 
   const { FONT_ZH, addBulletList, addPageBadge } = helpers;
   const spec = getTemplateSpec("split_media_dark");
   const points = safeBulletsFromArgs({ bullets, sourceSlide }, 8);
+  const bodyPoints = blockTextList(sourceSlide, ["body"], 6);
+  const listPoints = blockTextList(sourceSlide, ["list", "quote", "icon_text"], 6);
   const kpi = extractKpi(sourceSlide, points);
   const imageData = pickImageSource(sourceSlide);
+  const leftPoints = (bodyPoints.length ? bodyPoints : points).slice(0, 5);
+  const rightPoints = (listPoints.length ? listPoints : points.slice(2, 6)).slice(0, 4);
+  const hasExplicitKpi = Boolean(findFirstBlock(sourceSlide, ["kpi"]));
 
   addPanel(slide, spec.left, theme, {
     radius: spec.left.radius,
@@ -836,7 +1137,7 @@ function renderSplitMediaDarkTemplate(slide, bullets, pageNumber, theme, style, 
     border: theme.borderColor,
     pt: 0.7,
   });
-  addSlideText(slide, truncate(String(sourceSlide?.title || points[0] || "Core Narrative"), 44), {
+  addSlideText(slide, truncate(String(sourceSlide?.title || points[0] || sourceSlide?.slide_id || "slide"), 44), {
     x: spec.left.x + 0.18,
     y: spec.left.y + 0.16,
     w: spec.left.w - 0.36,
@@ -851,7 +1152,7 @@ function renderSplitMediaDarkTemplate(slide, bullets, pageNumber, theme, style, 
 
   addBulletList(
     slide,
-    points.slice(0, 5),
+    leftPoints,
     spec.left.x + 0.18,
     spec.left.y + 0.58,
     spec.left.w - 0.36,
@@ -861,30 +1162,32 @@ function renderSplitMediaDarkTemplate(slide, bullets, pageNumber, theme, style, 
     5,
   );
 
-  addPanel(slide, {
-    x: spec.left.x + 0.18,
-    y: spec.left.y + spec.left.h - 0.54,
-    w: Math.min(2.2, spec.left.w - 0.36),
-    h: 0.34,
-  }, theme, {
-    radius: 0.08,
-    fill: theme.accentSoft || theme.secondary,
-    transparency: 15,
-    border: theme.accentSoft || theme.secondary,
-    pt: 0,
-  });
-  addSlideText(slide, `${kpi.number}${kpi.unit}  |  ${kpi.trend >= 0 ? "+" : ""}${kpi.trend}%`, {
-    x: spec.left.x + 0.2,
-    y: spec.left.y + spec.left.h - 0.5,
-    w: Math.min(2.16, spec.left.w - 0.4),
-    h: 0.24,
-  }, {
-    fontFace: FONT_ZH,
-    fontSize: 11,
-    bold: true,
-    color: theme.darkText,
-    maxChars: 40,
-  });
+  if (hasExplicitKpi) {
+    addPanel(slide, {
+      x: spec.left.x + 0.18,
+      y: spec.left.y + spec.left.h - 0.54,
+      w: Math.min(2.2, spec.left.w - 0.36),
+      h: 0.34,
+    }, theme, {
+      radius: 0.08,
+      fill: theme.accentSoft || theme.secondary,
+      transparency: 15,
+      border: theme.accentSoft || theme.secondary,
+      pt: 0,
+    });
+    addSlideText(slide, `${kpi.number}${kpi.unit}  |  ${kpi.trend >= 0 ? "+" : ""}${kpi.trend}%`, {
+      x: spec.left.x + 0.2,
+      y: spec.left.y + spec.left.h - 0.5,
+      w: Math.min(2.16, spec.left.w - 0.4),
+      h: 0.24,
+    }, {
+      fontFace: FONT_ZH,
+      fontSize: 11,
+      bold: true,
+      color: theme.darkText,
+      maxChars: 40,
+    });
+  }
 
   addPanel(slide, spec.right, theme, {
     radius: spec.right.radius,
@@ -912,7 +1215,7 @@ function renderSplitMediaDarkTemplate(slide, bullets, pageNumber, theme, style, 
       pt: 0.5,
       dash: "dash",
     });
-    points.slice(0, 4).forEach((item, idx) => {
+    rightPoints.forEach((item, idx) => {
       addSlideText(slide, item, {
         x: spec.right.x + 0.24,
         y: spec.right.y + 0.34 + idx * 0.44,
@@ -935,19 +1238,7 @@ function renderDashboardDarkTemplate(slide, bullets, pageNumber, theme, style, h
   const spec = getTemplateSpec("dashboard_dark");
   const points = safeBulletsFromArgs({ bullets, sourceSlide }, 10);
   const series = extractChartSeries(sourceSlide, points);
-  const kpiPrimary = extractKpi(sourceSlide, points);
-  const kpiSecondary = {
-    number: Number.isFinite(Number(kpiPrimary.number)) ? Number(kpiPrimary.number) + 7 : 28,
-    unit: "%",
-    label: truncate(points[1] || "Conversion", 20),
-    trend: Number(kpiPrimary.trend || 6) + 3,
-  };
-  const kpiThird = {
-    number: 3.4,
-    unit: "x",
-    label: truncate(points[2] || "Throughput", 20),
-    trend: 11,
-  };
+  const kpis = extractKpiCards(sourceSlide, points, 3);
 
   addPanel(slide, spec.canvas, theme, {
     radius: spec.canvas.radius,
@@ -956,9 +1247,8 @@ function renderDashboardDarkTemplate(slide, bullets, pageNumber, theme, style, h
     border: theme.borderColor,
     pt: 0.7,
   });
-  const kpis = [kpiPrimary, kpiSecondary, kpiThird];
   spec.kpiCards.forEach((card, idx) => {
-    const item = kpis[idx];
+    const item = kpis[idx] || kpis[0] || { number: idx + 1, unit: "", label: `Metric ${idx + 1}`, trend: 0 };
     addPanel(slide, card, theme, {
       radius: 0.08,
       fill: theme.cardAltBg,
@@ -1162,7 +1452,7 @@ function renderImageShowcaseLightTemplate(slide, bullets, pageNumber, theme, sty
       border: nextTheme.borderColor,
       pt: 0.7,
     });
-    addSlideText(slide, points[idx] || `Highlight ${idx + 1}`, {
+    addSlideText(slide, points[idx], {
       x: slot.x + 0.16,
       y: slot.y + 0.18,
       w: slot.w - 0.32,
@@ -1200,7 +1490,7 @@ function renderProcessFlowDarkTemplate(slide, bullets, pageNumber, theme, style,
     pt: 0.8,
   });
 
-  const nodeTexts = [points[0], points[1], points[2], points[3]].map((v, i) => v || `Step ${i + 1}`);
+  const nodeTexts = [points[0], points[1], points[2], points[3]].map((v) => v);
   spec.nodes.forEach((node, idx) => {
     addPanel(slide, node, nextTheme, {
       radius: 0.08,
@@ -1262,8 +1552,28 @@ function renderComparisonCardsLightTemplate(slide, bullets, pageNumber, theme, s
     mutedText: "667A9D",
   };
   const points = safeBulletsFromArgs({ bullets, sourceSlide }, 9);
+  const preferZh = inferPreferZh(sourceSlide, points);
+  const comparison = extractComparisonModel(sourceSlide, points);
+  const cards = [
+    {
+      title: comparison.leftTitle,
+      body: comparison.leftItems.join(preferZh ? "；" : "; "),
+      titleColor: nextTheme.mutedText,
+    },
+    {
+      title: comparison.rightTitle,
+      body: comparison.rightItems.join(preferZh ? "；" : "; "),
+      titleColor: nextTheme.primary || "2F67E8",
+    },
+    {
+      title: preferZh ? "综合判断" : "Synthesis",
+      body: comparison.summary,
+      titleColor: nextTheme.primary || "2F67E8",
+    },
+  ];
 
   spec.cards.forEach((card, idx) => {
+    const cardModel = cards[idx] || cards[cards.length - 1];
     addPanel(slide, card, nextTheme, {
       radius: 0.09,
       fill: nextTheme.cardBg,
@@ -1271,7 +1581,7 @@ function renderComparisonCardsLightTemplate(slide, bullets, pageNumber, theme, s
       border: nextTheme.borderColor,
       pt: 0.7,
     });
-    addSlideText(slide, idx === 0 ? "Option A" : idx === 1 ? "Option B" : "Option C", {
+    addSlideText(slide, cardModel.title, {
       x: card.x + 0.16,
       y: card.y + 0.18,
       w: card.w - 0.32,
@@ -1280,11 +1590,10 @@ function renderComparisonCardsLightTemplate(slide, bullets, pageNumber, theme, s
       fontFace: FONT_ZH,
       fontSize: 12,
       bold: true,
-      color: nextTheme.primary || "2F67E8",
+      color: cardModel.titleColor,
       maxChars: 24,
     });
-    const text = [points[idx * 2], points[idx * 2 + 1]].filter(Boolean).join("; ") || points[idx] || "Comparison point";
-    addSlideText(slide, text, {
+    addSlideText(slide, cardModel.body, {
       x: card.x + 0.16,
       y: card.y + 0.5,
       w: card.w - 0.32,
@@ -1293,7 +1602,7 @@ function renderComparisonCardsLightTemplate(slide, bullets, pageNumber, theme, s
       fontFace: FONT_ZH,
       fontSize: 11,
       color: nextTheme.darkText,
-      maxChars: 120,
+      maxChars: 160,
       breakLine: true,
     });
   });
@@ -1305,12 +1614,16 @@ function renderComparisonCardsLightTemplate(slide, bullets, pageNumber, theme, s
 function renderQuoteHeroDarkTemplate(slide, bullets, pageNumber, theme, style, helpers, sourceSlide) {
   const { FONT_ZH, addPageBadge } = helpers;
   const spec = getTemplateSpec("quote_hero_dark");
+  const preferZh = inferPreferZh(sourceSlide, bullets);
   const quoteBlock = findFirstBlock(sourceSlide, ["quote", "body", "list"]);
   const quoteText = truncate(
-    blockText(quoteBlock) || safeBulletsFromArgs({ bullets, sourceSlide }, 2).join("；") || "Insight drives execution.",
+    blockText(quoteBlock)
+      || safeBulletsFromArgs({ bullets, sourceSlide }, 2).join(preferZh ? "；" : "; ")
+      || stripBoilerplatePrefix(String(sourceSlide?.title || sourceSlide?.slide_id || ""))
+      || (preferZh ? "核心观点" : "Core Insight"),
     200,
   );
-  const authorText = truncate(String(sourceSlide?.author || sourceSlide?.speaker || "Source"), 48);
+  const authorText = truncate(String(sourceSlide?.author || sourceSlide?.speaker || sourceSlide?.organization || "").trim(), 48);
   const nextTheme = {
     ...theme,
     template_family: "quote_hero_dark",
@@ -1336,13 +1649,15 @@ function renderQuoteHeroDarkTemplate(slide, bullets, pageNumber, theme, style, h
     maxChars: 220,
     breakLine: true,
   });
-  addSlideText(slide, `- ${authorText}`, spec.author, {
-    fontFace: FONT_ZH,
-    fontSize: spec.author.fontSize,
-    color: nextTheme.mutedText,
-    align: "right",
-    maxChars: 68,
-  });
+  if (authorText) {
+    addSlideText(slide, `- ${authorText}`, spec.author, {
+      fontFace: FONT_ZH,
+      fontSize: spec.author.fontSize,
+      color: nextTheme.mutedText,
+      align: "right",
+      maxChars: 68,
+    });
+  }
 
   addPageBadge(slide, pageNumber, nextTheme, style);
   return true;
@@ -1366,7 +1681,7 @@ function ensureBentoTemplateSource(sourceSlide = {}, bullets = [], templateFamil
       .filter((item) => item && typeof item === "object")
       .map((item) => ({ ...item }))
     : [];
-  const titleText = truncate(String(out.title || bullets[0] || "Core Highlights"), 64);
+  const titleText = truncate(String(out.title || bullets[0] || out.slide_id || "slide"), 64);
   if (!blocks.some((item) => blockType(item) === "title")) {
     blocks.unshift({ block_type: "title", card_id: "title", content: titleText });
   }
@@ -1385,11 +1700,25 @@ function ensureBentoTemplateSource(sourceSlide = {}, bullets = [], templateFamil
 
   if (nonTitleCount === 0) {
     const fallbackItems = safeBulletsFromArgs({ bullets, sourceSlide: out }, 6);
+    const numericMatches = String(fallbackItems.join(" ")).match(/-?\d+(?:\.\d+)?/g) || [];
+    const kpiNumber = Number(numericMatches[0]);
+    const kpiTrend = Number(numericMatches[1]) - Number(numericMatches[0]);
+    const safeKpiNumber = Number.isFinite(kpiNumber) ? kpiNumber : 1;
+    const safeKpiTrend = Number.isFinite(kpiTrend) ? kpiTrend : 0;
     const generated = [
-      { block_type: "body", card_id: slots[0], content: fallbackItems[0] || "Core narrative" },
-      { block_type: "list", card_id: slots[1], content: fallbackItems.slice(1, 4).join("; ") || "Insight A; Insight B" },
-      { block_type: "kpi", card_id: slots[2], data: { number: 118, unit: "%", trend: 8 }, content: "118%" },
-      { block_type: "image", card_id: slots[3], content: { title: fallbackItems[4] || "Visual anchor" } },
+      { block_type: "body", card_id: slots[0], content: fallbackItems[0] || titleText },
+      {
+        block_type: "list",
+        card_id: slots[1],
+        content: fallbackItems.slice(1, 4).join("; ") || titleText,
+      },
+      {
+        block_type: "kpi",
+        card_id: slots[2],
+        data: { number: safeKpiNumber, unit: "%", trend: safeKpiTrend },
+        content: `${safeKpiNumber}%`,
+      },
+      { block_type: "image", card_id: slots[3], content: { title: fallbackItems[4] || titleText } },
     ];
     blocks.push(...generated);
   }
@@ -1617,6 +1946,3 @@ export function renderTemplateContent(args) {
       return false;
   }
 }
-
-
-

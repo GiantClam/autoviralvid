@@ -5,6 +5,8 @@ from __future__ import annotations
 import re
 from typing import Any, Dict, Iterable, List, Set
 
+from src.ppt_visual_identity import canonicalize_theme_recipe, resolve_style_variant, resolve_tone
+
 
 _LIGHT_TEMPLATE_FAMILIES = {
     "neural_blueprint_light",
@@ -211,6 +213,13 @@ def _normalize_density(value: str) -> str:
     return "balanced"
 
 
+def _normalize_tone(value: str) -> str:
+    tone = str(value or "").strip().lower()
+    if tone in {"light", "dark"}:
+        return tone
+    return "auto"
+
+
 def _block_types(slide: Dict[str, Any]) -> Set[str]:
     out: Set[str] = set()
     for item in slide.get("blocks") or []:
@@ -326,6 +335,8 @@ def build_design_spec(
     theme: Dict[str, Any] | None = None,
     template_family: str = "",
     style_variant: str = "soft",
+    theme_recipe: str = "auto",
+    tone: str = "auto",
     visual_preset: str = "auto",
     visual_density: str = "balanced",
     visual_priority: bool = True,
@@ -333,7 +344,31 @@ def build_design_spec(
 ) -> Dict[str, Any]:
     """Build a normalized design_spec contract for Node rendering."""
     source = dict(theme or {})
-    style = _normalize_style(style_variant or str(source.get("style") or "soft"))
+    recipe = canonicalize_theme_recipe(
+        theme_recipe
+        or source.get("theme_recipe")
+        or source.get("recipe")
+        or "auto",
+        fallback="consulting_clean",
+    )
+    style = _normalize_style(
+        resolve_style_variant(
+            style_variant or source.get("style") or "auto",
+            theme_recipe=recipe,
+            fallback="soft",
+        )
+    )
+    normalized_tone = _normalize_tone(
+        resolve_tone(
+            tone
+            or source.get("tone")
+            or source.get("theme_tone")
+            or source.get("preferred_tone")
+            or "auto",
+            theme_recipe=recipe,
+            fallback="auto",
+        )
+    )
     density = _normalize_density(visual_density)
     family = str(template_family or source.get("template_family") or "").strip().lower()
     prefer_zh = _prefer_zh(topic, source.get("title"), source.get("subtitle"))
@@ -374,12 +409,14 @@ def build_design_spec(
         },
         "visual": {
             "style_recipe": style,
+            "theme_recipe": recipe,
+            "tone": normalized_tone,
             "backdrop_type": str(visual_preset or "auto"),
             "visual_priority": bool(visual_priority),
             "visual_density": density,
             "icon_style": "outlined",
             "template_family": family,
-            "light_template": family in _LIGHT_TEMPLATE_FAMILIES,
+            "light_template": normalized_tone == "light" or family in _LIGHT_TEMPLATE_FAMILIES,
         },
         "render_policy": {
             "svg_complex_layouts": sorted(_COMPLEX_LAYOUTS),

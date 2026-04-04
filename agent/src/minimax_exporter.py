@@ -12,13 +12,20 @@ import tempfile
 from pathlib import Path
 from typing import Any, Dict, List
 
+from src.ppt_design_decision import (
+    apply_design_decision_to_slides,
+    decision_deck_value,
+    normalize_design_decision_v1,
+)
 from src.ppt_failure_classifier import FailureClassification, classify_failure
 from src.ppt_template_catalog import (
     list_template_ids,
     resolve_template_for_slide,
+    template_capabilities,
     template_profiles,
 )
 from src.ppt_master_design_spec import apply_render_paths, build_design_spec
+from src.ppt_visual_identity import canonicalize_theme_recipe, resolve_style_variant, resolve_tone
 
 logger = logging.getLogger("minimax_exporter")
 
@@ -156,6 +163,10 @@ def _build_generator_cmd(
         cmd.extend(["--visual-density", str(visual_density).strip()])
     if str(constraint_hardness or "").strip():
         cmd.extend(["--constraint-hardness", str(constraint_hardness).strip()])
+    if str(payload.get("theme_recipe") or "").strip():
+        cmd.extend(["--theme-recipe", str(payload.get("theme_recipe")).strip()])
+    if str(payload.get("tone") or "").strip():
+        cmd.extend(["--tone", str(payload.get("tone")).strip()])
     return cmd
 
 
@@ -455,10 +466,71 @@ def _infer_slide_type(slide: Dict[str, Any], index: int, total: int) -> str:
     return "content"
 
 
-def _infer_template_family(slide: Dict[str, Any], *, slide_type: str, layout_grid: str) -> str:
+def _canonical_slide_type_for_template(slide_type: str) -> str:
+    normalized = str(slide_type or "").strip().lower()
+    if normalized in {"hero_1", "cover"}:
+        return "cover"
+    if normalized in {"table_of_contents", "contents", "toc"}:
+        return "cover"
+    if normalized in {"section", "section_divider", "divider"}:
+        return "cover"
+    if normalized in {"summary", "closing", "conclusion"}:
+        return "summary"
+    if normalized in {"timeline", "workflow"}:
+        return "workflow"
+    if normalized in {"comparison", "data"}:
+        return normalized
+    return "content"
+
+
+def _template_family_supports_slide(template_family: str, *, slide_type: str, layout_grid: str) -> bool:
+    family = str(template_family or "").strip().lower()
+    if not family:
+        return False
+    try:
+        cap = template_capabilities(family)
+    except Exception:
+        return False
+    supported_types = {
+        str(item or "").strip().lower()
+        for item in (cap.get("supported_slide_types") or [])
+        if str(item or "").strip()
+    }
+    supported_layouts = {
+        str(item or "").strip().lower()
+        for item in (cap.get("supported_layouts") or [])
+        if str(item or "").strip()
+    }
+    normalized_type = _canonical_slide_type_for_template(slide_type)
+    normalized_layout = str(layout_grid or "").strip().lower()
+    type_ok = normalized_type in supported_types if supported_types else True
+    if not type_ok and normalized_type in {"toc", "divider", "summary"} and "cover" in supported_types:
+        type_ok = True
+    layout_ok = normalized_layout in supported_layouts if supported_layouts else True
+    return bool(type_ok and layout_ok)
+
+
+def _infer_template_family(
+    slide: Dict[str, Any],
+    *,
+    slide_type: str,
+    layout_grid: str,
+    preferred_template_family: str = "",
+) -> str:
     explicit = str(slide.get("template_family") or slide.get("template_id") or "").strip().lower()
-    if explicit in _TEMPLATE_ID_SET:
+    if explicit in _TEMPLATE_ID_SET and _template_family_supports_slide(
+        explicit,
+        slide_type=slide_type,
+        layout_grid=layout_grid,
+    ):
         return explicit
+    preferred = str(preferred_template_family or "").strip().lower()
+    if preferred in _TEMPLATE_ID_SET and _template_family_supports_slide(
+        preferred,
+        slide_type=slide_type,
+        layout_grid=layout_grid,
+    ):
+        return preferred
     return resolve_template_for_slide(
         slide=slide,
         slide_type=slide_type,
@@ -472,7 +544,11 @@ def _template_profiles(template_family: str) -> Dict[str, str]:
     return template_profiles(template_family)
 
 
-def _normalize_contract_slides(slides: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def _normalize_contract_slides(
+    slides: List[Dict[str, Any]],
+    *,
+    preferred_template_family: str = "",
+) -> List[Dict[str, Any]]:
     normalized = _normalize_slides(slides)
     total = len(normalized)
     out: List[Dict[str, Any]] = []
@@ -500,7 +576,12 @@ def _normalize_contract_slides(slides: List[Dict[str, Any]]) -> List[Dict[str, A
         slide["page_number"] = int(page_number)
         slide["slide_type"] = slide_type
         slide["layout_grid"] = layout_grid
-        template_family = _infer_template_family(slide, slide_type=slide_type, layout_grid=layout_grid)
+        template_family = _infer_template_family(
+            slide,
+            slide_type=slide_type,
+            layout_grid=layout_grid,
+            preferred_template_family=preferred_template_family,
+        )
         profiles = _template_profiles(template_family)
         slide["template_family"] = profiles["template_id"]
         slide["template_id"] = str(slide.get("template_id") or profiles["template_id"])
@@ -526,6 +607,8 @@ def build_payload(
     author: str,
     style_variant: str = "auto",
     palette_key: str = "auto",
+    theme_recipe: str = "auto",
+    tone: str = "auto",
     verbatim_content: bool = False,
     deck_id: str = "",
     retry_scope: str = "deck",
@@ -553,13 +636,70 @@ def build_payload(
     quality_profile: str = "",
     enforce_visual_contract: bool = True,
     design_spec: Dict[str, Any] | None = None,
+    design_decision: Dict[str, Any] | None = None,
 ) -> Dict[str, Any]:
     mode = _normalize_generator_mode(generator_mode)
     channel = _normalize_render_channel(render_channel)
     preserve_original = bool(original_style)
     disable_rewrite = bool(disable_local_style_rewrite) or preserve_original
+    normalized_decision = normalize_design_decision_v1(design_decision)
+    resolved_style_variant = str(style_variant or "auto").strip() or "auto"
+    resolved_palette_key = str(palette_key or "auto").strip() or "auto"
+    resolved_theme_recipe = canonicalize_theme_recipe(theme_recipe or "auto", fallback="auto")
+    resolved_tone = resolve_tone(tone or "auto", theme_recipe=resolved_theme_recipe, fallback="auto")
+    resolved_template_family = str(template_family or "auto").strip() or "auto"
+    resolved_skill_profile = str(skill_profile or "").strip()
+
+    decision_style = decision_deck_value(normalized_decision, "style_variant")
+    decision_palette = decision_deck_value(normalized_decision, "palette_key")
+    decision_theme_recipe = decision_deck_value(normalized_decision, "theme_recipe")
+    decision_tone = decision_deck_value(normalized_decision, "tone")
+    decision_template = decision_deck_value(normalized_decision, "template_family")
+    decision_skill_profile = decision_deck_value(normalized_decision, "skill_profile")
+    decision_quality_profile = decision_deck_value(normalized_decision, "quality_profile")
+    decision_route_mode = decision_deck_value(normalized_decision, "route_mode")
+
+    if resolved_style_variant.lower() in {"", "auto"} and decision_style:
+        resolved_style_variant = decision_style
+    if resolved_palette_key.lower() in {"", "auto"} and decision_palette:
+        resolved_palette_key = decision_palette
+    if resolved_theme_recipe.lower() in {"", "auto"} and decision_theme_recipe:
+        resolved_theme_recipe = canonicalize_theme_recipe(decision_theme_recipe, fallback="consulting_clean")
+    if resolved_tone in {"", "auto"} and decision_tone:
+        resolved_tone = resolve_tone(decision_tone, theme_recipe=resolved_theme_recipe, fallback=resolved_tone)
+    if resolved_template_family.lower() in {"", "auto"} and decision_template:
+        resolved_template_family = decision_template
+    if not resolved_skill_profile and decision_skill_profile:
+        resolved_skill_profile = decision_skill_profile
+    if not str(quality_profile or "").strip() and decision_quality_profile:
+        quality_profile = decision_quality_profile
+    if str(route_mode or "").strip().lower() in {"", "auto"} and decision_route_mode:
+        route_mode = decision_route_mode
+
+    if resolved_theme_recipe in {"", "auto"}:
+        resolved_theme_recipe = canonicalize_theme_recipe(resolved_theme_recipe, fallback="consulting_clean")
+
+    resolved_style_variant = resolve_style_variant(
+        resolved_style_variant,
+        theme_recipe=resolved_theme_recipe,
+        fallback="soft",
+    )
+    resolved_tone = resolve_tone(
+        resolved_tone,
+        theme_recipe=resolved_theme_recipe,
+        fallback="auto",
+    )
+
+    normalized_contract_slides = _normalize_contract_slides(
+        slides,
+        preferred_template_family=resolved_template_family,
+    )
+    decision_filled_slides = apply_design_decision_to_slides(
+        normalized_contract_slides,
+        normalized_decision,
+    )
     normalized_slides = apply_render_paths(
-        _normalize_contract_slides(slides),
+        decision_filled_slides,
         svg_mode=str(svg_mode or "on"),
     )
     primary_template = (
@@ -569,8 +709,10 @@ def build_payload(
     )
     deck_profiles = _template_profiles(primary_template)
     theme = {
-        "palette": str(palette_key or "auto").strip() or "auto",
-        "style": str(style_variant or "auto").strip() or "auto",
+        "palette": str(resolved_palette_key or "auto").strip() or "auto",
+        "style": str(resolved_style_variant or "auto").strip() or "auto",
+        "theme_recipe": str(resolved_theme_recipe or "auto").strip() or "auto",
+        "tone": str(resolved_tone or "auto").strip() or "auto",
     }
     resolved_template_id = str(template_id or deck_profiles["template_id"]).strip() or deck_profiles["template_id"]
     resolved_design_spec = (
@@ -578,8 +720,10 @@ def build_payload(
         if isinstance(design_spec, dict)
         else build_design_spec(
             theme=theme,
-            template_family=str(template_family or resolved_template_id or "auto"),
+            template_family=str(resolved_template_family or resolved_template_id or "auto"),
             style_variant=str(theme.get("style") or "soft"),
+            theme_recipe=str(resolved_theme_recipe or "auto"),
+            tone=str(resolved_tone or "auto"),
             visual_preset=str(visual_preset or "auto"),
             visual_density=str(visual_density or "balanced"),
             visual_priority=bool(visual_priority),
@@ -591,6 +735,8 @@ def build_payload(
         "title": title,
         "author": author,
         "theme": theme,
+        "theme_recipe": str(resolved_theme_recipe or "auto"),
+        "tone": str(resolved_tone or "auto"),
         "render_channel": channel,
         "generator_mode": mode,
         "enable_legacy_fallback": bool(enable_legacy_fallback),
@@ -611,15 +757,16 @@ def build_payload(
         "visual_density": str(visual_density or "balanced"),
         "constraint_hardness": str(constraint_hardness or "minimal"),
         "svg_mode": str(svg_mode or "on"),
-        "template_family": str(template_family or resolved_template_id or "auto"),
+        "template_family": str(resolved_template_family or resolved_template_id or "auto"),
         "template_id": resolved_template_id,
-        "skill_profile": str(skill_profile or deck_profiles["skill_profile"]),
+        "skill_profile": str(resolved_skill_profile or deck_profiles["skill_profile"]),
         "hardness_profile": str(hardness_profile or deck_profiles["hardness_profile"]),
         "schema_profile": str(schema_profile or deck_profiles["schema_profile"]),
         "contract_profile": str(contract_profile or deck_profiles["contract_profile"]),
         "quality_profile": str(quality_profile or deck_profiles["quality_profile"]),
         "enforce_visual_contract": bool(enforce_visual_contract),
         "design_spec": resolved_design_spec,
+        "design_decision_v1": normalized_decision,
     }
 
 
@@ -630,6 +777,8 @@ def export_minimax_pptx(
     author: str,
     style_variant: str = "auto",
     palette_key: str = "auto",
+    theme_recipe: str = "auto",
+    tone: str = "auto",
     verbatim_content: bool = False,
     deck_id: str = "",
     retry_scope: str = "deck",
@@ -657,6 +806,7 @@ def export_minimax_pptx(
     quality_profile: str = "",
     enforce_visual_contract: bool = True,
     design_spec: Dict[str, Any] | None = None,
+    design_decision: Dict[str, Any] | None = None,
     timeout: int = 180,
 ) -> Dict[str, Any]:
     scripts_root = _resolve_scripts_root()
@@ -671,6 +821,8 @@ def export_minimax_pptx(
         author=author,
         style_variant=style_variant,
         palette_key=palette_key,
+        theme_recipe=theme_recipe,
+        tone=tone,
         verbatim_content=verbatim_content,
         deck_id=deck_id,
         retry_scope=retry_scope,
@@ -698,6 +850,7 @@ def export_minimax_pptx(
         quality_profile=quality_profile,
         enforce_visual_contract=enforce_visual_contract,
         design_spec=design_spec,
+        design_decision=design_decision,
     )
 
     requested_channel = _normalize_render_channel(payload.get("render_channel"))
@@ -743,6 +896,7 @@ def export_minimax_pptx(
         )
         should_use_module_orchestrator = should_use_module_retry or should_use_module_mainflow
 
+        render_each = False
         if should_use_module_orchestrator:
             modules_dir = input_path.with_name(f"{input_path.stem}_modules")
             manifest_path = modules_dir / "manifest.json"
@@ -780,15 +934,65 @@ def export_minimax_pptx(
                 deck_id=deck_id,
             )
 
-        def _run(export_cmd: List[str]) -> subprocess.CompletedProcess[str]:
+        def _run(export_cmd: List[str], *, cmd_timeout: int) -> subprocess.CompletedProcess[str]:
             return subprocess.run(
                 export_cmd,
                 capture_output=True,
                 text=True,
-                timeout=timeout,
+                encoding="utf-8",
+                timeout=max(30, int(cmd_timeout)),
             )
 
-        result = _run(cmd)
+        module_timeout = int(timeout)
+        if should_use_module_orchestrator:
+            env_timeout = str(os.getenv("PPT_MODULE_ORCHESTRATOR_TIMEOUT_SEC", "")).strip()
+            if env_timeout:
+                try:
+                    module_timeout = max(module_timeout, int(float(env_timeout)))
+                except Exception:
+                    module_timeout = max(module_timeout, 420)
+            else:
+                module_timeout = max(module_timeout, 420)
+
+        module_timeout_fallback_used = False
+        try:
+            result = _run(
+                cmd,
+                cmd_timeout=(module_timeout if should_use_module_orchestrator else int(timeout)),
+            )
+        except subprocess.TimeoutExpired:
+            if should_use_module_orchestrator:
+                logger.warning(
+                    "[minimax_exporter] module orchestrator timed out after %ss; fallback to direct generator",
+                    module_timeout,
+                )
+                cmd = _build_generator_cmd(
+                    script_path=generator_script_path,
+                    input_path=input_path,
+                    output_path=output_path,
+                    render_spec_path=render_spec_path,
+                    payload=payload,
+                    retry_scope=retry_scope,
+                    target_slide_ids=target_slide_ids,
+                    target_block_ids=target_block_ids,
+                    retry_hint=retry_hint,
+                    idempotency_key=idempotency_key,
+                    verbatim_content=verbatim_content,
+                    original_style=original_style,
+                    disable_local_style_rewrite=disable_local_style_rewrite,
+                    visual_priority=visual_priority,
+                    visual_preset=visual_preset,
+                    visual_density=visual_density,
+                    constraint_hardness=constraint_hardness,
+                    deck_id=deck_id,
+                )
+                result = _run(cmd, cmd_timeout=int(timeout))
+                should_use_module_orchestrator = False
+                should_use_module_mainflow = False
+                should_use_module_retry = False
+                module_timeout_fallback_used = True
+            else:
+                raise
         effective_mode = payload["generator_mode"]
         fallback_used = False
         legacy_fallback_enabled = bool(enable_legacy_fallback) and _allow_legacy_mode()
@@ -809,7 +1013,7 @@ def export_minimax_pptx(
                     continue
                 fallback_cmd.append(part)
             fallback_cmd.extend(["--generator-mode", "legacy"])
-            result = _run(fallback_cmd)
+            result = _run(fallback_cmd, cmd_timeout=int(timeout))
             effective_mode = "legacy"
             fallback_used = True
 
@@ -854,6 +1058,8 @@ def export_minimax_pptx(
         if fallback_used:
             generator_meta["fallback_used"] = True
             generator_meta["generator_mode"] = effective_mode
+        if module_timeout_fallback_used:
+            generator_meta["module_timeout_fallback_used"] = True
         if channel_fallback_reason:
             generator_meta["channel_fallback_used"] = True
             generator_meta["channel_fallback_reason"] = channel_fallback_reason
@@ -904,4 +1110,3 @@ def export_minimax_pptx(
                     shutil.rmtree(dir_path, ignore_errors=True)
                 except Exception:
                     logger.debug("failed to cleanup temp dir: %s", dir_path, exc_info=True)
-

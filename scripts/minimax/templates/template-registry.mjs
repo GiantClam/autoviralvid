@@ -1,4 +1,4 @@
-import { getTemplateCatalog } from "./template-catalog.mjs";
+import { defaultTemplateId, getTemplateCatalog } from "./template-catalog.mjs";
 import { getContractProfile, getTemplateCapabilities, getTemplateProfiles } from "./template-profiles.mjs";
 
 const DENSITY_ORDER = { sparse: 0, balanced: 1, dense: 2 };
@@ -6,6 +6,25 @@ const VISUAL_BLOCK_TYPES = new Set(["image", "chart", "kpi", "workflow", "diagra
 const DATA_BLOCK_TYPES = new Set(["chart", "kpi", "table"]);
 const CONSTRAINED_BLOCK_TYPES = new Set(["image", "chart", "kpi", "table", "workflow", "diagram", "icon_text", "svg"]);
 const LAYOUT_HINT_TYPES = new Set(["split_2", "asymmetric_2", "grid_2", "grid_3", "grid_4", "bento_5", "bento_6", "hero_1"]);
+const TERMINAL_TEMPLATE_IDS = new Set(["hero_dark", "hero_tech_cover", "quote_hero_dark"]);
+const LIGHT_THEME_HINTS = [
+  "education",
+  "teaching",
+  "training",
+  "classroom",
+  "student",
+  "school",
+  "curriculum",
+  "lesson",
+  "academic",
+  "\u6559\u5b66",
+  "\u8bfe\u5802",
+  "\u6559\u80b2",
+  "\u57f9\u8bad",
+  "\u5b66\u6821",
+  "\u8bfe\u7a0b",
+  "\u9ad8\u6821",
+];
 
 function normalizeKey(value) {
   return String(value || "")
@@ -14,10 +33,36 @@ function normalizeKey(value) {
     .replace(/[^a-z0-9_\u4e00-\u9fff]+/g, "_");
 }
 
+function normalizeTemplateWhitelist(raw) {
+  const out = [];
+  const seen = new Set();
+  const pushToken = (value) => {
+    const token = normalizeKey(value || "");
+    if (!token || seen.has(token)) return;
+    if (!listTemplateIds().includes(token)) return;
+    seen.add(token);
+    out.push(token);
+  };
+  if (Array.isArray(raw)) {
+    for (const item of raw) pushToken(item);
+    return out;
+  }
+  const text = String(raw || "").trim();
+  if (!text) return out;
+  for (const part of text.split(",")) pushToken(part);
+  return out;
+}
+
 function normalizeDensity(value) {
   const normalized = normalizeKey(value || "balanced");
   if (Object.prototype.hasOwnProperty.call(DENSITY_ORDER, normalized)) return normalized;
   return "balanced";
+}
+
+function normalizeTone(value) {
+  const normalized = normalizeKey(value || "");
+  if (normalized === "light" || normalized === "dark") return normalized;
+  return "";
 }
 
 function pick(obj, keys, fallback = "") {
@@ -114,6 +159,20 @@ function listTemplateIds() {
   return Object.keys(getCatalog().templates || {});
 }
 
+function getDefaultTemplateId() {
+  const fallback = normalizeKey(defaultTemplateId());
+  if (fallback && listTemplateIds().includes(fallback)) return fallback;
+  return "consulting_warm_light";
+}
+
+function getLayoutDefault(layoutKey = "split_2") {
+  const catalog = getCatalog();
+  const normalizedLayout = normalizeKey(layoutKey || "split_2") || "split_2";
+  const configured = normalizeKey(catalog.layout_defaults?.[normalizedLayout] || "");
+  if (configured && listTemplateIds().includes(configured)) return configured;
+  return getDefaultTemplateId();
+}
+
 function keywordScore(blob, keywords) {
   let score = 0;
   for (const kw of keywords || []) {
@@ -135,18 +194,61 @@ function templateKeywordScore(templateId, blob, catalog) {
   return best;
 }
 
+function normalizeArchetypeCandidates(raw) {
+  const rows = Array.isArray(raw) ? raw : [];
+  const out = [];
+  const seen = new Set();
+  for (const row of rows) {
+    const value = typeof row === "string"
+      ? row
+      : row && typeof row === "object"
+        ? row.archetype
+        : "";
+    const key = normalizeKey(value || "");
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push(key);
+  }
+  return out;
+}
+
+function templateArchetypeBonus(templateId, archetypeKey, archetypeCandidates, catalog) {
+  const templates = catalog?.templates || {};
+  const template = templateId && typeof templates[templateId] === "object" ? templates[templateId] : {};
+  const preferred = normalizeArchetypeCandidates(template?.preferred_archetypes);
+  if (!preferred.length) return 0;
+  const selected = normalizeKey(archetypeKey || "");
+  if (selected && preferred.includes(selected)) return 3.2;
+  const candidates = normalizeArchetypeCandidates(archetypeCandidates);
+  if (candidates.some((candidate) => preferred.includes(candidate))) return 1.4;
+  return 0;
+}
+
+function prefersLightTheme(searchBlob, blockTypes, { needsData, hasImageVisual }) {
+  const blob = String(searchBlob || "").toLowerCase();
+  const hintHit = LIGHT_THEME_HINTS.some((token) => token && blob.includes(String(token).toLowerCase()));
+  const hasVisualBlocks = Boolean(Array.from(blockTypes || []).some((bt) => VISUAL_BLOCK_TYPES.has(bt)));
+  const textHeavy = !needsData && !hasImageVisual && !hasVisualBlocks;
+  return Boolean(hintHit || textHeavy);
+}
+
 function capabilityScore({
   templateId,
   capabilities,
   explicitType,
   layoutGrid,
   desiredDensity,
+  preferredTone,
   blockTypes,
   needsVisual,
   needsData,
   hasImageVisual,
   keywordHit,
   layoutDefault,
+  searchBlob,
+  archetypeKey,
+  archetypeCandidates,
+  catalog,
 }) {
   let score = 0;
   const slideTypes = new Set(capabilities.supported_slide_types || []);
@@ -154,7 +256,10 @@ function capabilityScore({
   const supportedBlocks = new Set(capabilities.supported_block_types || []);
 
   if (slideTypes.has(explicitType)) score += 2.5;
+  else if (slideTypes.size > 0) score -= 4.0;
+  if (explicitType === "content" && TERMINAL_TEMPLATE_IDS.has(templateId)) score -= 7.5;
   if (layouts.has(layoutGrid)) score += 3.0;
+  else if (layouts.size > 0) score -= 6.0;
 
   const minRank = DENSITY_ORDER[normalizeDensity(capabilities?.density_range?.min)] ?? 0;
   const maxRank = DENSITY_ORDER[normalizeDensity(capabilities?.density_range?.max)] ?? 2;
@@ -179,11 +284,80 @@ function capabilityScore({
   }
 
   score += Math.min(3, Number(keywordHit || 0));
+  score += templateArchetypeBonus(templateId, archetypeKey, archetypeCandidates, catalog);
   if (templateId === "architecture_dark_panel" && keywordHit < 2 && !blockTypes.has("workflow")) {
     score -= 2.0;
   }
+  if (prefersLightTheme(searchBlob, blockTypes, { needsData, hasImageVisual })) {
+    if (templateId.endsWith("_light")) score += 1.8;
+    else if (templateId.endsWith("_dark")) score -= 1.0;
+  }
+  const tone = normalizeTone(preferredTone);
+  if (tone === "light") {
+    if (templateId.endsWith("_light")) score += 4.0;
+    else if (templateId.endsWith("_dark")) score -= 3.2;
+  } else if (tone === "dark") {
+    if (templateId.endsWith("_dark")) score += 3.2;
+    else if (templateId.endsWith("_light")) score -= 2.6;
+  }
   if (templateId === layoutDefault) score += 1.2;
   return score;
+}
+
+function pickBestTemplateFromAllowed({
+  allowedTemplates,
+  sourceSlide,
+  explicitType,
+  layoutGrid,
+  desiredDensity,
+  preferredTone = "",
+}) {
+  const candidates = normalizeTemplateWhitelist(allowedTemplates);
+  if (!candidates.length) return "";
+  if (candidates.length === 1) return candidates[0];
+
+  const normalizedType = normalizeKey(explicitType || "content");
+  const normalizedGrid = normalizeKey(layoutGrid || "split_2");
+  const blob = buildSearchBlob(sourceSlide);
+  const blockTypes = getSlideBlockTypes(sourceSlide);
+  const needsVisual = Boolean(Array.from(blockTypes).some((bt) => VISUAL_BLOCK_TYPES.has(bt)))
+    || Boolean(Array.isArray(sourceSlide?.image_keywords) && sourceSlide.image_keywords.length > 0);
+  const needsData = Boolean(Array.from(blockTypes).some((bt) => DATA_BLOCK_TYPES.has(bt)));
+  const hasImageVisual = hasImageAsset(sourceSlide);
+  const catalog = getCatalog();
+  const layoutDefault = getLayoutDefault(normalizedGrid);
+  const archetypeKey = normalizeKey(sourceSlide?.archetype || "");
+  const archetypeCandidates = normalizeArchetypeCandidates(sourceSlide?.archetype_candidates);
+
+  let bestTemplate = candidates[0];
+  let bestScore = -10_000;
+  for (const templateId of candidates) {
+    const capabilities = getTemplateCapabilities(templateId);
+    const kwScore = templateKeywordScore(templateId, blob, catalog);
+    const score = capabilityScore({
+      templateId,
+      capabilities,
+      explicitType: normalizedType,
+      layoutGrid: normalizedGrid,
+      desiredDensity,
+      preferredTone,
+      blockTypes,
+      needsVisual,
+      needsData,
+      hasImageVisual,
+      keywordHit: kwScore,
+      layoutDefault,
+      searchBlob: blob,
+      archetypeKey,
+      archetypeCandidates,
+      catalog,
+    });
+    if (score > bestScore) {
+      bestScore = score;
+      bestTemplate = templateId;
+    }
+  }
+  return bestTemplate;
 }
 
 export function inferTemplateFamilyFromContent(
@@ -191,6 +365,7 @@ export function inferTemplateFamilyFromContent(
   explicitType = "content",
   layoutGrid = "split_2",
   desiredDensity = "balanced",
+  preferredTone = "",
 ) {
   const normalizedType = normalizeKey(explicitType || "content");
   const normalizedGrid = normalizeKey(layoutGrid || "split_2");
@@ -198,7 +373,7 @@ export function inferTemplateFamilyFromContent(
   const templateIds = listTemplateIds();
 
   if (normalizedType === "cover" || normalizedGrid === "hero_1") return "hero_tech_cover";
-  if (normalizedType === "summary") return "hero_dark";
+  if (normalizedType === "summary") return "quote_hero_dark";
 
   const blob = buildSearchBlob(sourceSlide);
   const blockTypes = getSlideBlockTypes(sourceSlide);
@@ -206,7 +381,9 @@ export function inferTemplateFamilyFromContent(
     || Boolean(Array.isArray(sourceSlide?.image_keywords) && sourceSlide.image_keywords.length > 0);
   const needsData = Boolean(Array.from(blockTypes).some((bt) => DATA_BLOCK_TYPES.has(bt)));
   const hasImageVisual = hasImageAsset(sourceSlide);
-  const layoutDefault = String(catalog.layout_defaults?.[normalizedGrid] || "dashboard_dark");
+  const layoutDefault = getLayoutDefault(normalizedGrid);
+  const archetypeKey = normalizeKey(sourceSlide?.archetype || "");
+  const archetypeCandidates = normalizeArchetypeCandidates(sourceSlide?.archetype_candidates);
 
   let bestTemplate = layoutDefault;
   let bestScore = -10_000;
@@ -220,12 +397,17 @@ export function inferTemplateFamilyFromContent(
       explicitType: normalizedType,
       layoutGrid: normalizedGrid,
       desiredDensity,
+      preferredTone,
       blockTypes,
       needsVisual,
       needsData,
       hasImageVisual,
       keywordHit: kwScore,
       layoutDefault,
+      searchBlob: blob,
+      archetypeKey,
+      archetypeCandidates,
+      catalog,
     });
     if (score > bestScore) {
       bestScore = score;
@@ -233,7 +415,7 @@ export function inferTemplateFamilyFromContent(
     }
   }
 
-  return templateIds.includes(bestTemplate) ? bestTemplate : "dashboard_dark";
+  return templateIds.includes(bestTemplate) ? bestTemplate : getDefaultTemplateId();
 }
 
 export function resolveTemplateFamilyForSlide({
@@ -242,20 +424,63 @@ export function resolveTemplateFamilyForSlide({
   explicitType = "content",
   layoutGrid = "split_2",
   desiredDensity = "balanced",
+  preferredTone = "",
   normalizeTemplateFamily,
 }) {
+  const whitelist = normalizeTemplateWhitelist(
+    pick(sourceSlide || {}, ["template_family_whitelist", "template_candidates", "template_whitelist"], []),
+  );
   const requested = normalizeKey(requestedTemplateFamily) === "auto" ? "" : requestedTemplateFamily;
-  const inferred = requested || inferTemplateFamilyFromContent(sourceSlide, explicitType, layoutGrid, desiredDensity);
+  const inferred = requested
+    || inferTemplateFamilyFromContent(sourceSlide, explicitType, layoutGrid, desiredDensity, preferredTone);
+  const inferredNormalized = normalizeKey(inferred || "");
+  const constrainedInferred = whitelist.length > 0
+    ? (
+      whitelist.includes(inferredNormalized)
+        ? inferredNormalized
+        : pickBestTemplateFromAllowed({
+          allowedTemplates: whitelist,
+          sourceSlide,
+          explicitType,
+          layoutGrid,
+          desiredDensity,
+          preferredTone,
+        })
+    )
+    : inferred;
   if (typeof normalizeTemplateFamily === "function") {
-    return normalizeTemplateFamily(inferred, explicitType, layoutGrid);
+    const normalizedByFn = normalizeTemplateFamily(constrainedInferred, explicitType, layoutGrid);
+    const normalizedFnKey = normalizeKey(normalizedByFn || "");
+    if (whitelist.length > 0 && !whitelist.includes(normalizedFnKey)) {
+      return pickBestTemplateFromAllowed({
+        allowedTemplates: whitelist,
+        sourceSlide,
+        explicitType,
+        layoutGrid,
+        desiredDensity,
+        preferredTone,
+      });
+    }
+    return normalizedByFn;
   }
-  const normalized = normalizeKey(inferred || "dashboard_dark");
-  return listTemplateIds().includes(normalized) ? normalized : "dashboard_dark";
+  const normalized = normalizeKey(constrainedInferred || getDefaultTemplateId());
+  if (whitelist.length > 0) {
+    if (whitelist.includes(normalized)) return normalized;
+    return pickBestTemplateFromAllowed({
+      allowedTemplates: whitelist,
+      sourceSlide,
+      explicitType,
+      layoutGrid,
+      desiredDensity,
+      preferredTone,
+    });
+  }
+  return listTemplateIds().includes(normalized) ? normalized : getDefaultTemplateId();
 }
 
 export function resolveSubtypeByTemplate(subtype, templateFamily) {
   const normalizedSubtype = normalizeKey(subtype || "") || "content";
-  const family = normalizeKey(templateFamily || "") || "dashboard_dark";
+  const family = normalizeKey(templateFamily || "") || getDefaultTemplateId();
   const overrides = getCatalog().subtype_overrides?.[family];
   if (overrides && overrides[normalizedSubtype]) return overrides[normalizedSubtype];
   return normalizedSubtype;
@@ -266,8 +491,7 @@ export function isLightTemplateFamily(templateFamily) {
 }
 
 export function defaultTemplateForLayout(layoutGrid = "split_2") {
-  const layout = normalizeKey(layoutGrid || "split_2");
-  return String(getCatalog().layout_defaults?.[layout] || "dashboard_dark");
+  return getLayoutDefault(layoutGrid);
 }
 
 export function assessTemplateCapabilityForSlide({
@@ -276,7 +500,7 @@ export function assessTemplateCapabilityForSlide({
   slideType = "",
   layoutGrid = "",
 }) {
-  const family = normalizeKey(templateFamily || "") || "dashboard_dark";
+  const family = normalizeKey(templateFamily || "") || getDefaultTemplateId();
   const capabilities = getTemplateCapabilities(family);
   const supportedSlideTypes = new Set(
     (Array.isArray(capabilities?.supported_slide_types) ? capabilities.supported_slide_types : [])
@@ -338,3 +562,4 @@ export function assessTemplateCapabilityForSlide({
       && !unsupportedLayout,
   };
 }
+

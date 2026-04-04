@@ -647,6 +647,113 @@ test("renderSlideModulesInParallel can apply subagent patch before per-slide ren
   }
 });
 
+test("renderSlideModulesInParallel preserves visual identity fields when template_lock is enabled", async () => {
+  const workDir = mkdtempSync(path.join(tmpdir(), "slide-module-subagent-lock-"));
+  const modulesDir = path.join(workDir, "slides");
+  try {
+    const payload = {
+      ...buildPayload(),
+      slides: [
+        {
+          slide_id: "s-cover",
+          page_number: 1,
+          slide_type: "cover",
+          layout_grid: "hero_1",
+          title: "Cover",
+          blocks: [
+            { block_type: "title", card_id: "title", content: "Cover" },
+            { block_type: "subtitle", card_id: "subtitle", content: "Opening" },
+          ],
+        },
+        {
+          slide_id: "s-content",
+          page_number: 2,
+          slide_type: "content",
+          layout_grid: "split_2",
+          title: "Locked Slide",
+          template_lock: true,
+          template_family: "bento_2x2_dark",
+          template_id: "bento_2x2_dark",
+          style_variant: "soft",
+          palette_key: "pure_tech_blue",
+          skill_profile: "bento-general",
+          blocks: [
+            { block_type: "title", card_id: "title", content: "Locked Slide" },
+            { block_type: "body", card_id: "body", content: "Point A" },
+          ],
+        },
+        {
+          slide_id: "s-summary",
+          page_number: 3,
+          slide_type: "summary",
+          layout_grid: "hero_1",
+          title: "Summary",
+          blocks: [
+            { block_type: "title", card_id: "title", content: "Summary" },
+            { block_type: "list", card_id: "list", content: "Done" },
+          ],
+        },
+      ],
+    };
+
+    const { manifest } = writeSlideModules(payload, modulesDir);
+    const result = await renderSlideModulesInParallel({
+      manifest,
+      maxParallel: 1,
+      targetSlideIds: ["s-content"],
+      enableSubagentExec: true,
+      subagentExecutor: async () => ({
+        slide_patch: {
+          title: "Patched Title",
+          template_family: "dashboard_dark",
+          template_id: "dashboard_dark",
+          style_variant: "sharp",
+          palette_key: "business_authority",
+          skill_profile: "cover-default",
+        },
+      }),
+      generatorScriptPath: "scripts/generate-pptx-minimax.mjs",
+      outputDir: path.join(workDir, "rendered"),
+      runner: async (_command, args) => {
+        const inputPath = args[args.indexOf("--input") + 1];
+        const targetSlideId = args[args.indexOf("--target-slide-ids") + 1];
+        const renderOutputPath = args[args.indexOf("--render-output") + 1];
+        const compileInput = JSON.parse(readFileSync(inputPath, "utf-8"));
+        const targetSlide = compileInput.slides.find((slide) => slide.slide_id === targetSlideId);
+        assert.ok(targetSlide);
+        assert.equal(targetSlide.title, "Patched Title");
+        assert.equal(targetSlide.template_family, "bento_2x2_dark");
+        assert.equal(targetSlide.template_id, "bento_2x2_dark");
+        assert.equal(targetSlide.style_variant, "soft");
+        assert.equal(targetSlide.palette_key, "pure_tech_blue");
+        assert.equal(targetSlide.skill_profile, "bento-general");
+        writeFileSync(
+          renderOutputPath,
+          JSON.stringify({
+            slides: [{ slide_id: targetSlideId, render_path: "pptxgenjs" }],
+            official_output: { slides: [{ slide_id: targetSlideId, title: "Patched Title" }] },
+          }),
+          "utf-8",
+        );
+        return { ok: true };
+      },
+    });
+
+    assert.equal(result.ok, true);
+    const loaded = await loadSlideModules(manifest);
+    const contentSlide = loaded.modules.find((row) => row.slide_id === "s-content");
+    assert.ok(contentSlide);
+    assert.equal(contentSlide.slide_data.title, "Patched Title");
+    assert.equal(contentSlide.slide_data.template_family, "bento_2x2_dark");
+    assert.equal(contentSlide.slide_data.template_id, "bento_2x2_dark");
+    assert.equal(contentSlide.slide_data.style_variant, "soft");
+    assert.equal(contentSlide.slide_data.palette_key, "pure_tech_blue");
+    assert.equal(contentSlide.slide_data.skill_profile, "bento-general");
+  } finally {
+    rmSync(workDir, { recursive: true, force: true });
+  }
+});
+
 test("renderSlideModulesInParallel ignores generic subagent title downgrade", async () => {
   const workDir = mkdtempSync(path.join(tmpdir(), "slide-module-subagent-generic-"));
   const modulesDir = path.join(workDir, "slides");

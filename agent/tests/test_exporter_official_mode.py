@@ -1,6 +1,6 @@
 import re
 
-from src.minimax_exporter import build_payload
+from src.minimax_exporter import _template_family_supports_slide, build_payload
 
 
 def _norm(text: str) -> str:
@@ -40,6 +40,7 @@ def test_exporter_default_mode_is_official():
     assert payload.get("skill_profile")
     assert payload.get("schema_profile")
     assert payload.get("quality_profile")
+    assert isinstance(payload.get("design_decision_v1"), dict)
 
 
 def test_exporter_payload_includes_design_spec_contract():
@@ -158,3 +159,116 @@ def test_exporter_strips_supporting_point_prefix_from_non_title_blocks():
     ]
     assert all(not str(text).startswith("补充要点") for text in texts)
     assert len({_norm(text) for text in texts if _norm(text)}) == len([text for text in texts if _norm(text)])
+
+
+def test_exporter_payload_prefers_design_decision_when_requested_values_are_auto():
+    payload = build_payload(
+        slides=[
+            {"slide_id": "s1", "title": "Intro", "slide_type": "content"},
+        ],
+        title="Deck",
+        author="a",
+        style_variant="auto",
+        palette_key="auto",
+        template_family="auto",
+        design_decision={
+            "version": "v1",
+            "deck": {
+                "style_variant": "rounded",
+                "palette_key": "pure_tech_blue",
+                "template_family": "ops_lifecycle_light",
+                "skill_profile": "architecture",
+            },
+            "slides": [
+                {"slide_id": "s1", "layout_grid": "timeline", "render_path": "svg"},
+            ],
+        },
+    )
+    assert payload.get("minimax_style_variant") == "rounded"
+    assert payload.get("minimax_palette_key") == "pure_tech_blue"
+    assert payload.get("template_family") == "ops_lifecycle_light"
+    assert payload.get("skill_profile") == "architecture"
+    assert payload["slides"][0].get("layout_grid") == "timeline"
+    assert payload["slides"][0].get("render_path") == "svg"
+
+
+def test_exporter_payload_derives_style_and_tone_from_theme_recipe_when_auto():
+    payload = build_payload(
+        slides=[
+            {"slide_id": "s1", "title": "Classroom Intro", "slide_type": "content"},
+        ],
+        title="Deck",
+        author="a",
+        style_variant="auto",
+        palette_key="auto",
+        theme_recipe="classroom_soft",
+        tone="auto",
+        template_family="auto",
+    )
+    assert payload.get("theme_recipe") == "classroom_soft"
+    assert payload.get("tone") == "light"
+    assert payload.get("minimax_style_variant") == "rounded"
+    design_spec = payload.get("design_spec") if isinstance(payload.get("design_spec"), dict) else {}
+    visual = design_spec.get("visual") if isinstance(design_spec.get("visual"), dict) else {}
+    assert visual.get("style_recipe") == "rounded"
+    assert visual.get("theme_recipe") == "classroom_soft"
+    assert visual.get("tone") == "light"
+
+
+def test_exporter_rejects_incompatible_locked_cover_template_for_content_slide():
+    payload = build_payload(
+        slides=[
+            {
+                "slide_id": "s1",
+                "title": "Classroom analysis",
+                "slide_type": "content",
+                "layout_grid": "split_2",
+                "template_family": "hero_tech_cover",
+                "template_lock": True,
+                "blocks": [
+                    {"block_type": "title", "content": "Classroom analysis"},
+                    {"block_type": "body", "content": "explain legislative process impact"},
+                ],
+            }
+        ],
+        title="Deck",
+        author="a",
+    )
+    slide = payload["slides"][0]
+    assert slide.get("template_family") != "hero_tech_cover"
+    assert slide.get("contract_profile") != "cover_meta_required"
+
+
+def test_exporter_prefers_requested_deck_template_when_compatible():
+    payload = build_payload(
+        slides=[
+            {
+                "slide_id": "s1",
+                "title": "Legislation process",
+                "slide_type": "content",
+                "layout_grid": "split_2",
+                "blocks": [
+                    {"block_type": "title", "content": "Legislation process"},
+                    {"block_type": "body", "content": "stakeholders and policy flow"},
+                ],
+            }
+        ],
+        title="Deck",
+        author="a",
+        template_family="split_media_dark",
+    )
+    slide = payload["slides"][0]
+    assert slide.get("template_family") == "split_media_dark"
+
+
+def test_exporter_treats_toc_and_divider_as_cover_compatible_for_hero_template():
+    assert _template_family_supports_slide(
+        "hero_tech_cover",
+        slide_type="toc",
+        layout_grid="hero_1",
+    )
+    assert _template_family_supports_slide(
+        "hero_tech_cover",
+        slide_type="divider",
+        layout_grid="hero_1",
+    )

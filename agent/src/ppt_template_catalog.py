@@ -14,7 +14,7 @@ from src.schemas.ppt_policy import (
 )
 
 
-_DEFAULT_TEMPLATE_ID = "dashboard_dark"
+_DEFAULT_TEMPLATE_ID_FALLBACK = "consulting_warm_light"
 _DEFAULT_ROUTE_POLICIES = {
     "fast": RoutePolicyConfig(
         mode="fast",
@@ -59,13 +59,29 @@ def _as_dict(value: Any) -> Dict[str, Any]:
     return value if isinstance(value, dict) else {}
 
 
+def _normalize_key(value: Any) -> str:
+    return (
+        str(value or "")
+        .strip()
+        .lower()
+        .replace("-", "_")
+        .replace(" ", "_")
+    )
+
+
 @lru_cache(maxsize=1)
 def get_template_catalog() -> Dict[str, Any]:
     path = _catalog_path()
     if not path.exists():
         return {
+            "default_template_id": _DEFAULT_TEMPLATE_ID_FALLBACK,
+            "default_palette_key": "business_authority",
+            "default_theme_recipe": "consulting_clean",
             "layout_defaults": {},
             "subtype_overrides": {},
+            "palettes": {},
+            "palette_aliases": {},
+            "theme_recipes": {},
             "palette_keywords": {},
             "keyword_rules": [],
             "contract_profiles": {},
@@ -77,8 +93,14 @@ def get_template_catalog() -> Dict[str, Any]:
         data = json.loads(path.read_text(encoding="utf-8"))
     except Exception:
         return {
+            "default_template_id": _DEFAULT_TEMPLATE_ID_FALLBACK,
+            "default_palette_key": "business_authority",
+            "default_theme_recipe": "consulting_clean",
             "layout_defaults": {},
             "subtype_overrides": {},
+            "palettes": {},
+            "palette_aliases": {},
+            "theme_recipes": {},
             "palette_keywords": {},
             "keyword_rules": [],
             "contract_profiles": {},
@@ -87,8 +109,14 @@ def get_template_catalog() -> Dict[str, Any]:
             "templates": {},
         }
     return {
+        "default_template_id": str(data.get("default_template_id") or _DEFAULT_TEMPLATE_ID_FALLBACK).strip().lower(),
+        "default_palette_key": str(data.get("default_palette_key") or "business_authority").strip().lower(),
+        "default_theme_recipe": str(data.get("default_theme_recipe") or "consulting_clean").strip().lower(),
         "layout_defaults": _as_dict(data.get("layout_defaults")),
         "subtype_overrides": _as_dict(data.get("subtype_overrides")),
+        "palettes": _as_dict(data.get("palettes")),
+        "palette_aliases": _as_dict(data.get("palette_aliases")),
+        "theme_recipes": _as_dict(data.get("theme_recipes")),
         "palette_keywords": _as_dict(data.get("palette_keywords")),
         "keyword_rules": data.get("keyword_rules") if isinstance(data.get("keyword_rules"), list) else [],
         "contract_profiles": _as_dict(data.get("contract_profiles")),
@@ -102,11 +130,25 @@ def list_template_ids() -> List[str]:
     return list(get_template_catalog().get("templates", {}).keys())
 
 
+def default_template_id() -> str:
+    catalog = get_template_catalog()
+    templates = _as_dict(catalog.get("templates"))
+    template_ids = list(templates.keys())
+    requested = str(catalog.get("default_template_id") or "").strip().lower()
+    if requested and requested in template_ids:
+        return requested
+    if _DEFAULT_TEMPLATE_ID_FALLBACK in template_ids:
+        return _DEFAULT_TEMPLATE_ID_FALLBACK
+    if "dashboard_dark" in template_ids:
+        return "dashboard_dark"
+    return template_ids[0] if template_ids else _DEFAULT_TEMPLATE_ID_FALLBACK
+
+
 def template_profiles(template_id: str) -> Dict[str, str]:
     templates = _as_dict(get_template_catalog().get("templates"))
     candidate = str(template_id or "").strip().lower()
     if candidate not in templates:
-        candidate = _DEFAULT_TEMPLATE_ID
+        candidate = default_template_id()
     profile = _as_dict(templates.get(candidate))
     return {
         "template_id": candidate,
@@ -120,15 +162,34 @@ def template_profiles(template_id: str) -> Dict[str, str]:
 
 def default_template_for_layout(layout_grid: str) -> str:
     defaults = _as_dict(get_template_catalog().get("layout_defaults"))
-    candidate = str(defaults.get(str(layout_grid or "").strip().lower()) or _DEFAULT_TEMPLATE_ID).strip().lower()
+    candidate = str(defaults.get(str(layout_grid or "").strip().lower()) or default_template_id()).strip().lower()
     if candidate in list_template_ids():
         return candidate
-    return _DEFAULT_TEMPLATE_ID
+    return default_template_id()
 
 
 _DENSITY_ORDER = {"sparse": 0, "balanced": 1, "dense": 2}
 _VISUAL_BLOCK_TYPES = {"image", "chart", "kpi", "workflow", "diagram"}
 _DATA_BLOCK_TYPES = {"chart", "kpi", "table"}
+_LIGHT_THEME_HINTS = (
+    "education",
+    "teaching",
+    "training",
+    "classroom",
+    "student",
+    "school",
+    "curriculum",
+    "lesson",
+    "academic",
+    "\u6559\u5b66",
+    "\u8bfe\u5802",
+    "\u6559\u80b2",
+    "\u57f9\u8bad",
+    "\u5b66\u6821",
+    "\u8bfe\u7a0b",
+    "\u9ad8\u6821",
+)
+_TERMINAL_TEMPLATE_IDS = {"hero_dark", "hero_tech_cover", "quote_hero_dark"}
 _LAYOUT_CARD_COUNTS = {
     "hero_1": 1,
     "split_2": 2,
@@ -139,6 +200,13 @@ _LAYOUT_CARD_COUNTS = {
     "bento_6": 6,
     "timeline": 5,
 }
+
+
+def _normalize_tone(value: str) -> str:
+    normalized = str(value or "").strip().lower()
+    if normalized in {"light", "dark"}:
+        return normalized
+    return ""
 
 
 def _normalize_density(value: str) -> str:
@@ -236,6 +304,48 @@ def _build_text_blob(slide: Dict[str, Any]) -> str:
                 if value:
                     parts.append(value)
     return " ".join(parts).lower()
+
+
+def _prefers_light_theme(blob: str, block_types: Set[str], *, needs_data: bool, has_image_visual: bool) -> bool:
+    hint_hit = any(token in blob for token in _LIGHT_THEME_HINTS)
+    _ = (block_types, needs_data, has_image_visual)
+    return bool(hint_hit)
+
+
+def _normalize_archetype_candidates(raw: Any) -> List[str]:
+    rows = raw if isinstance(raw, list) else []
+    out: List[str] = []
+    seen: Set[str] = set()
+    for row in rows:
+        if isinstance(row, str):
+            value = row
+        elif isinstance(row, dict):
+            value = row.get("archetype")
+        else:
+            value = ""
+        key = _normalize_key(value)
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        out.append(key)
+    return out
+
+
+def _template_archetype_bonus(
+    *,
+    template_row: Dict[str, Any],
+    selected_archetype: str,
+    archetype_candidates: List[str],
+) -> float:
+    preferred = _normalize_archetype_candidates(template_row.get("preferred_archetypes"))
+    if not preferred:
+        return 0.0
+    selected = _normalize_key(selected_archetype)
+    if selected and selected in preferred:
+        return 3.2
+    if any(candidate in preferred for candidate in archetype_candidates):
+        return 1.4
+    return 0.0
 
 
 def contract_profile(contract_id: str) -> Dict[str, Any]:
@@ -392,7 +502,7 @@ def template_capabilities(template_id: str) -> Dict[str, Any]:
     templates = _as_dict(get_template_catalog().get("templates"))
     requested = str(template_id or "").strip().lower()
     if requested not in templates:
-        requested = _DEFAULT_TEMPLATE_ID
+        requested = default_template_id()
     raw = _as_dict(_as_dict(templates.get(requested)).get("capabilities"))
     density_raw = _as_dict(raw.get("density_range"))
     supported_slide_types = raw.get("supported_slide_types")
@@ -433,6 +543,7 @@ def resolve_template_for_slide(
     layout_grid: str,
     requested_template: str = "",
     desired_density: str = "balanced",
+    preferred_tone: str = "",
 ) -> str:
     templates = _as_dict(get_template_catalog().get("templates"))
     template_ids = list(templates.keys())
@@ -442,9 +553,15 @@ def resolve_template_for_slide(
 
     normalized_type = str(slide_type or "").strip().lower() or "content"
     normalized_layout = str(layout_grid or "").strip().lower() or "split_2"
-    if normalized_type in {"cover", "hero_1"} or normalized_layout == "hero_1":
+    if normalized_type == "cover":
         return "hero_tech_cover"
-    if normalized_type == "summary":
+    if normalized_type == "toc":
+        return "hero_dark"
+    if normalized_type in {"summary", "divider"}:
+        return "quote_hero_dark"
+    if normalized_type == "hero_1":
+        return "hero_tech_cover"
+    if normalized_layout == "hero_1":
         return "hero_dark"
 
     desired = _normalize_density(desired_density)
@@ -453,6 +570,9 @@ def resolve_template_for_slide(
     layout_default = default_template_for_layout(normalized_layout)
     keyword_rules = get_template_catalog().get("keyword_rules") or []
     layout_capacity = int(_LAYOUT_CARD_COUNTS.get(normalized_layout, 3))
+    normalized_preferred_tone = _normalize_tone(preferred_tone)
+    selected_archetype = _normalize_key(slide.get("archetype") or "")
+    archetype_candidates = _normalize_archetype_candidates(slide.get("archetype_candidates"))
 
     def _keyword_score(candidate: str) -> int:
         best = 0
@@ -475,12 +595,19 @@ def resolve_template_for_slide(
     needs_visual = bool(block_types & _VISUAL_BLOCK_TYPES) or bool(slide.get("image_keywords"))
     needs_data = bool(block_types & _DATA_BLOCK_TYPES)
     has_image_visual = _has_image_asset(slide)
+    prefers_light_theme = _prefers_light_theme(
+        blob,
+        block_types,
+        needs_data=needs_data,
+        has_image_visual=has_image_visual,
+    )
     best_template = layout_default
     best_score = -10_000.0
 
     for template_id in template_ids:
         cap = template_capabilities(template_id)
-        contract = contract_profile(str(_as_dict(templates.get(template_id)).get("contract_profile") or "default"))
+        template_row = _as_dict(templates.get(template_id))
+        contract = contract_profile(str(template_row.get("contract_profile") or "default"))
         score = 0.0
         supported_layouts = set(cap["supported_layouts"])
         supported_types = set(cap["supported_slide_types"])
@@ -493,6 +620,9 @@ def resolve_template_for_slide(
             score += 3.0
         else:
             score -= 4.0
+        # Keep cover/quote templates away from regular content pages.
+        if normalized_type == "content" and template_id in _TERMINAL_TEMPLATE_IDS:
+            score -= 7.5
 
         density_min = _DENSITY_ORDER.get(cap["density_range"]["min"], 0)
         density_max = _DENSITY_ORDER.get(cap["density_range"]["max"], 2)
@@ -527,8 +657,29 @@ def resolve_template_for_slide(
 
         kw_score = _keyword_score(template_id)
         score += min(3.0, float(kw_score))
+        score += _template_archetype_bonus(
+            template_row=template_row,
+            selected_archetype=selected_archetype,
+            archetype_candidates=archetype_candidates,
+        )
         if template_id == "architecture_dark_panel" and kw_score < 2 and "workflow" not in block_types:
             score -= 2.0
+
+        if prefers_light_theme:
+            if template_id.endswith("_light"):
+                score += 3.2
+            elif template_id.endswith("_dark"):
+                score -= 2.4
+        if normalized_preferred_tone == "light":
+            if template_id.endswith("_light"):
+                score += 4.0
+            elif template_id.endswith("_dark"):
+                score -= 3.2
+        elif normalized_preferred_tone == "dark":
+            if template_id.endswith("_dark"):
+                score += 3.2
+            elif template_id.endswith("_light"):
+                score -= 2.6
 
         if template_id == layout_default:
             score += 1.2
@@ -537,4 +688,5 @@ def resolve_template_for_slide(
             best_score = score
             best_template = template_id
 
-    return best_template if best_template in templates else _DEFAULT_TEMPLATE_ID
+    return best_template if best_template in templates else default_template_id()
+

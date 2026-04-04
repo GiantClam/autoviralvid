@@ -24,7 +24,7 @@ def test_template_routing_prefers_data_capability_for_dense_data_slide():
         layout_grid="grid_3",
         desired_density="dense",
     )
-    assert template in {"dashboard_dark", "ops_lifecycle_light"}
+    assert template in {"dashboard_dark", "ops_lifecycle_light", "kpi_dashboard_dark"}
 
 
 def test_template_routing_weak_keyword_does_not_force_architecture():

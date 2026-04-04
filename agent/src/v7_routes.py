@@ -681,6 +681,8 @@ async def _execute_export(req: Dict[str, Any]) -> Dict[str, Any]:
     )[0]
     style_variant = str(req.get("minimax_style_variant", "auto") or "auto")
     palette_key = str(req.get("minimax_palette_key", "auto") or "auto")
+    theme_recipe = str(req.get("theme_recipe", "auto") or "auto")
+    tone = str(req.get("tone", "auto") or "auto")
     verbatim_content = bool(req.get("verbatim_content", False))
     retry_scope = str(req.get("retry_scope", "deck") or "deck")
     target_slide_ids = [str(s).strip() for s in req.get("target_slide_ids", []) if str(s).strip()]
@@ -720,6 +722,8 @@ async def _execute_export(req: Dict[str, Any]) -> Dict[str, Any]:
         author="AutoViralVid",
         style_variant=style_variant,
         palette_key=palette_key,
+        theme_recipe=theme_recipe,
+        tone=tone,
         verbatim_content=verbatim_content,
         deck_id=run_id,
         retry_scope=retry_scope,

@@ -28,17 +28,21 @@ class PPTPipelineRequest(BaseModel):
     purpose: str = Field(default="presentation", max_length=200)
     style_preference: str = Field(default="professional", max_length=200)
     constraints: List[str] = Field(default_factory=list, max_length=20)
+    anchors: List[str] = Field(default_factory=list, max_length=20)
     required_facts: List[str] = Field(default_factory=list, max_length=20)
     geography: str = Field(default="", max_length=120)
     time_range: str = Field(default="", max_length=120)
     domain_terms: List[str] = Field(default_factory=list, max_length=20)
     web_enrichment: bool = True
+    image_asset_enrichment: bool = True
     research_min_completeness: float = Field(default=0.4, ge=0.3, le=1.0)
     desired_citations: int = Field(default=3, ge=1, le=12)
     min_reference_materials: int = Field(default=3, ge=1, le=12)
     min_key_data_points: int = Field(default=5, ge=3, le=20)
     max_web_queries: int = Field(default=4, ge=1, le=8)
     max_search_results: int = Field(default=5, ge=3, le=10)
+    execution_profile: Literal["auto", "dev_strict", "prod_safe"] = "auto"
+    force_ppt_master: Optional[bool] = None
     quality_profile: str = Field(default="auto", max_length=64)
     total_pages: int = Field(default=10, ge=3, le=50)
     language: Literal["zh-CN", "en-US"] = "zh-CN"
@@ -50,6 +54,14 @@ class PPTPipelineRequest(BaseModel):
     save_artifacts: bool = True
     minimax_style_variant: Literal["auto", "sharp", "soft", "rounded", "pill"] = "auto"
     minimax_palette_key: str = Field(default="auto", max_length=64)
+    theme_recipe: str = Field(default="auto", max_length=64)
+    tone: Literal["auto", "light", "dark"] = "auto"
+    visual_preset: str = Field(default="auto", max_length=64)
+    template_family: str = Field(default="auto", max_length=64)
+    skill_profile: str = Field(default="auto", max_length=64)
+    template_file_url: Optional[str] = Field(default=None, max_length=2048)
+    reconstruct_from_reference: bool = False
+    reference_desc: Optional[Dict[str, Any]] = None
 
 
 class PPTPipelineStageStatus(BaseModel):

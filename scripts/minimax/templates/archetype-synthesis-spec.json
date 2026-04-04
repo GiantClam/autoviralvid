@@ -1,0 +1,72 @@
+{
+  "default": {
+    "template_whitelist": ["consulting_warm_light", "split_media_dark", "comparison_cards_light"],
+    "required_blocks": ["title", "body", "list"],
+    "optional_blocks": ["image"],
+    "dual_text": true,
+    "semantic_page_type": "content"
+  },
+  "thesis_assertion": {
+    "template_whitelist": ["consulting_warm_light", "split_media_dark", "comparison_cards_light"],
+    "required_blocks": ["title", "body", "list"],
+    "optional_blocks": ["image", "kpi"],
+    "dual_text": true,
+    "semantic_page_type": "content"
+  },
+  "evidence_cards_3": {
+    "template_whitelist": ["consulting_warm_light", "split_media_dark", "bento_2x2_dark"],
+    "required_blocks": ["title", "body", "list"],
+    "optional_blocks": ["kpi", "image"],
+    "dual_text": true,
+    "semantic_page_type": "content"
+  },
+  "comparison_2col": {
+    "template_whitelist": ["comparison_cards_light", "consulting_warm_light", "split_media_dark"],
+    "required_blocks": ["title", "comparison", "body"],
+    "optional_blocks": ["list", "kpi"],
+    "dual_text": false,
+    "semantic_page_type": "comparison"
+  },
+  "chart_dual_compare": {
+    "template_whitelist": ["kpi_dashboard_dark", "dashboard_dark", "ops_lifecycle_light"],
+    "required_blocks": ["title", "chart", "body", "list"],
+    "optional_blocks": ["kpi", "table", "comparison"],
+    "dual_text": true,
+    "semantic_page_type": "comparison"
+  },
+  "chart_single_focus": {
+    "template_whitelist": ["kpi_dashboard_dark", "dashboard_dark", "ops_lifecycle_light"],
+    "required_blocks": ["title", "chart", "body"],
+    "optional_blocks": ["kpi", "list", "table"],
+    "dual_text": true,
+    "semantic_page_type": "data_visualization"
+  },
+  "dashboard_kpi_4": {
+    "template_whitelist": ["kpi_dashboard_dark", "dashboard_dark", "ops_lifecycle_light"],
+    "required_blocks": ["title", "kpi", "chart", "body"],
+    "optional_blocks": ["list", "table"],
+    "dual_text": true,
+    "semantic_page_type": "data_visualization"
+  },
+  "media_showcase_1p2s": {
+    "template_whitelist": ["split_media_dark", "image_showcase_light", "consulting_warm_light"],
+    "required_blocks": ["title", "image", "body"],
+    "optional_blocks": ["list", "kpi"],
+    "dual_text": true,
+    "semantic_page_type": "showcase"
+  },
+  "process_flow_4step": {
+    "template_whitelist": ["ops_lifecycle_light", "process_flow_dark", "architecture_dark_panel"],
+    "required_blocks": ["title", "body", "list"],
+    "optional_blocks": ["workflow", "diagram", "chart"],
+    "dual_text": true,
+    "semantic_page_type": "workflow"
+  },
+  "timeline_horizontal": {
+    "template_whitelist": ["ops_lifecycle_light", "process_flow_dark", "dashboard_dark"],
+    "required_blocks": ["title", "body", "list"],
+    "optional_blocks": ["chart", "kpi"],
+    "dual_text": true,
+    "semantic_page_type": "roadmap"
+  }
+}

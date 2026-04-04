@@ -14,9 +14,13 @@ def test_quality_profile_exposes_orchestration_policy():
 
 
 def test_route_policy_and_recommendation_are_catalog_driven():
+    standard = route_policy("standard")
+    assert standard.get("mode") == "standard"
+    assert int(standard.get("max_retry_attempts") or 0) == 2
+
     refine = route_policy("refine")
     assert refine.get("mode") == "refine"
-    assert int(refine.get("max_retry_attempts") or 0) >= 4
+    assert int(refine.get("max_retry_attempts") or 0) == 3
     assert bool(refine.get("run_post_render_visual_qa")) is True
 
     recommendation = route_recommendation_policy()

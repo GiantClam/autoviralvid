@@ -16,7 +16,7 @@ test("template registry: weak orchestration keyword should not force architectur
     explicitType: "content",
     layoutGrid: "split_2",
   });
-  assert.equal(family, "split_media_dark");
+  assert.equal(["split_media_dark", "comparison_cards_light"].includes(family), true);
 });
 
 test("template registry: strong architecture signal should select architecture template", () => {
@@ -175,7 +175,45 @@ test("template registry: comparison keywords can select comparison_cards_light",
   assert.equal(family, "comparison_cards_light");
 });
 
-test("template registry: quote-heavy content can select quote_hero_dark", () => {
+test("template registry: explicit comparison archetype biases template selection", () => {
+  const family = resolveTemplateFamilyForSlide({
+    sourceSlide: {
+      title: "Operating model review",
+      archetype: "comparison_2col",
+      blocks: [
+        { block_type: "title", content: "Workflow comparison" },
+        { block_type: "body", content: "handoff heavy and slow" },
+        { block_type: "list", content: "automated routing;faster iteration" },
+      ],
+    },
+    requestedTemplateFamily: "auto",
+    explicitType: "content",
+    layoutGrid: "split_2",
+  });
+  assert.equal(family, "comparison_cards_light");
+});
+
+test("template registry: dashboard archetype biases toward KPI templates", () => {
+  const family = resolveTemplateFamilyForSlide({
+    sourceSlide: {
+      title: "Quarterly KPI review",
+      archetype: "dashboard_kpi_4",
+      blocks: [
+        { block_type: "title", content: "KPI review" },
+        { block_type: "kpi", content: "ROI 132%" },
+        { block_type: "chart", content: "Q1-Q4 trend" },
+        { block_type: "body", content: "CAC down 17%" },
+      ],
+    },
+    requestedTemplateFamily: "auto",
+    explicitType: "content",
+    layoutGrid: "grid_3",
+    desiredDensity: "dense",
+  });
+  assert.equal(["kpi_dashboard_dark", "dashboard_dark", "ops_lifecycle_light"].includes(family), true);
+});
+
+test("template registry: quote-heavy content avoids terminal hero templates", () => {
   const family = resolveTemplateFamilyForSlide({
     sourceSlide: {
       title: "Vision quote insight",
@@ -189,7 +227,40 @@ test("template registry: quote-heavy content can select quote_hero_dark", () => 
     layoutGrid: "split_2",
     desiredDensity: "sparse",
   });
-  assert.equal(family, "quote_hero_dark");
+  assert.equal(["quote_hero_dark", "hero_dark", "hero_tech_cover"].includes(family), false);
+});
+
+test("template registry: whitelist constrains template selection for critic-repair pages", () => {
+  const family = resolveTemplateFamilyForSlide({
+    sourceSlide: {
+      title: "Visual similarity repair page",
+      blocks: [
+        { block_type: "title", content: "Repair target" },
+        { block_type: "body", content: "Layout and geometry stabilization" },
+      ],
+      template_family_whitelist: ["split_media_dark", "consulting_warm_light"],
+    },
+    requestedTemplateFamily: "auto",
+    explicitType: "content",
+    layoutGrid: "split_2",
+    desiredDensity: "balanced",
+  });
+  assert.equal(["split_media_dark", "consulting_warm_light"].includes(family), true);
+});
+
+test("template registry: whitelist blocks dashboard fallback when requested template not allowed", () => {
+  const family = resolveTemplateFamilyForSlide({
+    sourceSlide: {
+      title: "Repair page with constrained templates",
+      blocks: [{ block_type: "body", content: "Stabilize structure mismatch." }],
+      template_candidates: ["ops_lifecycle_light", "comparison_cards_light"],
+    },
+    requestedTemplateFamily: "dashboard_dark",
+    explicitType: "content",
+    layoutGrid: "grid_3",
+    desiredDensity: "balanced",
+  });
+  assert.equal(["ops_lifecycle_light", "comparison_cards_light"].includes(family), true);
 });
 
 test("template registry: capability assessment flags unsupported constrained blocks", () => {

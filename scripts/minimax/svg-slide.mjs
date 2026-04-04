@@ -40,6 +40,105 @@ export function buildSlideSvg(sourceSlide, theme = {}, width = 1600, height = 90
   ].join("");
 }
 
+function splitTitleLines(title = "", maxChars = 16) {
+  const text = String(title || "").trim();
+  if (!text) return ["", ""];
+  const parts = text.split(/[：:]/).map((item) => item.trim()).filter(Boolean);
+  if (parts.length >= 2) {
+    return [parts[0], parts.slice(1).join("：")];
+  }
+  if (text.length <= maxChars) return [text, ""];
+  const midpoint = Math.ceil(text.length / 2);
+  return [text.slice(0, midpoint).trim(), text.slice(midpoint).trim()];
+}
+
+function cleanHex(value, fallback = "FFFFFF") {
+  const raw = String(value || "").replace("#", "").trim();
+  return /^[0-9a-fA-F]{6}$/.test(raw) ? raw.toUpperCase() : fallback;
+}
+
+export function buildTerminalPageSvg(kind, payload = {}, theme = {}, width = 1280, height = 720) {
+  const primary = cleanHex(theme.primary, "005587");
+  const secondary = cleanHex(theme.secondary || theme.accentStrong, "0076A8");
+  const accent = cleanHex(theme.accentStrong || theme.accent, "F5A623");
+  const bg = cleanHex(theme.white || theme.bg, kind === "toc" ? "F7F8FA" : "FFFFFF");
+  const panelBg = cleanHex(theme.cardBg || theme.white || "F8F9FA", "F8F9FA");
+  const text = cleanHex(theme.darkText, kind === "toc" ? "2C3E50" : "2C3E50");
+  const muted = cleanHex(theme.mutedText, "7F8C8D");
+  const title = String(payload.title || "").trim();
+  const subtitle = String(payload.subtitle || "").trim();
+  const titleLines = splitTitleLines(title, 16);
+  const sections = Array.isArray(payload.sections) ? payload.sections.slice(0, 6).map((item) => String(item || "").trim()).filter(Boolean) : [];
+  const bullets = Array.isArray(payload.bullets) ? payload.bullets.slice(0, 4).map((item) => String(item || "").trim()).filter(Boolean) : [];
+  const footerLabel = String(payload.footerLabel || "").trim();
+  const pageLabel = String(payload.pageLabel || "").trim();
+  const focus = String(payload.focus || "").trim();
+
+  if (kind === "cover") {
+    return [
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}">`,
+      `<defs><linearGradient id="headerGrad" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#${primary}"/><stop offset="100%" stop-color="#${secondary}"/></linearGradient><linearGradient id="decoGrad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#${primary}" stop-opacity="0.12"/><stop offset="100%" stop-color="#${secondary}" stop-opacity="0.04"/></linearGradient></defs>`,
+      `<rect width="${width}" height="${height}" fill="#${bg}"/>`,
+      `<rect x="0" y="0" width="12" height="${height}" fill="url(#headerGrad)"/>`,
+      `<rect x="12" y="0" width="3" height="${height}" fill="#${accent}"/>`,
+      `<rect x="60" y="55" width="180" height="5" fill="#${primary}"/>`,
+      `<rect x="60" y="65" width="100" height="3" fill="#${secondary}" fill-opacity="0.5"/>`,
+      `<rect x="780" y="0" width="500" height="${height}" fill="url(#decoGrad)"/>`,
+      `<rect x="850" y="120" width="360" height="360" fill="none" stroke="#${primary}" stroke-width="1" stroke-opacity="0.15"/>`,
+      `<rect x="900" y="170" width="260" height="260" fill="none" stroke="#${primary}" stroke-width="1" stroke-opacity="0.1"/>`,
+      `<rect x="950" y="220" width="160" height="160" fill="#${primary}" fill-opacity="0.03"/>`,
+      `<path d="M 1050,140 L 1220,140 L 1135,320 Z" fill="#${primary}" fill-opacity="0.06"/>`,
+      `<path d="M 880,400 L 1000,400 L 940,520 Z" fill="#${secondary}" fill-opacity="0.05"/>`,
+      `</svg>`,
+    ].join("");
+  }
+
+  if (kind === "toc") {
+    const rowY = [170, 170, 300, 300, 430, 430];
+    const rowX = [60, 660, 60, 660, 60, 660];
+    const colors = [primary, secondary, cleanHex(theme.light, "004D5C"), accent, muted, muted];
+    const rows = sections.map((_item, idx) => {
+      const x = rowX[idx] || 60;
+      const y = rowY[idx] || (170 + idx * 110);
+      const color = colors[idx] || primary;
+      const dashed = idx >= 4 ? ' stroke-dasharray="6,4"' : "";
+      const opacity = idx >= 4 ? ' fill="#FAFAFA" stroke="#E5E7EB" stroke-width="1"' : ` fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1.5"`;
+      return `
+        <g>
+          <rect x="${x}" y="${y}" width="560" height="110" ${opacity}${dashed} rx="6"/>
+          <rect x="${x}" y="${y}" width="6" height="110" fill="#${color}" rx="3"/>
+          <rect x="${x + 20}" y="${y + 20}" width="60" height="60" fill="#${color}" fill-opacity="0.08" rx="4"/>
+        </g>`;
+    }).join("");
+    return [
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}">`,
+      `<rect width="${width}" height="${height}" fill="#${bg}"/>`,
+      `<rect x="0" y="0" width="${width}" height="12" fill="#${primary}"/>`,
+      `<rect x="60" y="115" width="180" height="5" fill="#${primary}"/><rect x="245" y="115" width="90" height="5" fill="#${accent}"/>`,
+      `${rows}`,
+      `<rect x="60" y="580" width="1160" height="60" fill="#F8F9FA" rx="6"/>`,
+      `</svg>`,
+    ].join("");
+  }
+
+  return [
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}">`,
+    `<defs><linearGradient id="headerGrad" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#${primary}"/><stop offset="100%" stop-color="#${secondary}"/></linearGradient><linearGradient id="cardGrad" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#FAFBFC"/><stop offset="100%" stop-color="#F1F3F4"/></linearGradient></defs>`,
+    `<rect width="${width}" height="${height}" fill="#${bg}"/>`,
+    `<rect x="0" y="0" width="${width}" height="6" fill="url(#headerGrad)"/>`,
+    `<rect x="0" y="0" width="400" height="${height}" fill="#${primary}" fill-opacity="0.02"/>`,
+    `<rect x="880" y="0" width="400" height="${height}" fill="#${primary}" fill-opacity="0.02"/>`,
+    `<rect x="80" y="100" width="180" height="180" fill="none" stroke="#${primary}" stroke-width="1" stroke-opacity="0.08"/>`,
+    `<rect x="1020" y="420" width="180" height="180" fill="none" stroke="#${primary}" stroke-width="1" stroke-opacity="0.08"/>`,
+    `<line x1="480" y1="340" x2="600" y2="340" stroke="#${primary}" stroke-width="3"/>`,
+    `<circle cx="640" cy="340" r="8" fill="#${accent}"/>`,
+    `<line x1="680" y1="340" x2="800" y2="340" stroke="#${primary}" stroke-width="3"/>`,
+    `<rect x="390" y="440" width="500" height="150" fill="url(#cardGrad)" stroke="#E5E7EB" stroke-width="1.5" rx="8"/>`,
+    `<rect x="390" y="440" width="6" height="150" fill="#${primary}" rx="3"/>`,
+    `</svg>`,
+  ].join("");
+}
+
 export function addSvgOverlay(
   slide,
   svgText,

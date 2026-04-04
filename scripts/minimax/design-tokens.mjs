@@ -1,3 +1,5 @@
+import { defaultTemplateId, getTemplateCatalog } from "./templates/template-catalog.mjs";
+
 export const TEMPLATE_FAMILIES = [
   "hero_dark",
   "hero_tech_cover",
@@ -24,6 +26,15 @@ const LIGHT_TEMPLATE_FAMILIES = new Set([
   "image_showcase_light",
   "comparison_cards_light",
 ]);
+
+function defaultTemplateFamilyForLayout(layoutGrid = "") {
+  const catalog = getTemplateCatalog();
+  const grid = String(layoutGrid || "").trim().toLowerCase();
+  const candidate = String(catalog.layout_defaults?.[grid] || defaultTemplateId()).trim().toLowerCase();
+  if (TEMPLATE_FAMILIES.includes(candidate)) return candidate;
+  const fallback = String(defaultTemplateId() || "").trim().toLowerCase();
+  return TEMPLATE_FAMILIES.includes(fallback) ? fallback : "consulting_warm_light";
+}
 
 export const DARK_VISUAL_TOKENS = {
   colors: {
@@ -66,6 +77,46 @@ function cleanHex(value, fallback = "000000") {
   return /^[0-9a-fA-F]{6}$/.test(v) ? v.toUpperCase() : fallback;
 }
 
+function hexToRgb(hex) {
+  const normalized = cleanHex(hex, "000000");
+  return {
+    r: parseInt(normalized.slice(0, 2), 16),
+    g: parseInt(normalized.slice(2, 4), 16),
+    b: parseInt(normalized.slice(4, 6), 16),
+  };
+}
+
+function relativeLuminance(hex) {
+  const { r, g, b } = hexToRgb(hex);
+  const convert = (v) => {
+    const c = v / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  };
+  const lr = convert(r);
+  const lg = convert(g);
+  const lb = convert(b);
+  return (0.2126 * lr) + (0.7152 * lg) + (0.0722 * lb);
+}
+
+function contrastRatio(fgHex, bgHex) {
+  const l1 = relativeLuminance(fgHex);
+  const l2 = relativeLuminance(bgHex);
+  const bright = Math.max(l1, l2);
+  const dark = Math.min(l1, l2);
+  return (bright + 0.05) / (dark + 0.05);
+}
+
+function pickReadableTextColor(preferredHex, bgHex, minContrast = 4.5) {
+  const preferred = cleanHex(preferredHex, "FFFFFF");
+  const bg = cleanHex(bgHex, "000000");
+  if (contrastRatio(preferred, bg) >= minContrast) return preferred;
+  const darkCandidate = "0F172A";
+  const lightCandidate = "F8FAFC";
+  const darkRatio = contrastRatio(darkCandidate, bg);
+  const lightRatio = contrastRatio(lightCandidate, bg);
+  return darkRatio >= lightRatio ? darkCandidate : lightCandidate;
+}
+
 function mixHex(baseHex, overlayHex, ratio = 0.5) {
   const base = cleanHex(baseHex, "000000");
   const mix = cleanHex(overlayHex, "000000");
@@ -78,6 +129,63 @@ function mixHex(baseHex, overlayHex, ratio = 0.5) {
   return `${toChannel(0)}${toChannel(2)}${toChannel(4)}`;
 }
 
+function applyContrastGuards(theme = {}) {
+  const next = { ...theme };
+  const bgCandidates = [next.cardBg, next.cardAltBg, next.bg].filter(Boolean).map((v) => cleanHex(v, "FFFFFF"));
+  const allBackgrounds = bgCandidates.length ? bgCandidates : [cleanHex(next.bg, "FFFFFF")];
+  const evaluateCandidate = (candidateHex, minContrast) => {
+    const candidate = cleanHex(candidateHex, "0F172A");
+    const ratios = allBackgrounds.map((bg) => contrastRatio(candidate, bg));
+    const worst = ratios.length ? Math.min(...ratios) : 0;
+    const pass = ratios.every((ratio) => ratio >= minContrast);
+    return { candidate, worst, pass };
+  };
+  const pickBestAcrossBackgrounds = (preferredHex, minContrast, fallbackPool) => {
+    const pool = [preferredHex, ...fallbackPool].map((v) => cleanHex(v, "0F172A"));
+    let best = evaluateCandidate(pool[0], minContrast);
+    for (const item of pool) {
+      const result = evaluateCandidate(item, minContrast);
+      if (result.pass && !best.pass) {
+        best = result;
+        continue;
+      }
+      if (result.pass === best.pass && result.worst > best.worst) {
+        best = result;
+      }
+    }
+    return best.candidate;
+  };
+
+  next.darkText = pickBestAcrossBackgrounds(
+    next.darkText || "0F172A",
+    4.5,
+    ["0F172A", "17243D", "F8FAFC", "E8F0FF"],
+  );
+  next.mutedText = pickBestAcrossBackgrounds(
+    next.mutedText || next.darkText || "475569",
+    4.5,
+    ["475569", "64748B", "6B7C96", next.darkText || "0F172A", "F8FAFC"],
+  );
+  // Accent/primary are frequently reused as heading colors in templates.
+  // Keep them AA-safe across card/background surfaces to prevent subtle low-contrast text.
+  next.primary = pickBestAcrossBackgrounds(
+    next.primary || next.darkText || "2F67E8",
+    4.5,
+    [next.darkText || "0F172A", "2F67E8", "F8FAFC", "17243D"],
+  );
+  next.accent = pickBestAcrossBackgrounds(
+    next.accent || next.primary || next.darkText || "2F67E8",
+    4.5,
+    [next.primary || "2F67E8", next.darkText || "0F172A", "F8FAFC", "17243D"],
+  );
+  next.accentStrong = pickBestAcrossBackgrounds(
+    next.accentStrong || next.accent || next.primary || next.darkText || "2F67E8",
+    4.5,
+    [next.accent || "2F67E8", next.primary || "2F67E8", next.darkText || "0F172A", "F8FAFC"],
+  );
+  return next;
+}
+
 export function normalizeTemplateFamily(input, slideType, layoutGrid) {
   const requested = String(input || "").trim().toLowerCase();
   if (TEMPLATE_FAMILIES.includes(requested)) return requested;
@@ -85,21 +193,21 @@ export function normalizeTemplateFamily(input, slideType, layoutGrid) {
   const st = String(slideType || "").trim().toLowerCase();
   const grid = String(layoutGrid || "").trim().toLowerCase();
 
-  if (st === "cover" || grid === "hero_1") return "hero_tech_cover";
-  if (st === "summary") return "hero_dark";
-  if (grid === "split_2" || grid === "asymmetric_2") return "architecture_dark_panel";
-  if (grid === "grid_4") return "neural_blueprint_light";
-  if (grid === "timeline") return "process_flow_dark";
-  if (grid === "bento_5") return "bento_mosaic_dark";
-  if (grid === "bento_6") return "dashboard_dark";
-  return "dashboard_dark";
+  if (st === "cover" || st === "hero_1") return "hero_tech_cover";
+  if (st === "toc") return "hero_dark";
+  if (st === "summary" || st === "divider") return "quote_hero_dark";
+  if (grid === "hero_1") return "hero_dark";
+  if (grid) return defaultTemplateFamilyForLayout(grid);
+  return "consulting_warm_light";
 }
 
 export function buildDarkTheme(baseTheme = {}, templateFamily = "dashboard_dark") {
   const t = DARK_VISUAL_TOKENS;
+  const allowTemplateChroma = String(process.env.PPT_TEMPLATE_CHROMA_ENABLED || "false").trim().toLowerCase()
+    === "true";
   if (LIGHT_TEMPLATE_FAMILIES.has(templateFamily)) {
     const isWarm = templateFamily === "consulting_warm_light";
-    return {
+    return applyContrastGuards({
       ...baseTheme,
       bg: isWarm ? "F7F3EE" : "F4F7FC",
       primary: isWarm ? "7A2E1F" : (baseTheme.primary || "2F67E8"),
@@ -117,11 +225,11 @@ export function buildDarkTheme(baseTheme = {}, templateFamily = "dashboard_dark"
       success: "22C55E",
       danger: "EF4444",
       template_family: templateFamily,
-    };
+    });
   }
 
-  if (templateFamily === "ecosystem_orange_dark") {
-    return {
+  if (allowTemplateChroma && templateFamily === "ecosystem_orange_dark") {
+    return applyContrastGuards({
       ...baseTheme,
       bg: "090C13",
       primary: "FF8A00",
@@ -139,11 +247,11 @@ export function buildDarkTheme(baseTheme = {}, templateFamily = "dashboard_dark"
       success: "22C55E",
       danger: "EF4444",
       template_family: templateFamily,
-    };
+    });
   }
 
-  if (templateFamily === "hero_tech_cover") {
-    return {
+  if (allowTemplateChroma && templateFamily === "hero_tech_cover") {
+    return applyContrastGuards({
       ...baseTheme,
       bg: "070B1A",
       primary: "2B5FE8",
@@ -161,11 +269,11 @@ export function buildDarkTheme(baseTheme = {}, templateFamily = "dashboard_dark"
       success: "22C55E",
       danger: "EF4444",
       template_family: templateFamily,
-    };
+    });
   }
 
-  if (templateFamily === "bento_mosaic_dark") {
-    return {
+  if (allowTemplateChroma && templateFamily === "bento_mosaic_dark") {
+    return applyContrastGuards({
       ...baseTheme,
       bg: "06070A",
       primary: "6E7BFF",
@@ -183,7 +291,7 @@ export function buildDarkTheme(baseTheme = {}, templateFamily = "dashboard_dark"
       success: "22C55E",
       danger: "EF4444",
       template_family: templateFamily,
-    };
+    });
   }
 
   const blended = {
@@ -206,5 +314,5 @@ export function buildDarkTheme(baseTheme = {}, templateFamily = "dashboard_dark"
     danger: t.colors.danger,
     template_family: templateFamily,
   };
-  return blended;
+  return applyContrastGuards(blended);
 }

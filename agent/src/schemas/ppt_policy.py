@@ -90,8 +90,25 @@ class FamilyConvergencePolicy(BaseModel):
         return _normalize_key_list(value)
 
 
+class ThemeCohesionPolicy(BaseModel):
+    enabled: bool = True
+    # auto | light | dark
+    preferred_tone: str = "auto"
+    content_only: bool = True
+    apply_to_terminal: bool = False
+
+    @field_validator("preferred_tone")
+    @classmethod
+    def normalize_preferred_tone(cls, value: str) -> str:
+        normalized = str(value or "").strip().lower()
+        if normalized in {"light", "dark"}:
+            return normalized
+        return "auto"
+
+
 class QualityOrchestrationPolicy(BaseModel):
     require_image_anchor: bool = False
     dense_layout_remap: DenseLayoutRemapPolicy = Field(default_factory=DenseLayoutRemapPolicy)
     prevent_adjacent_layout_repeat: bool = True
     family_convergence: FamilyConvergencePolicy = Field(default_factory=FamilyConvergencePolicy)
+    theme_cohesion: ThemeCohesionPolicy = Field(default_factory=ThemeCohesionPolicy)

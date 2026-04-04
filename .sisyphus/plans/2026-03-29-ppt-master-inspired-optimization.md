@@ -943,3 +943,394 @@ class DensityEngine:
 - 问题列表: [描述]
 - 修复建议: [描述]
 ```
+
+---
+
+## 分阶段闭环交付计划（2026-03-31 增补，重构版）
+
+目标：基于“官方 + 社区”最佳实践，把当前新增方案升级为**评测驱动（EDD）+ 测试闭环 + 可回归**的最优执行闭环。
+
+适用范围：本节仅覆盖新增分阶段方案，不改动前文已完成历史记录。
+
+---
+
+## 0. 总体原则（重构后）
+
+- 评测先行：每次改动必须先定义可量化评测，再允许代码变更。
+- 双集防过拟合：开发集（dev set）用于迭代；保留集（holdout）仅用于阶段验收。
+- 单变量优化：同一轮只改一个主变量，避免“多改动导致归因失败”。
+- 硬门禁优先：图片、主题、页数、PSNR 走 hard gate；其余指标走 soft gate。
+- 测试分层：单测、集成、端到端回归必须分层执行，且每层都有失败即停策略。
+- 失败簇驱动：按失败类型分簇修复（媒体、主题、布局、文本），禁止跨簇混改。
+- 回归优先：每阶段必须完成 dev/holdout/challenge 三套回归，结果可复现实验。
+
+---
+
+## 1. 通用验收契约（所有阶段统一）
+
+### 1.1 必交付产物
+
+- 代码变更（仅限本阶段范围）
+- 测试证据（命令 + 通过数 + 失败数）
+- 真实样例：`output/regression/generated.<phase>.pptx`
+- 对比报告：`output/regression/issues.<phase>.json`
+- 变更记录：`output/regression/fix_record.json`
+- 阶段结论：`pass/fail` + 失败簇说明 + 下一轮测试计划
+
+### 1.2 统一评分协议（强约束）
+
+- 主分：`score = min(structural_score, psnr_score)`
+- Hard fail 条件（任一命中即失败）：
+  - 图片覆盖率低于阈值
+  - 主题一致性低于阈值
+  - 页数不一致（22/20 等）
+  - PSNR 低于阈值
+- Soft fail 条件：布局节奏、图表语义、文案覆盖不足等
+- 失败必须输出可定位字段：`slide_id`、`issue_code`、`retry_scope`、`retry_target_ids`
+
+### 1.3 数据集与防过拟合
+
+- `dev_set`：用于日常调参与快速迭代
+- `holdout_set`：阶段验收专用，不参与日常调参
+- `challenge_set`：极端案例（图形复杂、媒体密集、多语种）
+- 规则：连续 3 轮只涨 dev 不涨 holdout，判定为过拟合并触发策略重置
+
+### 1.4 测试门禁与冻结策略
+
+- 门禁通过条件：
+  - 单测/集成测试全绿
+  - holdout_set 达到阶段目标
+  - 无新增 blocker 级失败用例
+- 冻结触发条件：
+  - 连续 2 轮 hard fail
+  - holdout_set 连续回退超过阈值（如 score 回退 > 5 分）
+  - flaky case 比率超过阈值
+  - 关键指标回退超过阈值（如 score 回退 > 5 分）
+
+---
+
+## 2. 分阶段执行（自闭环、可测试、可回归）
+
+### Phase 0 - 基线冻结（0.5 天）
+
+目标：建立可信对照组。
+
+实施：
+- 固化 `pipeline-only` / `reconstruct` / `source-replay` 三条基线
+- 固化三套数据集（dev/holdout/challenge）
+- 固化当前 hard/soft gate 阈值
+
+验收：
+- 基线报告可复现（同输入、同版本、同结果）
+- 评分与问题桶统计入库
+
+---
+
+### Phase 1 - 输入保真与合同加固（1-2 天）
+
+目标：消除 extraction -> planning -> render 的信息损失。
+
+主改文件：
+- `scripts/extract_to_minimax_json.py`
+- `scripts/generate_ppt_from_desc.py`
+- `agent/src/ppt_service.py`
+
+关键动作：
+- 去除硬编码文案兜底，统一改为“输入派生兜底”
+- 强制透传 `required_facts/anchors/theme/media_manifest`
+- 新增 payload 完整性校验（缺字段直接 fail-fast）
+
+验收：
+- 合同字段完整率 100%
+- 关键锚点命中率达到阈值
+
+---
+
+### Phase 2 - 设计合同 V2 与 Archetype 编排（2 天）
+
+目标：建立稳定视觉语法，减少“每页临场发挥”。
+
+主改文件：
+- `agent/src/ppt_service.py`
+- `scripts/minimax/render-contract.mjs`
+- `scripts/minimax/templates/archetype-catalog.json`
+
+关键动作：
+- 引入 `PresentationDesignContractV2`（deck token + slide spec）
+- 建立“页面角色 -> archetype”映射（cover/toc/section/content/summary）
+- 增加模板能力约束校验，避免误用 fallback
+
+验收：
+- 20 页样例 archetype 覆盖 >= 6
+- 模板能力冲突全部可诊断（非静默）
+
+---
+
+### Phase 3 - Skill 治理与单写者策略（1-2 天）
+
+目标：解决多 skill 相互覆盖与风格漂移。
+
+主改文件：
+- `agent/src/installed_skill_executor.py`
+- `agent/src/ppt_service.py`
+
+关键动作：
+- 增加 `skill_write_policy`（字段所有权矩阵）
+- 增加 `skill_write_conflict` 诊断
+- `dev_strict` 下：越权写入直接失败
+
+验收：
+- 越权覆盖为 0
+- 冲突诊断可追溯到 skill、字段、slide
+
+---
+
+### Phase 4 - 主题/媒体强对齐（2 天）
+
+目标：优先修复当前最大扣分项（theme/media）。
+
+主改文件：
+- `scripts/extract_to_minimax_json.py`
+- `scripts/generate-pptx-minimax.mjs`
+- `agent/src/minimax_exporter.py`
+- `scripts/compare_ppt_visual.py`
+
+关键动作：
+- 抽取并透传主题 token（主色/辅色/字体/字号层级）
+- 抽取并透传媒体清单（含 base64/hash/位置）
+- 本地重建链路强制执行媒体插入与主题色落地
+
+验收（hard gate）：
+- 主题一致性 >= 阈值
+- 媒体覆盖率 >= 阈值（建议 >= 70%）
+- 缺图缺色直接 fail
+
+---
+
+### Phase 5 - 评分器升级与门禁重平衡（1-2 天）
+
+目标：让分数真实反映视觉质量，避免“高分低质”。
+
+主改文件：
+- `scripts/compare_ppt_visual.py`
+- `agent/src/ppt_quality_gate.py`
+
+关键动作：
+- 强制 PSNR 必跑
+- 加入“页数明确扣分”（如 22/20）
+- 对 image/theme 增加 hard penalty 与 hard fail
+- 输出结构化失败原因，直接驱动下一轮修复
+
+验收：
+- 评分报告可解释（结构分/PSNR/扣分项）
+- 不再出现“缺图缺色但高分通过”
+
+---
+
+### Phase 6 - 优化循环工程化（2-3 天）
+
+目标：把“像训练模型一样迭代优化”制度化。
+
+关键动作：
+- 引入 champion/challenger 机制（旧策略 vs 新策略）
+- 单变量实验协议（每轮仅一个主改动）
+- 自动生成 `fix_plan.json`，并把失败类型映射到固定修复策略
+- 每轮写入 `fix_record.json`，沉淀可复用经验
+
+验收：
+- holdout_set 中位分持续提升
+- 修复策略命中率持续提升
+- 回归次数下降
+
+---
+
+### Phase 7 - 测试资产与可观测加固（1 天）
+
+目标：确保测试体系稳定演进，问题可快速发现与定位。
+
+主改文件：
+- `agent/src/ppt_routes.py`
+- `agent/src/ppt_service.py`
+- runbook 文档
+
+关键动作：
+- 测试配置开关：`PPT_DEV_STRICT`, `PPT_GATE_STRICT`, `PPT_TEST_PROFILE`
+- 建立 nightly 回归任务（dev/holdout/challenge）
+- 固化失败簇看板（score、hard_fail_rate、fallback_ratio、flaky_rate）
+- 失败样例自动归档到 `output/regression/failures/`
+
+验收：
+- 任一阶段可复现实验结果
+- 指标异常可在 SLA 时间内告警并定位到失败簇
+
+---
+
+## 3. 阶段执行矩阵（升级版）
+
+每个阶段固定记录以下字段：
+- `baseline_score`
+- `after_score`
+- `delta`
+- `hard_fail_rate`
+- `main_bucket_improvement`（content/layout/theme/media/geometry）
+- `gate_decision`（pass/fail）
+- `regression_verified`（yes/no）
+
+模板：
+
+| Phase | Baseline | After | Delta | Hard Fail Rate | Main Bucket Improvement | Test Status | Gate Decision | Regression Verified |
+|------|----------|-------|-------|----------------|--------------------------|-------------|---------|-------------------|
+| P0 | - | - | - | - | baseline only | pass | n/a | yes |
+| P1 | | | | | | | | |
+| P2 | | | | | | | | |
+| P3 | | | | | | | | |
+| P4 | | | | | | | | |
+| P5 | | | | | | | | |
+| P6 | | | | | | | | |
+| P7 | | | | | | | | |
+
+---
+
+## 4. 参考依据（官方 + 社区）
+
+### 官方
+- OpenAI：Evaluation best practices（评测驱动、自动化评测、与人工评估对齐、持续迭代）  
+  https://platform.openai.com/docs/guides/evaluation-best-practices
+- OpenAI：Evals drive next chapter of AI（持续评测与改进）  
+  https://openai.com/index/evals-drive-next-chapter-of-ai/
+- Google：Rules of ML（数据与特征优先、迭代与系统化评测）  
+  https://developers.google.com/machine-learning/guides/rules-of-ml
+- pytest 官方文档（测试组织、参数化、fixture 最佳实践）  
+  https://docs.pytest.org/
+
+### 社区
+- Martin Fowler：Test Pyramid（分层测试思想）  
+  https://martinfowler.com/articles/practical-test-pyramid.html
+- Google Testing Blog（自动化测试与回归实践）  
+  https://testing.googleblog.com/
+
+---
+
+## 五、覆盖核对与补强（针对“从零创作”七项要求）
+
+### 5.1 七项要求覆盖结论
+
+| 要求 | 当前覆盖情况 | 现有落点 | 补强动作 |
+| :--- | :--- | :--- | :--- |
+| 先定设计系统，再生成内容 | 已覆盖 | S1、Phase 2（DesignContractV2） | 增加“Token 只读约束”，禁止 slide 自由覆写 |
+| 内容生成与视觉编排拆通道 | 部分覆盖 | Layer 2、S6 | 增加双通道 Schema（content/visual）并做合同校验 |
+| 页面语法库（12-20 archetype） | 已覆盖（方向） | S5、Phase 2 | 固化最小可用 16 个 archetype 清单 |
+| 媒体与图形语义强约束 | 部分覆盖 | S2、S7、Phase 4 | 新增 `media_required/chart_required/diagram_type` 硬门禁 |
+| Skill 主从制（单写者） | 已覆盖 | Phase 3（skill_write_policy） | 明确字段写权限矩阵并落地 fail-fast |
+| 质量门创作目标导向 | 已覆盖 | S8/S9、Phase 5 | 增加“字体层级完整性”硬/软门禁指标 |
+| 失败类型驱动迭代 | 已覆盖 | Phase 6（single-variable/fix_plan） | 固化失败簇与修复策略映射表 |
+
+结论：7 项里 4 项已覆盖、3 项部分覆盖。本节补强内容用于把“部分覆盖”升级为“可执行强约束”。
+
+### 5.2 从零创作专用 Schema V2（双通道）
+
+```jsonc
+{
+  "deck_spec": {
+    "topic": "string",
+    "design_tokens": {
+      "color": { "primary": "#22223B", "secondary": "#4A4E69", "accent": "#9A8C98", "bg": "#F2E9E4" },
+      "typography": {
+        "title_font": "Microsoft YaHei",
+        "body_font": "Arial",
+        "size_scale": { "h1": 34, "h2": 26, "h3": 20, "body": 15, "caption": 11 }
+      },
+      "shape": { "radius": [0, 4, 8, 12], "shadow": ["none", "soft", "medium"] },
+      "spacing": { "page_margin": 0.45, "grid_gap": 0.2, "section_gap": 0.32 }
+    },
+    "guardrails": {
+      "token_only_mode": true,
+      "max_text_only_slide_ratio": 0.2,
+      "min_media_coverage_ratio": 0.7
+    }
+  },
+  "slides": [
+    {
+      "slide_id": "s01",
+      "archetype": "cover_hero",
+      "content_channel": {
+        "title": "string",
+        "assertion": "string",
+        "evidence": ["string"],
+        "data_points": [{ "label": "营收", "value": 120, "unit": "亿" }],
+        "chart_data": { "type": "bar", "series": [] },
+        "media_intent": "人物/产品/场景"
+      },
+      "visual_channel": {
+        "layout": "hero_1",
+        "render_path": "pptxgenjs",
+        "component_slots": ["title", "subtitle", "hero_media", "footer_note"],
+        "animation_rhythm": "calm"
+      },
+      "semantic_constraints": {
+        "media_required": true,
+        "chart_required": false,
+        "diagram_type": "none"
+      }
+    }
+  ]
+}
+```
+
+执行规则：
+- 通道 A（`content_channel`）只允许写内容与数据，不允许写布局与主题。
+- 通道 B（`visual_channel`）只允许写布局与视觉，不允许改写事实与数据。
+- `token_only_mode=true` 时，所有颜色/字号/圆角必须取自 `design_tokens`，越权即 fail-fast。
+
+### 5.3 页面语法库（Archetype）最小清单
+
+建议先固化 16 个 archetype，覆盖“叙事 + 数据 + 关系 +结论”四类场景：
+
+1. `cover_hero`
+2. `toc_compact`
+3. `section_divider`
+4. `thesis_assertion`
+5. `evidence_cards_3`
+6. `comparison_2col`
+7. `process_flow_4step`
+8. `timeline_horizontal`
+9. `matrix_2x2`
+10. `dashboard_kpi_4`
+11. `chart_single_focus`
+12. `chart_dual_compare`
+13. `media_showcase_1p2s`
+14. `quote_hero`
+15. `risk_mitigation`
+16. `summary_action`
+
+路由约束：
+- 每页先选 archetype，再填 slot，不允许“自由布局直出”。
+- 同一 deck 内单 archetype 占比建议 <= 25%，TOP-2 占比 <= 60%。
+
+### 5.4 质量门指标表（创作目标导向）
+
+| 指标 | 类型 | 计算口径 | 建议阈值 | 失败动作 |
+| :--- | :--- | :--- | :--- | :--- |
+| 媒体覆盖率 | Hard | `media_required=true` 且实际有媒体的页占比 | >= 70% | slide 重试，失败则降级 |
+| 图表覆盖率 | Hard | `chart_required=true` 且图表数据有效占比 | >= 90% | 回退到 chart archetype 重排 |
+| 主题一致性 | Hard | token 命中率（颜色/字体/字号） | >= 95% | 直接 fail-fast |
+| 页数一致性 | Hard | 输出页数与计划页数一致 | 100% | 直接 fail-fast |
+| PSNR | Hard | 与参考输出视觉差异 | >= 阈值 | 触发视觉重试 |
+| 版式多样性 | Soft | TOP-2 占比 + ABAB 检测 | TOP-2 <= 60% | 触发布局重排 |
+| 密度节奏 | Soft | 连续高密度页/五页呼吸页规则 | 连高 <= 2 | 触发 density 降级 |
+| 字体层级完整性 | Soft | H1/H2/body/caption 是否齐全且有序 | >= 95% | 回写 typography 纠偏 |
+| 文案覆盖率 | Soft | assertion/evidence 命中率 | >= 90% | 触发内容通道重写 |
+
+### 5.5 Skill 主从写权限矩阵（落地版）
+
+| 字段域 | 主写 Skill | 从 Skill 权限 | 冲突策略 |
+| :--- | :--- | :--- | :--- |
+| `layout/template/render_path` | `visual-orchestrator` | 只读 | 从 skill 写入直接拒绝 |
+| `theme/tokens/typography` | `design-style-skill` + `color-font-skill` | 建议值 | 主写覆盖并记录冲突 |
+| `title/assertion/evidence` | `content-strategy-skill` | 建议值 | 以主写为准 |
+| `chart_type/chart_data` | `slide-making-skill` | 可补全 | 不可降级为占位图表 |
+| `template_edit/xml_patch` | `ppt-editing-skill` | 禁写 | 非模板路由禁用 |
+
+执行建议：
+- 在 `skill_write_policy` 中把上表配置化。
+- 在 `dev_strict` 与 `PPT_GATE_STRICT` 下启用“越权即失败”。

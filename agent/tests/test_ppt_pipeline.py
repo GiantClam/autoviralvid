@@ -1,6 +1,10 @@
 import pytest
 
-from src.ppt_service import PPTService, _resolve_quality_profile_id
+from src.ppt_service import (
+    PPTService,
+    _pipeline_export_timeout_sec,
+    _resolve_quality_profile_id,
+)
 from src.schemas.ppt_pipeline import PPTPipelineRequest
 
 
@@ -12,11 +16,11 @@ async def test_run_ppt_pipeline_without_export(monkeypatch):
 
     result = await svc.run_ppt_pipeline(
         PPTPipelineRequest(
-            topic="灵创智能企业介绍",
-            audience="投资人",
-            purpose="融资路演",
+            topic="Lingchuang company overview",
+            audience="investor audience",
+            purpose="fundraising pitch",
             style_preference="professional",
-            constraints=["10页以内", "15分钟"],
+            constraints=["<=10 slides", "<=15 minutes"],
             total_pages=8,
             route_mode="standard",
             quality_profile="lenient_draft",
@@ -44,7 +48,9 @@ async def test_run_ppt_pipeline_without_export(monkeypatch):
     assert runtime.get("enabled") is True
     assert isinstance(runtime.get("slides"), list)
     assert any(
-        isinstance(slide, dict) and isinstance(slide.get("load_skills"), list) and slide.get("load_skills")
+        isinstance(slide, dict)
+        and isinstance(slide.get("load_skills"), list)
+        and slide.get("load_skills")
         for slide in result.artifacts.render_payload["slides"]
         if isinstance(slide, dict)
     )
@@ -86,7 +92,7 @@ async def test_run_ppt_pipeline_quality_gate_fails_when_plan_is_empty(monkeypatc
     with pytest.raises(ValueError, match="Quality gate failed"):
         await svc.run_ppt_pipeline(
             PPTPipelineRequest(
-                topic="AI工作流平台",
+                topic="AI workflow platform",
                 total_pages=6,
                 with_export=False,
                 save_artifacts=False,
@@ -102,3 +108,39 @@ def test_resolve_quality_profile_auto_mapping():
     assert _resolve_quality_profile_id("auto", topic="", purpose="品牌发布会 launch", audience="", total_pages=8) == "marketing_pitch"
     assert _resolve_quality_profile_id("auto", topic="产品介绍", purpose="", audience="", total_pages=18) == "high_density_consulting"
     assert _resolve_quality_profile_id("auto", topic="产品介绍", purpose="", audience="", total_pages=8) == "default"
+
+
+def test_pipeline_export_timeout_default_cap(monkeypatch):
+    monkeypatch.delenv("PPT_PIPELINE_EXPORT_TIMEOUT_SEC", raising=False)
+    timeout = _pipeline_export_timeout_sec(slide_count=20, route_mode="standard")
+    assert 120 <= timeout <= 540
+
+
+@pytest.mark.asyncio
+async def test_run_ppt_pipeline_research_timeout(monkeypatch):
+    monkeypatch.setenv("PPT_DIRECT_SKILL_RUNTIME_REQUIRE", "false")
+    monkeypatch.setenv("PPT_DIRECT_SKILL_RUNTIME_ENABLED", "false")
+    svc = PPTService()
+
+    monkeypatch.setattr(
+        "src.ppt_service._pipeline_stage_timeout_sec",
+        lambda stage, default: 1 if str(stage).lower() == "research" else default,
+    )
+
+    async def _slow_research(_req):
+        import asyncio
+
+        await asyncio.sleep(2)
+        raise AssertionError("unreachable")
+
+    monkeypatch.setattr(svc, "generate_research_context", _slow_research)
+
+    with pytest.raises(ValueError, match="Research stage timeout"):
+        await svc.run_ppt_pipeline(
+            PPTPipelineRequest(
+                topic="pipeline timeout test",
+                total_pages=6,
+                with_export=False,
+                save_artifacts=False,
+            )
+        )

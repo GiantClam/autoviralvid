@@ -290,29 +290,35 @@ def enforce_density_rhythm(
 
     win = max(2, int(window_size))
     required = max(1, int(require_low_or_breathing_per_window))
-    for start in range(middle_start, middle_end):
-        end = min(middle_end, start + win)
-        if end - start < win:
-            break
-        window_levels = [density_level_for_layout(out[pos]) for pos in range(start, end)]
-        have_low = sum(1 for level in window_levels if level in {"low", "breathing"})
-        if have_low >= required:
-            continue
+    changed = True
+    while changed:
+        changed = False
+        for start in range(middle_start, middle_end):
+            end = min(middle_end, start + win)
+            if end - start < win:
+                break
+            window_levels = [density_level_for_layout(out[pos]) for pos in range(start, end)]
+            have_low = sum(1 for level in window_levels if level in {"low", "breathing"})
+            if have_low >= required:
+                continue
 
-        candidate_positions = list(range(start, end))
-        candidate_positions.sort(
-            key=lambda pos: (density_level_for_layout(out[pos]) != "high", -pos),
-        )
-        for pos in candidate_positions:
-            downgraded = _downgrade_layout(out[pos], target_levels={"low", "breathing"})
-            if density_level_for_layout(downgraded) not in {"low", "breathing"}:
-                continue
-            prev_layout = out[pos - 1] if pos - 1 >= 0 else ""
-            next_layout = out[pos + 1] if pos + 1 < len(out) else ""
-            if downgraded == prev_layout or downgraded == next_layout:
-                continue
-            out[pos] = downgraded
-            break
+            candidate_positions = list(range(start, end))
+            candidate_positions.sort(
+                key=lambda pos: (density_level_for_layout(out[pos]) != "high", -pos),
+            )
+            for pos in candidate_positions:
+                downgraded = _downgrade_layout(out[pos], target_levels={"low", "breathing"})
+                if density_level_for_layout(downgraded) not in {"low", "breathing"}:
+                    continue
+                prev_layout = out[pos - 1] if pos - 1 >= 0 else ""
+                next_layout = out[pos + 1] if pos + 1 < len(out) else ""
+                if downgraded == prev_layout or downgraded == next_layout:
+                    continue
+                if downgraded == out[pos]:
+                    continue
+                out[pos] = downgraded
+                changed = True
+                break
 
     return out  # type: ignore[return-value]
 
@@ -392,17 +398,24 @@ def _build_assertion_title(
 ) -> str:
     core = str(core_message or "").strip()
     anchor = str(data_anchor or "").strip()
-    if core and not _is_generic_title(core) and _looks_assertive_title(core, is_zh=is_zh):
-        return core[:220]
+    candidates = [core, anchor]
+    for item in candidates:
+        text = str(item or "").strip()
+        if not text:
+            continue
+        if _is_generic_title(text) and len(text) <= 14:
+            continue
+        # Root-cause fix: avoid verbose boilerplate title prefixes that
+        # repeatedly trigger title clipping and visual monotony.
+        return text[:96]
+
     if page_role == "summary":
-        return (f"结论已验证：{anchor}" if is_zh else f"Conclusion validated: {anchor}")[:220]
+        return "总结与行动建议" if is_zh else "Summary and Next Steps"
     if page_role == "transition":
-        return (f"推进路径明确：{anchor}" if is_zh else f"Execution path defined: {anchor}")[:220]
+        return "关键流程与机制" if is_zh else "Key Process and Mechanism"
     if page_role == "evidence":
-        prefix = "关键证据显示" if is_zh else "Key evidence shows"
-        return f"{prefix}：{anchor}"[:220] if is_zh else f"{prefix}: {anchor}"[:220]
-    lead = core if core and not _is_generic_title(core) else ("核心判断" if is_zh else "Core claim")
-    return f"{lead}：{anchor}"[:220] if is_zh else f"{lead}: {anchor}"[:220]
+        return "关键证据与案例" if is_zh else "Key Evidence and Cases"
+    return "核心观点" if is_zh else "Core Claim"
 
 
 def build_slide_content_strategy(

@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from typing import Any, Dict, List, Literal, Optional
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 def _new_id() -> str:
@@ -72,6 +72,10 @@ class SlideBackground(BaseModel):
 
 class SlideContent(BaseModel):
     """Fully generated slide content."""
+
+    # Preserve rich render-contract fields (slide_type/layout_grid/blocks/template_family...)
+    # when /api/v1/ppt/export receives pipeline-level slide payloads.
+    model_config = ConfigDict(extra="allow")
 
     id: str = Field(default_factory=_new_id)
     slide_id: Optional[str] = Field(default=None, max_length=128)
@@ -170,7 +174,11 @@ class ExportRequest(BaseModel):
     disable_local_style_rewrite: bool = False
     visual_priority: bool = True
     visual_preset: Literal["auto", "tech_cinematic", "executive_brief", "premium_light", "energetic"] = "auto"
+    theme_recipe: str = Field(default="auto", max_length=64)
+    tone: Literal["auto", "light", "dark"] = "auto"
     visual_density: Literal["sparse", "balanced", "dense"] = "balanced"
+    execution_profile: Literal["auto", "dev_strict", "prod_safe"] = "auto"
+    force_ppt_master: Optional[bool] = None
     constraint_hardness: Literal["minimal", "balanced", "strict"] = "minimal"
     svg_mode: Literal["off", "on"] = "on"
     template_family: Literal[

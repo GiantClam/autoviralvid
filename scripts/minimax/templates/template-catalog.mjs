@@ -58,14 +58,37 @@ function normalizeObject(value) {
   return value && typeof value === "object" && !Array.isArray(value) ? value : {};
 }
 
+function normalizeThemeRecipes(value) {
+  const raw = normalizeObject(value);
+  const out = {};
+  for (const [key, item] of Object.entries(raw)) {
+    const normalizedKey = normalizeKey(key);
+    if (!normalizedKey) continue;
+    const recipe = normalizeObject(item);
+    out[normalizedKey] = {
+      style_variant: normalizeKey(recipe.style_variant || "soft") || "soft",
+      backdrop: normalizeKey(recipe.backdrop || "minimal-grid") || "minimal-grid",
+      tone: normalizeKey(recipe.tone || "auto"),
+      surface_profile: normalizeKey(recipe.surface_profile || "clean") || "clean",
+    };
+  }
+  return out;
+}
+
 function loadCatalog() {
   if (_cachedCatalog) return _cachedCatalog;
   const raw = readFileSync(CATALOG_PATH, "utf-8");
   const parsed = JSON.parse(raw);
   _cachedCatalog = {
+    default_template_id: normalizeKey(parsed.default_template_id || "consulting_warm_light") || "consulting_warm_light",
+    default_palette_key: normalizeKey(parsed.default_palette_key || "business_authority") || "business_authority",
+    default_theme_recipe: normalizeKey(parsed.default_theme_recipe || "consulting_clean") || "consulting_clean",
     layout_defaults: normalizeObject(parsed.layout_defaults),
     subtype_overrides: normalizeObject(parsed.subtype_overrides),
+    palettes: normalizeObject(parsed.palettes),
+    palette_aliases: normalizeObject(parsed.palette_aliases),
     palette_keywords: normalizeObject(parsed.palette_keywords),
+    theme_recipes: normalizeThemeRecipes(parsed.theme_recipes),
     keyword_rules: Array.isArray(parsed.keyword_rules) ? parsed.keyword_rules : [],
     contract_profiles: normalizeObject(parsed.contract_profiles),
     quality_profiles: normalizeObject(parsed.quality_profiles),
@@ -79,8 +102,100 @@ export function getTemplateCatalog() {
   return loadCatalog();
 }
 
+export function listPaletteKeys() {
+  return Object.keys(loadCatalog().palettes || {})
+    .map((item) => normalizeKey(item))
+    .filter(Boolean);
+}
+
+export function canonicalizePaletteKey(value, topicText = "") {
+  const catalog = loadCatalog();
+  const normalized = normalizeKey(value || "");
+  const palettes = catalog.palettes || {};
+  const aliases = catalog.palette_aliases || {};
+  const hasPalette = (key) => Boolean(key && Object.prototype.hasOwnProperty.call(palettes, key));
+  if (!normalized || normalized === "auto") return "auto";
+  if (hasPalette(normalized)) return normalized;
+  const aliasTarget = normalizeKey(aliases?.[normalized] || "");
+  if (hasPalette(aliasTarget)) return aliasTarget;
+
+  const blob = String(topicText || "").toLowerCase();
+  for (const [pattern, palette] of Object.entries(catalog.palette_keywords || {})) {
+    if (!pattern || !palette) continue;
+    try {
+      if (new RegExp(String(pattern), "i").test(blob)) {
+        const normalizedPalette = normalizeKey(palette);
+        if (hasPalette(normalizedPalette)) return normalizedPalette;
+      }
+    } catch {
+      // ignore invalid regex in user-customized catalog
+    }
+  }
+  const fallback = normalizeKey(catalog.default_palette_key || "business_authority");
+  return hasPalette(fallback) ? fallback : "business_authority";
+}
+
+export function listThemeRecipeKeys() {
+  return Object.keys(loadCatalog().theme_recipes || {})
+    .map((item) => normalizeKey(item))
+    .filter(Boolean);
+}
+
+export function canonicalizeThemeRecipe(value) {
+  const catalog = loadCatalog();
+  const recipes = catalog.theme_recipes || {};
+  const normalized = normalizeKey(value || "");
+  if (!normalized || normalized === "auto") return "auto";
+  if (Object.prototype.hasOwnProperty.call(recipes, normalized)) return normalized;
+  const aliases = {
+    classroom: "classroom_soft",
+    education: "classroom_soft",
+    consulting: "consulting_clean",
+    executive_brief: "consulting_clean",
+    premium_light: "consulting_clean",
+    editorial: "editorial_magazine",
+    magazine: "editorial_magazine",
+    tech: "tech_cinematic",
+    tech_cinematic: "tech_cinematic",
+    energetic: "energetic_campaign",
+    campaign: "energetic_campaign",
+  };
+  const alias = normalizeKey(aliases[normalized] || "");
+  if (alias && Object.prototype.hasOwnProperty.call(recipes, alias)) return alias;
+  const fallback = normalizeKey(catalog.default_theme_recipe || "consulting_clean");
+  return Object.prototype.hasOwnProperty.call(recipes, fallback) ? fallback : "consulting_clean";
+}
+
+export function getThemeRecipe(recipeKey) {
+  const catalog = loadCatalog();
+  const recipes = catalog.theme_recipes || {};
+  const key = canonicalizeThemeRecipe(recipeKey);
+  const resolved = key === "auto"
+    ? canonicalizeThemeRecipe(catalog.default_theme_recipe || "consulting_clean")
+    : key;
+  return {
+    id: resolved,
+    ...(recipes[resolved] || {
+      style_variant: "soft",
+      backdrop: "minimal-grid",
+      tone: "auto",
+      surface_profile: "clean",
+    }),
+  };
+}
+
 export function listTemplateIds() {
   return Object.keys(loadCatalog().templates);
+}
+
+export function defaultTemplateId() {
+  const catalog = loadCatalog();
+  const templateIds = Object.keys(catalog.templates || {});
+  const requested = normalizeKey(catalog.default_template_id || "");
+  if (requested && templateIds.includes(requested)) return requested;
+  if (templateIds.includes("consulting_warm_light")) return "consulting_warm_light";
+  if (templateIds.includes("dashboard_dark")) return "dashboard_dark";
+  return templateIds[0] || "consulting_warm_light";
 }
 
 export function getTemplateField(templateId, field, fallback = "") {

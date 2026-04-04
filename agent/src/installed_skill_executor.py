@@ -15,6 +15,20 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List
 
+from src.ppt_master_skill_adapter import execute_ppt_master_skill
+from src.ppt_template_catalog import (
+    default_template_for_layout as catalog_default_template_for_layout,
+    list_template_ids as catalog_list_template_ids,
+    resolve_template_for_slide as catalog_resolve_template_for_slide,
+    template_capabilities as catalog_template_capabilities,
+    template_profiles as catalog_template_profiles,
+)
+from src.ppt_visual_identity import (
+    canonicalize_theme_recipe,
+    resolve_style_variant,
+    resolve_tone,
+    suggest_theme_recipe_from_context,
+)
 
 _DEFAULT_LAYOUT_BY_SLIDE_TYPE: Dict[str, str] = {
     "cover": "hero_1",
@@ -37,37 +51,6 @@ _AGENT_BY_SLIDE_TYPE: Dict[str, str] = {
     "content": "content-page-generator",
 }
 
-_STYLE_TEMPLATE_BY_TYPE: Dict[str, Dict[str, str]] = {
-    "sharp": {
-        "cover": "hero_tech_cover",
-        "toc": "dashboard_dark",
-        "divider": "architecture_dark_panel",
-        "summary": "dashboard_dark",
-        "content": "architecture_dark_panel",
-    },
-    "soft": {
-        "cover": "hero_dark",
-        "toc": "dashboard_dark",
-        "divider": "dashboard_dark",
-        "summary": "dashboard_dark",
-        "content": "dashboard_dark",
-    },
-    "rounded": {
-        "cover": "hero_dark",
-        "toc": "ops_lifecycle_light",
-        "divider": "ops_lifecycle_light",
-        "summary": "ops_lifecycle_light",
-        "content": "ops_lifecycle_light",
-    },
-    "pill": {
-        "cover": "hero_dark",
-        "toc": "dashboard_dark",
-        "divider": "ecosystem_orange_dark",
-        "summary": "ecosystem_orange_dark",
-        "content": "bento_mosaic_dark",
-    },
-}
-
 _PALETTE_HINTS: List[tuple[str, str]] = [
     ("finance", "business_authority"),
     ("investor", "business_authority"),
@@ -85,15 +68,15 @@ _PALETTE_HINTS: List[tuple[str, str]] = [
     ("cloud", "pure_tech_blue"),
     ("ai", "pure_tech_blue"),
     ("tech", "pure_tech_blue"),
-    ("绉戞妧", "pure_tech_blue"),
-    ("鏋舵瀯", "pure_tech_blue"),
-    ("娴佺▼", "education_charts"),
-    ("鍩硅", "education_charts"),
-    ("鏁欒偛", "education_charts"),
-    ("鍖荤枟", "modern_wellness"),
-    ("鍝佺墝", "energetic"),
-    ("钀ラ攢", "energetic"),
-    ("铻嶈祫", "business_authority"),
+    ("科技", "pure_tech_blue"),
+    ("架构", "pure_tech_blue"),
+    ("流程", "education_charts"),
+    ("培训", "education_charts"),
+    ("教育", "education_charts"),
+    ("医疗", "modern_wellness"),
+    ("品牌", "energetic"),
+    ("营销", "energetic"),
+    ("融资", "business_authority"),
 ]
 
 _STYLE_HINTS: List[tuple[str, str]] = [
@@ -110,11 +93,11 @@ _STYLE_HINTS: List[tuple[str, str]] = [
     ("training", "soft"),
     ("education", "soft"),
     ("consulting", "soft"),
-    ("??", "sharp"),
-    ("??", "sharp"),
-    ("??", "sharp"),
-    ("??", "rounded"),
-    ("??", "soft"),
+    ("架构", "sharp"),
+    ("系统", "sharp"),
+    ("流程", "sharp"),
+    ("品牌", "rounded"),
+    ("教育", "soft"),
 ]
 
 _SECTION_HINT_RE = re.compile(
@@ -149,6 +132,52 @@ _CONTENT_LAYOUT_ROTATION: List[str] = ["split_2", "grid_3", "grid_4", "asymmetri
 _CONTENT_LAYOUT_SET = set(_CONTENT_LAYOUT_ROTATION)
 _CONTENT_LAYOUT_MAX_RATIO = 0.5
 _CONTENT_LAYOUT_MAX_SPLIT_RATIO = 0.34
+_CONTENT_TEMPLATE_MAX_RATIO = 0.5
+_CONTENT_TEMPLATE_MAX_DASHBOARD_RATIO = 0.34
+
+# Phase-3: field ownership policy for skill patch writes.
+_SKILL_WRITE_POLICY: Dict[str, set[str]] = {
+    "slide_type": {"ppt-orchestra-skill", "slide-making-skill", "ppt-master"},
+    "layout_grid": {"ppt-orchestra-skill", "slide-making-skill", "ppt-master"},
+    "render_path": {"ppt-orchestra-skill", "slide-making-skill", "pptx", "ppt-master"},
+    "agent_type": {"ppt-orchestra-skill", "slide-making-skill", "ppt-master"},
+    "style_variant": {"design-style-skill", "ppt-master"},
+    "theme_recipe": {"design-style-skill", "ppt-master"},
+    "tone": {"design-style-skill", "ppt-master"},
+    "template_family": {"design-style-skill", "ppt-editing-skill", "ppt-master"},
+    "skill_profile": {"design-style-skill", "ppt-editing-skill", "ppt-master"},
+    "palette_key": {"color-font-skill", "ppt-master"},
+    "title": {"content-strategy-skill", "ppt-master"},
+    "chart_type": {"slide-making-skill", "ppt-master"},
+    "chart_data": {"slide-making-skill", "ppt-master"},
+    "xml_patch": {"ppt-editing-skill"},
+}
+_SKILL_WRITE_CONFLICT_KEYS = set(_SKILL_WRITE_POLICY.keys())
+_PRIMARY_VISUAL_FIELDS = {"layout_grid", "template_family", "render_path"}
+
+
+def _primary_visual_skill_names() -> set[str]:
+    default_names: set[str] = set()
+    for field in _PRIMARY_VISUAL_FIELDS:
+        for owner in _SKILL_WRITE_POLICY.get(field, set()):
+            skill = _normalize_skill_key(owner)
+            if skill:
+                default_names.add(skill)
+    if not default_names:
+        default_names = {"ppt-orchestra-skill", "ppt-master"}
+    default_raw = ",".join(sorted(default_names))
+    raw = _normalize_text(
+        os.getenv("PPT_PRIMARY_VISUAL_SKILL", default_raw),
+        default_raw,
+    )
+    names: set[str] = set()
+    for item in raw.split(","):
+        skill = _normalize_skill_key(item)
+        if skill:
+            names.add(skill)
+    if not names:
+        names.add("ppt-orchestra-skill")
+    return names
 
 
 def _normalize_text(value: Any, fallback: str = "") -> str:
@@ -210,6 +239,15 @@ def _as_bool(value: Any, default: bool = False) -> bool:
     return text in {"1", "true", "yes", "on"}
 
 
+def _normalize_execution_profile(value: Any) -> str:
+    text = _normalize_text(value, "").strip().lower().replace("-", "_")
+    if text in {"dev", "strict", "dev_strict"}:
+        return "dev_strict"
+    if text in {"prod", "safe", "prod_safe"}:
+        return "prod_safe"
+    return ""
+
+
 def _parse_command_args(raw_value: str) -> List[str]:
     text = _normalize_text(raw_value, "")
     if not text:
@@ -248,6 +286,142 @@ def _parse_json_object(raw_text: str) -> Dict[str, Any]:
     return {}
 
 
+def _resolve_runtime_bin(bin_name: str, cwd: str) -> str:
+    normalized = _normalize_text(bin_name, "")
+    lower = normalized.lower()
+    if lower not in {"python", "python3"}:
+        return normalized
+    base = Path(cwd or ".")
+    candidates: List[Path] = []
+    if os.name == "nt":
+        candidates.extend(
+            [
+                base / ".venv" / "Scripts" / "python.exe",
+                base / "venv" / "Scripts" / "python.exe",
+            ]
+        )
+    else:
+        candidates.extend(
+            [
+                base / ".venv" / "bin" / "python",
+                base / "venv" / "bin" / "python",
+            ]
+        )
+    for candidate in candidates:
+        if candidate.exists():
+            return str(candidate)
+    return normalized
+
+
+def _compact_error_detail(raw_text: Any, *, max_chars: int = 420, tail_chars: int = 260) -> str:
+    text = _normalize_text(raw_text, "")
+    if not text:
+        return ""
+    if len(text) <= max_chars:
+        return text
+    keep_tail = max(80, min(tail_chars, max_chars - 40))
+    keep_head = max(40, max_chars - keep_tail - 5)
+    return f"{text[:keep_head]} ... {text[-keep_tail:]}"
+
+
+def _stable_json_signature(value: Any) -> str:
+    try:
+        return json.dumps(value, ensure_ascii=False, sort_keys=True, default=str)
+    except Exception:
+        return str(value)
+
+
+def _append_note(existing: Any, updates: List[str]) -> str:
+    values = _dedupe_text_list(
+        [
+            _normalize_text(existing, ""),
+            *[_normalize_text(item, "") for item in updates],
+        ]
+    )
+    return "; ".join([item for item in values if item])
+
+
+def _govern_patch_for_skill(
+    *,
+    skill: str,
+    patch: Dict[str, Any],
+    seen_writes: Dict[str, Dict[str, Any]],
+    violations: List[Dict[str, Any]],
+    conflicts: List[Dict[str, Any]],
+    strict_primary_writer: bool = False,
+    primary_visual_skills: set[str] | None = None,
+) -> tuple[Dict[str, Any], List[str], bool]:
+    skill_key = _normalize_skill_key(skill)
+    sanitized: Dict[str, Any] = {}
+    notes: List[str] = []
+    has_violation = False
+
+    for raw_key, raw_value in patch.items():
+        key = _normalize_text(raw_key, "")
+        if not key:
+            continue
+
+        if strict_primary_writer and key in _PRIMARY_VISUAL_FIELDS:
+            owners = {item for item in (primary_visual_skills or set()) if item}
+            if owners and skill_key not in owners:
+                violations.append(
+                    {
+                        "skill": skill_key or "unknown",
+                        "field": key,
+                        "reason": "primary_visual_writer_only",
+                        "allowed_skills": sorted(owners),
+                    }
+                )
+                notes.append(f"skill_write_policy_violation:{key}")
+                has_violation = True
+                continue
+
+        owners = _SKILL_WRITE_POLICY.get(key)
+        if owners is not None and skill_key not in owners:
+            violations.append(
+                {
+                    "skill": skill_key or "unknown",
+                    "field": key,
+                    "reason": "unauthorized_write",
+                    "allowed_skills": sorted(owners),
+                }
+            )
+            notes.append(f"skill_write_policy_violation:{key}")
+            has_violation = True
+            continue
+
+        signature = _stable_json_signature(raw_value)
+        prior = seen_writes.get(key)
+        if (
+            prior
+            and key in _SKILL_WRITE_CONFLICT_KEYS
+            and prior.get("signature") != signature
+            and prior.get("skill") != skill_key
+        ):
+            conflicts.append(
+                {
+                    "field": key,
+                    "first_skill": str(prior.get("skill") or ""),
+                    "second_skill": skill_key or "unknown",
+                    "first_value": prior.get("value"),
+                    "second_value": raw_value,
+                }
+            )
+            notes.append(f"skill_write_conflict_dropped:{key}")
+            # Deterministic single-writer rule: keep first writer, drop later writes.
+            continue
+
+        if key not in seen_writes:
+            seen_writes[key] = {
+                "skill": skill_key or "unknown",
+                "signature": signature,
+                "value": raw_value,
+            }
+        sanitized[key] = raw_value
+
+    return sanitized, notes, has_violation
+
+
 def _invoke_direct_skill_runtime(
     *,
     slide: Dict[str, Any],
@@ -271,6 +445,7 @@ def _invoke_direct_skill_runtime(
     cwd = _normalize_text(os.getenv("PPT_DIRECT_SKILL_RUNTIME_CWD", ""), "")
     if not cwd:
         cwd = str(Path(__file__).resolve().parents[1])
+    resolved_bin_name = _resolve_runtime_bin(bin_name, cwd)
     payload = {
         "version": 1,
         "requested_skills": requested_skills,
@@ -282,12 +457,11 @@ def _invoke_direct_skill_runtime(
 
     try:
         proc = subprocess.run(
-            [bin_name, *args],
+            [resolved_bin_name, *args],
             input=json.dumps(payload, ensure_ascii=False),
             capture_output=True,
             text=True,
             encoding="utf-8",
-            errors="replace",
             timeout=timeout_sec,
             check=False,
             cwd=cwd,
@@ -301,9 +475,10 @@ def _invoke_direct_skill_runtime(
 
     if int(proc.returncode) != 0:
         detail = _normalize_text(proc.stderr, "") or _normalize_text(proc.stdout, "") or f"exit_{proc.returncode}"
+        compact_detail = _compact_error_detail(detail)
         return {
             "enabled": True,
-            "reason": f"direct_skill_runtime_nonzero:{detail[:180]}",
+            "reason": f"direct_skill_runtime_nonzero:exit_{proc.returncode}:{compact_detail}",
             "parsed": {},
         }
 
@@ -423,6 +598,234 @@ def _pick_content_layout(current: str, slide: Dict[str, Any], deck: Dict[str, An
     return deduped[0] if deduped else "grid_3"
 
 
+def _parse_template_whitelist(slide: Dict[str, Any]) -> List[str]:
+    raw = (
+        slide.get("template_family_whitelist")
+        if slide.get("template_family_whitelist") is not None
+        else slide.get("template_candidates")
+    )
+    if raw is None:
+        raw = slide.get("template_whitelist")
+    if isinstance(raw, str):
+        values = [part.strip() for part in raw.split(",")]
+    elif isinstance(raw, list):
+        values = [str(item or "").strip() for item in raw]
+    else:
+        values = []
+    valid = {str(item or "").strip().lower() for item in catalog_list_template_ids()}
+    out: List[str] = []
+    seen: set[str] = set()
+    for item in values:
+        key = _normalize_text(item, "").lower()
+        if not key or key in seen:
+            continue
+        if valid and key not in valid:
+            continue
+        seen.add(key)
+        out.append(key)
+    return out
+
+
+def _parse_used_template_families(deck: Dict[str, Any]) -> List[str]:
+    raw = deck.get("used_template_families") if isinstance(deck.get("used_template_families"), list) else []
+    valid = {str(item or "").strip().lower() for item in catalog_list_template_ids()}
+    out: List[str] = []
+    for item in raw:
+        key = _normalize_text(item, "").lower()
+        if not key:
+            continue
+        if valid and key not in valid:
+            continue
+        out.append(key)
+    return out
+
+
+def _slide_has_image_asset(slide: Dict[str, Any]) -> bool:
+    blocks = slide.get("blocks") if isinstance(slide.get("blocks"), list) else []
+    for block in blocks:
+        row = _as_dict(block)
+        block_type = _normalize_text(row.get("block_type") or row.get("type"), "").lower()
+        if block_type != "image":
+            continue
+        content = _as_dict(row.get("content"))
+        data = _as_dict(row.get("data"))
+        candidates = [
+            content.get("url"),
+            content.get("src"),
+            content.get("imageUrl"),
+            content.get("image_url"),
+            data.get("url"),
+            data.get("src"),
+            data.get("imageUrl"),
+            data.get("image_url"),
+            row.get("url"),
+            row.get("src"),
+            row.get("imageUrl"),
+            row.get("image_url"),
+        ]
+        if any(_normalize_text(item, "") for item in candidates):
+            return True
+    return False
+
+
+def _resolve_template_plan(
+    slide_type: str,
+    _style_variant: str,
+    slide: Dict[str, Any],
+    deck: Dict[str, Any],
+    preferred_tone: str = "",
+) -> Dict[str, Any]:
+    layout_grid = _normalize_text(
+        slide.get("layout_grid") or slide.get("layout") or deck.get("layout_grid"),
+        _DEFAULT_LAYOUT_BY_SLIDE_TYPE.get(slide_type, "split_2"),
+    ).lower()
+    locked = _as_bool(slide.get("template_lock"), False)
+    explicit = _normalize_text(
+        slide.get("template_family") or slide.get("template_id") or deck.get("template_family"),
+        "",
+    ).lower()
+    normalized_preferred_tone = _normalize_text(preferred_tone, "").lower()
+    if normalized_preferred_tone not in {"light", "dark"}:
+        normalized_preferred_tone = ""
+    style_default = _normalize_text(
+        catalog_default_template_for_layout(layout_grid),
+        "dashboard_dark",
+    ).lower()
+    all_templates = [str(item or "").strip().lower() for item in catalog_list_template_ids() if str(item or "").strip()]
+    valid_templates = set(all_templates)
+    whitelist = _parse_template_whitelist(slide)
+    if locked and explicit and (not valid_templates or explicit in valid_templates):
+        return {
+            "selected": explicit,
+            "candidates": [explicit],
+            "whitelist": whitelist,
+            "mode": "template_lock",
+        }
+
+    requested_template = ""
+    if explicit and explicit != "auto" and (not valid_templates or explicit in valid_templates):
+        requested_template = explicit
+
+    resolved = _normalize_text(
+        catalog_resolve_template_for_slide(
+            slide=slide if isinstance(slide, dict) else {},
+            slide_type=slide_type,
+            layout_grid=layout_grid,
+            requested_template=requested_template,
+            desired_density=_normalize_text(slide.get("content_density"), "balanced"),
+            preferred_tone=normalized_preferred_tone,
+        ),
+        "",
+    ).lower()
+
+    has_image_asset = _slide_has_image_asset(slide)
+    if whitelist:
+        candidate_pool = list(whitelist)
+    else:
+        candidate_pool: List[str] = []
+        for template_id in all_templates:
+            cap = catalog_template_capabilities(template_id)
+            supported_types = {
+                _normalize_text(item, "").lower()
+                for item in (cap.get("supported_slide_types") if isinstance(cap.get("supported_slide_types"), list) else [])
+            }
+            supported_layouts = {
+                _normalize_text(item, "").lower()
+                for item in (cap.get("supported_layouts") if isinstance(cap.get("supported_layouts"), list) else [])
+            }
+            if supported_types and slide_type not in supported_types:
+                continue
+            if supported_layouts and layout_grid not in supported_layouts:
+                continue
+            if normalized_preferred_tone == "light" and template_id.endswith("_dark"):
+                continue
+            if normalized_preferred_tone == "dark" and template_id.endswith("_light"):
+                continue
+            if bool(cap.get("requires_image_asset")) and not has_image_asset:
+                continue
+            candidate_pool.append(template_id)
+        if not candidate_pool and style_default:
+            candidate_pool = [style_default]
+        if not candidate_pool and all_templates:
+            candidate_pool = list(all_templates)
+
+    ordered: List[str] = []
+    for candidate in [explicit, resolved]:
+        key = _normalize_text(candidate, "").lower()
+        if not key:
+            continue
+        if valid_templates and key not in valid_templates:
+            continue
+        if key in ordered:
+            continue
+        if candidate_pool and key not in candidate_pool:
+            continue
+        ordered.append(key)
+    if slide_type == "cover" and (not explicit or explicit in _GENERIC_COVER_TEMPLATE_OVERRIDES):
+        cover_preferred = _normalize_text(
+            catalog_resolve_template_for_slide(
+                slide=slide if isinstance(slide, dict) else {},
+                slide_type="cover",
+                layout_grid="hero_1",
+                requested_template="",
+                desired_density=_normalize_text(slide.get("content_density"), "balanced"),
+                preferred_tone=normalized_preferred_tone,
+            ),
+            "hero_tech_cover",
+        ).lower()
+        if cover_preferred and cover_preferred not in ordered and (not candidate_pool or cover_preferred in candidate_pool):
+            ordered.insert(0, cover_preferred)
+
+    if slide_type == "content" and candidate_pool:
+        used_templates = _parse_used_template_families(deck)
+        idx = _content_slide_index(slide, deck, used_templates)
+        for step in range(len(candidate_pool)):
+            candidate = candidate_pool[(idx + step) % len(candidate_pool)]
+            if candidate not in ordered:
+                ordered.append(candidate)
+
+        counts: Dict[str, int] = {}
+        for item in used_templates:
+            counts[item] = counts.get(item, 0) + 1
+
+        def _violates_budget(candidate: str) -> bool:
+            if used_templates and candidate == used_templates[-1]:
+                return True
+            ratio = counts.get(candidate, 0) / max(1, len(used_templates))
+            if ratio >= _CONTENT_TEMPLATE_MAX_RATIO:
+                return True
+            if candidate == "dashboard_dark":
+                dashboard_ratio = counts.get("dashboard_dark", 0) / max(1, len(used_templates))
+                if dashboard_ratio >= _CONTENT_TEMPLATE_MAX_DASHBOARD_RATIO:
+                    return True
+            return False
+
+        for candidate in ordered:
+            if not _violates_budget(candidate):
+                return {
+                    "selected": candidate,
+                    "candidates": ordered or candidate_pool,
+                    "whitelist": whitelist,
+                    "mode": "catalog_diversity",
+                }
+        for candidate in ordered:
+            if not (used_templates and candidate == used_templates[-1]):
+                return {
+                    "selected": candidate,
+                    "candidates": ordered or candidate_pool,
+                    "whitelist": whitelist,
+                    "mode": "catalog_diversity_relaxed",
+                }
+
+    selected = ordered[0] if ordered else (candidate_pool[0] if candidate_pool else (style_default or "dashboard_dark"))
+    return {
+        "selected": selected,
+        "candidates": ordered or candidate_pool or ([selected] if selected else []),
+        "whitelist": whitelist,
+        "mode": "catalog_resolve",
+    }
+
+
 def _infer_slide_type(slide: Dict[str, Any], deck: Dict[str, Any]) -> str:
     explicit = _normalize_text(
         slide.get("slide_type") or slide.get("page_type") or slide.get("subtype"),
@@ -484,36 +887,48 @@ def _choose_palette(deck: Dict[str, Any], slide: Dict[str, Any]) -> str:
     return "platinum_white_gold"
 
 
+def _choose_theme_recipe(deck: Dict[str, Any], slide: Dict[str, Any]) -> str:
+    explicit = canonicalize_theme_recipe(
+        slide.get("theme_recipe") or deck.get("theme_recipe") or "auto",
+        fallback="auto",
+    )
+    if explicit != "auto":
+        return explicit
+    blob = _slide_text_blob(slide, deck)
+    return suggest_theme_recipe_from_context(blob, slide.get("title") or "", deck.get("title") or "")
+
+
+def _choose_tone(deck: Dict[str, Any], slide: Dict[str, Any], *, theme_recipe: str) -> str:
+    return resolve_tone(
+        slide.get("tone")
+        or slide.get("theme_tone")
+        or slide.get("preferred_tone")
+        or deck.get("tone")
+        or deck.get("theme_tone")
+        or "auto",
+        theme_recipe=theme_recipe,
+        fallback="auto",
+    )
+
+
 def _choose_style(deck: Dict[str, Any], slide: Dict[str, Any]) -> str:
-    explicit = _normalize_text(
+    recipe = _choose_theme_recipe(deck, slide)
+    explicit = resolve_style_variant(
         slide.get("style_variant")
         or slide.get("style")
         or deck.get("style_variant")
-        or deck.get("style"),
-        "",
-    ).lower()
+        or deck.get("style")
+        or "auto",
+        theme_recipe=recipe,
+        fallback="soft",
+    )
     if explicit in {"sharp", "soft", "rounded", "pill"}:
         return explicit
     blob = _slide_text_blob(slide, deck)
     for hint, style in _STYLE_HINTS:
         if hint in blob:
             return style
-    return "soft"
-
-
-def _choose_template_family(slide_type: str, style_variant: str, slide: Dict[str, Any]) -> str:
-    locked = _as_bool(slide.get("template_lock"), False)
-    explicit = _normalize_text(
-        slide.get("template_family") or slide.get("template_id"),
-        "",
-    ).lower()
-    mapping = _STYLE_TEMPLATE_BY_TYPE.get(style_variant, _STYLE_TEMPLATE_BY_TYPE["soft"])
-    if slide_type == "cover" and not locked:
-        if explicit in _GENERIC_COVER_TEMPLATE_OVERRIDES:
-            return mapping.get("cover", "hero_dark")
-    if explicit and explicit != "auto":
-        return explicit
-    return mapping.get(slide_type, mapping.get("content", "dashboard_dark"))
+    return resolve_style_variant("auto", theme_recipe=recipe, fallback="soft")
 
 
 def _page_skill_directives(slide_type: str, layout_grid: str, render_path: str) -> List[str]:
@@ -522,7 +937,7 @@ def _page_skill_directives(slide_type: str, layout_grid: str, render_path: str) 
     path = _normalize_text(render_path, "pptxgenjs").lower()
     directives: List[str] = [
         "Only one title area is allowed at the top of the slide.",
-        "Never emit prefixes like 补充要点: or Supporting point:.",
+        "Never emit prefixes like 'Supporting point:' or 'Extra note:'.",
     ]
     if slide == "cover":
         directives.extend(
@@ -622,6 +1037,9 @@ def _choose_skill_profile(slide_type: str, template_family: str) -> str:
         return "data-story"
     if "consulting" in family:
         return "consulting"
+    profile = _normalize_text(catalog_template_profiles(family).get("skill_profile"), "").lower()
+    if profile and profile != "auto":
+        return profile
     return "general-content"
 
 
@@ -635,10 +1053,19 @@ def _recommended_skills(
     render_path: str,
     requested_skills: List[str],
     deck: Dict[str, Any] | None = None,
+    slide: Dict[str, Any] | None = None,
 ) -> List[str]:
     skills: List[str] = ["slide-making-skill", "design-style-skill", "ppt-orchestra-skill"]
     template_family = _normalize_text(deck.get("template_family") if isinstance(deck, dict) else "", "").lower()
-    if template_family and template_family not in {"auto"}:
+    has_template_hints = bool(
+        template_family and template_family not in {"auto"}
+    )
+    if isinstance(slide, dict):
+        has_template_hints = has_template_hints or bool(
+            _parse_template_whitelist(slide)
+            or _normalize_text(slide.get("template_family") or slide.get("template_id"), "").lower() not in {"", "auto"}
+        )
+    if has_template_hints:
         skills.append("ppt-editing-skill")
     if slide_type in {"cover", "toc", "summary", "divider"}:
         skills.append("color-font-skill")
@@ -665,6 +1092,8 @@ def _build_skill_row(
     render_path = _normalize_text(state.get("render_path"), "pptxgenjs").lower()
     style_variant = _normalize_text(state.get("style_variant"), "soft").lower()
     palette_key = _normalize_text(state.get("palette_key"), "platinum_white_gold")
+    theme_recipe = _normalize_text(state.get("theme_recipe"), "consulting_clean").lower()
+    tone = _normalize_text(state.get("tone"), "auto").lower()
     template_family = _normalize_text(state.get("template_family"), "")
 
     if skill == "ppt-orchestra-skill":
@@ -677,6 +1106,7 @@ def _build_skill_row(
             render_path=render_path,
             requested_skills=requested_skills,
             deck=deck,
+            slide=slide,
         )
         outputs["page_skill_directives"] = _page_skill_directives(slide_type, layout_grid, render_path)
         outputs["page_design_intent"] = (
@@ -697,9 +1127,24 @@ def _build_skill_row(
             outputs["page_badge_required"] = True
     elif skill == "design-style-skill":
         patch["style_variant"] = style_variant
+        patch["theme_recipe"] = theme_recipe
+        patch["tone"] = tone
         patch["template_family"] = template_family
         patch["skill_profile"] = _normalize_text(state.get("skill_profile"), "general-content")
         outputs["style_recipe"] = style_variant
+        outputs["theme_recipe"] = theme_recipe
+        outputs["tone"] = tone
+        outputs["template_selection_mode"] = _normalize_text(state.get("template_selection_mode"), "catalog_resolve")
+        outputs["template_candidates"] = [
+            _normalize_text(item, "").lower()
+            for item in _as_list(state.get("template_candidates"))
+            if _normalize_text(item, "")
+        ]
+        outputs["template_family_whitelist"] = [
+            _normalize_text(item, "").lower()
+            for item in _as_list(state.get("template_family_whitelist"))
+            if _normalize_text(item, "")
+        ]
     elif skill == "color-font-skill":
         patch["palette_key"] = palette_key
         outputs["font_pair"] = {
@@ -717,6 +1162,21 @@ def _build_skill_row(
             if _TIMELINE_HINT_RE.search(blob):
                 patch["render_path"] = "svg"
         outputs["qa_pipeline"] = "markitdown+ooxml"
+    elif skill == "ppt-master":
+        adapter_result = execute_ppt_master_skill(slide=slide, deck=deck, state=state)
+        patch.update(_as_dict(adapter_result.get("patch")))
+        outputs.update(_as_dict(adapter_result.get("outputs")))
+        note = _normalize_text(adapter_result.get("note"), "")
+        status = _normalize_text(adapter_result.get("status"), "").lower()
+        if status in {"applied", "noop", "error"}:
+            return {
+                "skill": skill,
+                "status": status,
+                "patch": patch,
+                "outputs": outputs,
+                "note": note or "ppt_master_adapter",
+                "source": "builtin_fallback",
+            }
     else:
         note = "unknown_skill_passthrough"
 
@@ -741,12 +1201,28 @@ def execute_installed_skill_request(payload: Dict[str, Any]) -> Dict[str, Any]:
     if not deck:
         deck = _as_dict(request.get("context"))
 
+    execution_profile = _normalize_execution_profile(
+        request.get("execution_profile")
+        or slide.get("execution_profile")
+        or deck.get("execution_profile")
+    )
+    force_ppt_master_raw: Any = None
+    if "force_ppt_master" in request:
+        force_ppt_master_raw = request.get("force_ppt_master")
+    elif "force_ppt_master" in slide:
+        force_ppt_master_raw = slide.get("force_ppt_master")
+    elif "force_ppt_master" in deck:
+        force_ppt_master_raw = deck.get("force_ppt_master")
+
     slide_type = _infer_slide_type(slide, deck)
     layout_grid = _infer_layout(slide_type, slide, deck)
     render_path = _infer_render_path(slide_type, layout_grid, slide, deck)
+    theme_recipe = _choose_theme_recipe(deck, slide)
+    tone = _choose_tone(deck, slide, theme_recipe=theme_recipe)
     style_variant = _choose_style(deck, slide)
     palette_key = _choose_palette(deck, slide)
-    template_family = _choose_template_family(slide_type, style_variant, slide)
+    template_plan = _resolve_template_plan(slide_type, style_variant, slide, deck, preferred_tone=tone)
+    template_family = _normalize_text(template_plan.get("selected"), "dashboard_dark").lower()
     skill_profile = _choose_skill_profile(slide_type, template_family)
 
     state: Dict[str, Any] = {
@@ -755,9 +1231,18 @@ def execute_installed_skill_request(payload: Dict[str, Any]) -> Dict[str, Any]:
         "render_path": render_path,
         "style_variant": style_variant,
         "palette_key": palette_key,
+        "theme_recipe": theme_recipe,
+        "tone": tone,
         "template_family": template_family,
         "skill_profile": skill_profile,
+        "template_candidates": _as_list(template_plan.get("candidates")),
+        "template_family_whitelist": _as_list(template_plan.get("whitelist")),
+        "template_selection_mode": _normalize_text(template_plan.get("mode"), "catalog_resolve"),
     }
+    if execution_profile:
+        state["execution_profile"] = execution_profile
+    if force_ppt_master_raw is not None:
+        state["force_ppt_master"] = force_ppt_master_raw
 
     require_direct_runtime = _env_flag("PPT_DIRECT_SKILL_RUNTIME_REQUIRE", "true")
     direct_runtime = _invoke_direct_skill_runtime(
@@ -784,26 +1269,71 @@ def execute_installed_skill_request(payload: Dict[str, Any]) -> Dict[str, Any]:
     merged_patch: Dict[str, Any] = {}
     aggregated_load_skills: List[str] = []
     fulfilled_skills: set[str] = set()
+    policy_violations: List[Dict[str, Any]] = []
+    policy_conflicts: List[Dict[str, Any]] = []
+    policy_seen_writes: Dict[str, Dict[str, Any]] = {}
+    strict_policy = execution_profile == "dev_strict"
+    primary_visual_skills = _primary_visual_skill_names()
+    strict_primary_writer = strict_policy and _env_flag("PPT_PRIMARY_VISUAL_SINGLE_WRITER", "true")
 
-    for row in direct_rows:
+    def _consume_row(raw_row: Dict[str, Any], *, record_fulfilled: bool = True) -> None:
+        row = dict(raw_row if isinstance(raw_row, dict) else {})
         skill_key = _normalize_skill_key(row.get("skill"))
-        if skill_key:
+        if record_fulfilled and skill_key:
             fulfilled_skills.add(skill_key)
+
         row_patch = _as_dict(row.get("patch"))
-        if row_patch:
-            merged_patch.update(row_patch)
-            state.update(row_patch)
+        governed_patch, policy_notes, has_violation = _govern_patch_for_skill(
+            skill=skill_key,
+            patch=row_patch,
+            seen_writes=policy_seen_writes,
+            violations=policy_violations,
+            conflicts=policy_conflicts,
+            strict_primary_writer=strict_primary_writer,
+            primary_visual_skills=primary_visual_skills,
+        )
+        row["patch"] = governed_patch
+
+        status = _normalize_text(row.get("status"), "").lower()
+        if status not in {"applied", "noop", "error"}:
+            status = "applied" if governed_patch or _as_dict(row.get("outputs")) else "noop"
+        if strict_policy and has_violation:
+            status = "error"
+        row["status"] = status
+
+        if policy_notes:
+            row["note"] = _append_note(row.get("note"), policy_notes)
+
         outputs = _as_dict(row.get("outputs"))
         if isinstance(outputs.get("recommended_load_skills"), list):
             aggregated_load_skills.extend(
                 [str(item or "") for item in outputs.get("recommended_load_skills") or []]
             )
+
+        if status != "error" and governed_patch:
+            merged_patch.update(governed_patch)
+            state.update(governed_patch)
+
         results.append(row)
+
+    for row in direct_rows:
+        _consume_row(row)
 
     direct_patch = _as_dict(direct_parsed.get("patch") or direct_parsed.get("slide_patch"))
     if direct_patch:
-        merged_patch.update(direct_patch)
-        state.update(direct_patch)
+        default_direct_skill = requested_skills[0] if requested_skills else "ppt-orchestra-skill"
+        governed_direct_patch, _, _ = _govern_patch_for_skill(
+            skill=default_direct_skill,
+            patch=direct_patch,
+            seen_writes=policy_seen_writes,
+            violations=policy_violations,
+            conflicts=policy_conflicts,
+            strict_primary_writer=strict_primary_writer,
+            primary_visual_skills=primary_visual_skills,
+        )
+        if governed_direct_patch:
+            merged_patch.update(governed_direct_patch)
+            state.update(governed_direct_patch)
     if isinstance(direct_context.get("recommended_load_skills"), list):
         aggregated_load_skills.extend(
             [str(item or "") for item in direct_context.get("recommended_load_skills") or []]
@@ -815,7 +1345,7 @@ def execute_installed_skill_request(payload: Dict[str, Any]) -> Dict[str, Any]:
     direct_reason = _normalize_text(direct_runtime.get("reason"), "")
     if require_direct_runtime and (direct_reason or unresolved_skills):
         for skill in unresolved_skills:
-            results.append(
+            _consume_row(
                 {
                     "skill": skill,
                     "status": "error",
@@ -823,7 +1353,8 @@ def execute_installed_skill_request(payload: Dict[str, Any]) -> Dict[str, Any]:
                     "outputs": {},
                     "note": direct_reason or f"direct_skill_runtime_unresolved:{skill}",
                     "source": "direct_skill_runtime",
-                }
+                },
+                record_fulfilled=False,
             )
     else:
         for skill in unresolved_skills:
@@ -834,23 +1365,27 @@ def execute_installed_skill_request(payload: Dict[str, Any]) -> Dict[str, Any]:
                 requested_skills=requested_skills,
                 state=state,
             )
-            row_patch = _as_dict(row.get("patch"))
-            if row_patch:
-                merged_patch.update(row_patch)
-                state.update(row_patch)
-            outputs = _as_dict(row.get("outputs"))
-            if isinstance(outputs.get("recommended_load_skills"), list):
-                aggregated_load_skills.extend(
-                    [str(item or "") for item in outputs.get("recommended_load_skills") or []]
-                )
-            results.append(row)
+            _consume_row(row, record_fulfilled=False)
 
     context = {
         "agent_type": _agent_type_for_slide_type(_normalize_text(state.get("slide_type"), "content").lower()),
         "style_variant": _normalize_text(state.get("style_variant"), "soft"),
         "palette_key": _normalize_text(state.get("palette_key"), "platinum_white_gold"),
+        "theme_recipe": _normalize_text(state.get("theme_recipe"), "consulting_clean"),
+        "tone": _normalize_text(state.get("tone"), "auto"),
         "template_family": _normalize_text(state.get("template_family"), "dashboard_dark"),
         "skill_profile": _normalize_text(state.get("skill_profile"), "general-content"),
+        "template_candidates": [
+            _normalize_text(item, "").lower()
+            for item in _as_list(state.get("template_candidates"))
+            if _normalize_text(item, "")
+        ],
+        "template_family_whitelist": [
+            _normalize_text(item, "").lower()
+            for item in _as_list(state.get("template_family_whitelist"))
+            if _normalize_text(item, "")
+        ],
+        "template_selection_mode": _normalize_text(state.get("template_selection_mode"), "catalog_resolve"),
         "recommended_load_skills": _dedupe_skills(aggregated_load_skills),
         "page_skill_directives": _page_skill_directives(
             _normalize_text(state.get("slide_type"), "content"),
@@ -877,10 +1412,27 @@ def execute_installed_skill_request(payload: Dict[str, Any]) -> Dict[str, Any]:
         context["style_variant"] = _normalize_text(direct_context.get("style_variant"), context["style_variant"])
     if _normalize_text(direct_context.get("palette_key"), ""):
         context["palette_key"] = _normalize_text(direct_context.get("palette_key"), context["palette_key"])
+    if _normalize_text(direct_context.get("theme_recipe"), ""):
+        context["theme_recipe"] = _normalize_text(direct_context.get("theme_recipe"), context["theme_recipe"])
+    if _normalize_text(direct_context.get("tone"), ""):
+        context["tone"] = _normalize_text(direct_context.get("tone"), context["tone"])
     if _normalize_text(direct_context.get("template_family"), ""):
         context["template_family"] = _normalize_text(direct_context.get("template_family"), context["template_family"])
     if _normalize_text(direct_context.get("skill_profile"), ""):
         context["skill_profile"] = _normalize_text(direct_context.get("skill_profile"), context["skill_profile"])
+    if isinstance(direct_context.get("template_candidates"), list):
+        context["template_candidates"] = _dedupe_text_list(
+            [_normalize_text(item, "").lower() for item in direct_context.get("template_candidates") or []]
+        )
+    if isinstance(direct_context.get("template_family_whitelist"), list):
+        context["template_family_whitelist"] = _dedupe_text_list(
+            [_normalize_text(item, "").lower() for item in direct_context.get("template_family_whitelist") or []]
+        )
+    if _normalize_text(direct_context.get("template_selection_mode"), ""):
+        context["template_selection_mode"] = _normalize_text(
+            direct_context.get("template_selection_mode"),
+            context["template_selection_mode"],
+        )
     if isinstance(direct_context.get("page_skill_directives"), list):
         context["page_skill_directives"] = _dedupe_text_list(
             [str(item or "") for item in direct_context.get("page_skill_directives") or []]
@@ -900,7 +1452,18 @@ def execute_installed_skill_request(payload: Dict[str, Any]) -> Dict[str, Any]:
             render_path=_normalize_text(state.get("render_path"), "pptxgenjs").lower(),
             requested_skills=requested_skills,
             deck=deck,
+            slide=slide,
         )
+    context["skill_write_policy"] = {
+        "version": "v1",
+        "strict_mode": bool(strict_policy),
+        "primary_visual_single_writer": bool(strict_primary_writer),
+        "primary_visual_owner": sorted(primary_visual_skills),
+        "single_writer_fields": sorted(_PRIMARY_VISUAL_FIELDS),
+    }
+    context["skill_write_violations"] = policy_violations
+    context["skill_write_conflicts"] = policy_conflicts
+    context["skill_write_conflict"] = policy_conflicts
 
     if context["agent_type"]:
         merged_patch.setdefault("agent_type", context["agent_type"])
@@ -908,6 +1471,10 @@ def execute_installed_skill_request(payload: Dict[str, Any]) -> Dict[str, Any]:
         merged_patch.setdefault("style_variant", context["style_variant"])
     if context["palette_key"]:
         merged_patch.setdefault("palette_key", context["palette_key"])
+    if context["theme_recipe"]:
+        merged_patch.setdefault("theme_recipe", context["theme_recipe"])
+    if context["tone"]:
+        merged_patch.setdefault("tone", context["tone"])
     if context["template_family"]:
         merged_patch.setdefault("template_family", context["template_family"])
     if context["skill_profile"]:
@@ -920,12 +1487,19 @@ def execute_installed_skill_request(payload: Dict[str, Any]) -> Dict[str, Any]:
         "results": results,
         "patch": merged_patch,
         "context": context,
+        "skill_write_violations": policy_violations,
+        "skill_write_conflicts": policy_conflicts,
+        "skill_write_conflict": policy_conflicts,
         "note": "installed_skill_executor_ok",
     }
 
 
 def _read_stdin_payload() -> Dict[str, Any]:
-    raw = sys.stdin.read()
+    buffer = getattr(sys.stdin, "buffer", None)
+    if buffer is not None:
+        raw = buffer.read().decode("utf-8")
+    else:
+        raw = sys.stdin.read()
     try:
         parsed = json.loads(raw) if raw else {}
     except Exception:
@@ -937,7 +1511,7 @@ def _write_json_stdout(payload: Dict[str, Any]) -> None:
     raw = json.dumps(payload, ensure_ascii=False)
     buffer = getattr(sys.stdout, "buffer", None)
     if buffer is not None:
-        buffer.write(raw.encode("utf-8", errors="replace"))
+        buffer.write(raw.encode("utf-8"))
     else:
         sys.stdout.write(raw)
     sys.stdout.flush()
@@ -952,4 +1526,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

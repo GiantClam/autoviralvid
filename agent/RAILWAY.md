@@ -80,6 +80,19 @@ PPT_MODULE_RETRY_MAX_PARALLEL=5
 # Optional explicit cwd override (defaults to agent root automatically)
 # PPT_INSTALLED_SKILL_EXECUTOR_CWD=/app
 
+# Direct skill runtime backend for installed_skill_executor.
+# Default mode is builtin heuristic; to align with Codex CLI + SKILL.md planning:
+# PPT_DIRECT_SKILL_RUNTIME_MODE=codex_cli
+# PPT_DIRECT_SKILL_RUNTIME_REQUIRE=true   # strict: no fallback
+# PPT_DIRECT_SKILL_RUNTIME_CODEX_BIN=codex
+# PPT_DIRECT_SKILL_RUNTIME_CODEX_ARGS=["exec","--skip-git-repo-check","--sandbox","read-only"]
+# PPT_DIRECT_SKILL_RUNTIME_CODEX_TIMEOUT_SEC=90
+# PPT_DIRECT_SKILL_RUNTIME_CODEX_CWD=/app
+# Optional skill root override (os.pathsep-separated):
+# PPT_DIRECT_SKILL_RUNTIME_SKILL_ROOTS=/app/vendor/minimax-skills/plugins/pptx-plugin/skills:/app/vendor/minimax-skills/skills
+# Optional max SKILL.md injection chars:
+# PPT_DIRECT_SKILL_RUNTIME_SKILL_CONTENT_MAX_CHARS=120000
+
 # Subagent execution before each targeted slide render is always enabled on worker role.
 
 # Optional: custom subagent executor process.

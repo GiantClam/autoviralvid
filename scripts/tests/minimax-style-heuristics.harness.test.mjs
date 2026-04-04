@@ -56,7 +56,7 @@ test("palette harness: topic keyword routing", () => {
   assert.equal(selectPalette("auto", "forest eco esg"), "forest_eco");
   assert.equal(selectPalette("auto", "high-end luxury premium"), "platinum_white_gold");
   assert.equal(selectPalette("auto", ZH_TECH), "pure_tech_blue");
-  assert.equal(selectPalette("auto", "unclassified topic"), "luxury_mysterious");
+  assert.equal(selectPalette("auto", "unclassified topic"), "business_authority");
 });
 
 test("subtype harness: explicit subtype normalization", () => {

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from typing import Dict, List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -27,6 +27,7 @@ BlockType = Literal[
     "title",
     "subtitle",
     "body",
+    "comparison",
     "kpi",
     "chart",
     "image",
@@ -56,18 +57,25 @@ class ContentBlock(BaseModel):
 
     block_type: BlockType
     position: PositionType
-    content: str = Field(..., min_length=1, max_length=4000)
+    content: str | Dict[str, Any] = Field(...)
     data: Optional[Dict] = None
     emphasis: List[str] = Field(default_factory=list, max_length=10)
 
     @field_validator("content")
     @classmethod
-    def validate_content_no_placeholder(cls, value: str) -> str:
-        text = str(value or "").strip()
+    def validate_content_no_placeholder(cls, value: str | Dict[str, Any]) -> str | Dict[str, Any]:
+        if isinstance(value, dict):
+            text = " ".join(str(item or "").strip() for item in value.values() if str(item or "").strip()).strip()
+        else:
+            text = str(value or "").strip()
+        if not text:
+            raise ValueError("content must not be empty")
+        if len(text) > 4000:
+            raise ValueError("content exceeds max_length=4000")
         for pattern in _PLACEHOLDER_PATTERNS:
             if re.search(pattern, text, flags=re.IGNORECASE):
                 raise ValueError(f"content contains placeholder pattern: {pattern}")
-        return text
+        return value if isinstance(value, dict) else text
 
     @model_validator(mode="after")
     def validate_block_data(self) -> "ContentBlock":
@@ -106,6 +114,8 @@ class SlidePlan(BaseModel):
     blocks: List[ContentBlock] = Field(default_factory=list, min_length=2, max_length=30)
     bg_style: Literal["light", "dark", "accent", "image"] = "light"
     image_keywords: List[str] = Field(default_factory=list, max_length=8)
+    archetype: str = Field(default="", max_length=80)
+    template_candidates: List[str] = Field(default_factory=list, max_length=6)
     notes_for_designer: str = Field(default="", max_length=500)
     content_strategy: Optional[SlideContentStrategy] = None
 
@@ -133,5 +143,3 @@ class PresentationPlanRequest(BaseModel):
 
     outline: OutlinePlan
     research: Optional[ResearchContext] = None
-
-
