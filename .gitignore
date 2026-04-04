@@ -71,6 +71,12 @@ agent.log
 .tmp-*
 .cache/
 .playwright-mcp/
+tmp-codex-last.txt
+tmp_recover/
+agent/tmp_run_round*.py
+
+# python build metadata
+*.egg-info/
 
 # test outputs
 test_outputs/
