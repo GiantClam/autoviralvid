@@ -314,7 +314,7 @@ src/
 
 ```
 已移除本地历史 PPT-video skill 目录（未接入运行时）
-当前执行链路：agent/src/minimax_exporter.py -> scripts/generate-pptx-minimax.mjs
+当前执行链路：agent/src/minimax_exporter.py -> agent/src/svg_to_pptx (DrawingML native)
 官方 skill 参考保留在：vendor/minimax-skills/skills/pptx-generator/
 ```
 

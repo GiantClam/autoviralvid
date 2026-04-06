@@ -29,7 +29,7 @@ def _repo_root() -> Path:
 
 
 def _default_spec_path() -> Path:
-    return _repo_root() / "scripts" / "minimax" / "templates" / "archetype-slot-spec.json"
+    return Path(__file__).resolve().parent / "ppt_specs" / "archetype-slot-spec.json"
 
 
 def load_archetype_slot_spec(path: Path | None = None) -> Dict[str, Any]:

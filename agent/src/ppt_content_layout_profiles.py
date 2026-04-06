@@ -111,7 +111,7 @@ def _load_synthesis_spec() -> Dict[str, Dict[str, Any]]:
             "semantic_page_type": "content",
         }
     }
-    path = _repo_root() / "scripts" / "minimax" / "templates" / "archetype-synthesis-spec.json"
+    path = Path(__file__).resolve().parent / "ppt_specs" / "archetype-synthesis-spec.json"
     if not path.exists():
         return fallback
     try:

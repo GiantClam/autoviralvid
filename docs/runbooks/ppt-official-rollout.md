@@ -38,8 +38,8 @@
 - Verify stage-5 `official_input` content slides always keep non-empty `blocks`.
 - Verify template diversity for mixed content decks is >= 2.
 - Run:
-  - `node scripts/generate-pptx-minimax.mjs --input agent/renders/tmp/ppt_pipeline/d1ef781b8ac5/stage-4-render-payload.json --output test_outputs/d1ef-fixed.pptx --render-output test_outputs/d1ef-fixed.render.json`
-  - `node scripts/generate-pptx-minimax.mjs --input agent/renders/tmp/ppt_pipeline/a6cfe06be5bf/stage-4-render-payload.json --output test_outputs/a6cf-fixed.pptx --render-output test_outputs/a6cf-fixed.render.json`
+  - `(deprecated) Node export entry has been removed.`
+  - `Use Python export path via agent/src/minimax_exporter.py (DrawingML native).`
   - `node scripts/tests/validate-render-metrics.mjs test_outputs/d1ef-fixed.render.json test_outputs/a6cf-fixed.render.json`
 
 ## Rollback

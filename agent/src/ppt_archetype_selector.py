@@ -14,7 +14,7 @@ def _repo_root() -> Path:
 
 
 def _catalog_path() -> Path:
-    return _repo_root() / "scripts" / "minimax" / "templates" / "archetype-catalog.json"
+    return Path(__file__).resolve().parent / "ppt_specs" / "archetype-catalog.json"
 
 
 def _normalize_key(value: Any) -> str:
@@ -241,4 +241,3 @@ def select_slide_archetype(
         "candidates": top_rows,
         "rerank_version": "v1",
     }
-

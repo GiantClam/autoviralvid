@@ -150,7 +150,7 @@ design_decision_v1 = {
 
 ### 阶段4: 渲染生成（Render）
 
-**主要文件**: `agent/src/minimax_exporter.py`, `scripts/generate-pptx-minimax.mjs`
+**主要文件**: `agent/src/minimax_exporter.py`, `agent/src/svg_to_pptx/`
 
 **渲染路径**:
 
@@ -189,7 +189,7 @@ def choose_render_path(slide):
 **关键函数**:
 - `export_to_minimax_format()` - 导出为MiniMax格式
 - `apply_render_paths()` - 应用渲染路径决策
-- `generate-pptx-minimax.mjs` - Node.js渲染脚本
+- `minimax_exporter.py` + `svg_to_pptx` - Python DrawingML渲染脚本
 
 ---
 
@@ -439,7 +439,7 @@ quality_score < threshold?
 - **职责**: 失败修复、重试控制
 
 ### 6. 渲染引擎
-- **文件**: `scripts/generate-pptx-minimax.mjs`
+- **文件**: `agent/src/minimax_exporter.py`
 - **职责**: PPTX文件生成
 
 ---

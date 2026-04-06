@@ -6,7 +6,7 @@
 
 Supported modes:
     1. API mode: call backend service (requires backend running)
-    2. Local mode: call Node.js renderer directly (render fallback)
+    2. Local mode: python-only reconstruction pipeline (no Node export fallback)
 """
 
 from __future__ import annotations
@@ -33,7 +33,7 @@ AGENT_SRC = REPO_ROOT / "agent" / "src"
 if str(AGENT_SRC) not in sys.path:
     sys.path.append(str(AGENT_SRC))
 
-from ppt_reference_contract import audit_reference_contract
+from ppt_reference_contract import audit_reference_contract  # noqa: E402
 
 try:
     from pptx import Presentation
@@ -166,7 +166,7 @@ def generate_via_api(
     except requests.exceptions.ConnectionError:
         reason = f"Cannot connect to API: {api_url}"
         print(reason)
-        print("Please ensure backend is running (pnpm dev:agent:render)")
+        print("Please ensure backend is running (cd agent && uv run uvicorn main:app --host 0.0.0.0 --port 8124)")
         if isinstance(diagnostics, dict):
             diagnostics["failure_stage"] = "api_connectivity"
             diagnostics["failure_reason"] = reason
@@ -248,60 +248,15 @@ def generate_via_local(
             )
         return False
 
-    scripts_dir = Path(__file__).parent
-    generator_script = scripts_dir / "generate-pptx-minimax.mjs"
-
-    if not generator_script.exists():
-        reason = f"鎵句笉鍒版覆鏌撹剼鏈? {generator_script}"
-        print(reason)
-        if isinstance(diagnostics, dict):
-            diagnostics["failure_stage"] = "local_node_renderer"
-            diagnostics["failure_reason"] = reason
-        return False
-
-    desc_path = Path(output_path).with_suffix(".desc.json")
-    desc_path.write_text(
-        json.dumps(desc, ensure_ascii=False, indent=2), encoding="utf-8"
+    reason = (
+        "python-only local reconstruction failed; "
+        "node export fallback has been decommissioned"
     )
-
-    cmd = [
-        "node",
-        str(generator_script),
-        "--input",
-        str(desc_path),
-        "--output",
-        output_path,
-    ]
-
-    if render_output_path:
-        cmd.extend(["--render-output", render_output_path])
-
-    try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
-        if result.returncode == 0:
-            _safe_print(f"PPT saved to: {output_path}")
-            return True
-        else:
-            reason = f"娓叉煋澶辫触: {result.stderr}"
-            _safe_print(reason)
-            if isinstance(diagnostics, dict):
-                diagnostics["failure_stage"] = "local_node_renderer"
-                diagnostics["failure_reason"] = reason
-            return False
-    except subprocess.TimeoutExpired:
-        reason = "renderer timeout"
-        print(reason)
-        if isinstance(diagnostics, dict):
-            diagnostics["failure_stage"] = "local_node_renderer"
-            diagnostics["failure_reason"] = reason
-        return False
-    except Exception as e:
-        reason = f"娓叉煋寮傚父: {e}"
-        _safe_print(reason)
-        if isinstance(diagnostics, dict):
-            diagnostics["failure_stage"] = "local_node_renderer"
-            diagnostics["failure_reason"] = reason
-        return False
+    _safe_print(reason)
+    if isinstance(diagnostics, dict):
+        diagnostics["failure_stage"] = "local_reconstruct"
+        diagnostics["failure_reason"] = reason
+    return False
 
 
 def _generate_via_source_replay(
@@ -1134,19 +1089,29 @@ def _should_auto_start_local_service(api_url: str) -> bool:
 
 def _start_local_render_service() -> Optional[subprocess.Popen]:
     repo_root = Path(__file__).resolve().parent.parent
+    agent_root = repo_root / "agent"
     creationflags = 0
     for flag_name in ("CREATE_NEW_PROCESS_GROUP", "DETACHED_PROCESS"):
         creationflags |= int(getattr(subprocess, flag_name, 0))
     launch_candidates = [
-        ["pnpm", "dev:agent:render"],
-        ["pnpm.cmd", "dev:agent:render"],
-        ["npm", "run", "dev:agent:render"],
+        ["uv", "run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8124"],
+        ["uv.exe", "run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8124"],
+        [
+            sys.executable,
+            "-m",
+            "uvicorn",
+            "main:app",
+            "--host",
+            "0.0.0.0",
+            "--port",
+            "8124",
+        ],
     ]
     for cmd in launch_candidates:
         try:
             proc = subprocess.Popen(
                 cmd,
-                cwd=str(repo_root),
+                cwd=str(agent_root),
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
                 creationflags=creationflags,
@@ -1158,7 +1123,7 @@ def _start_local_render_service() -> Optional[subprocess.Popen]:
         except Exception as exc:
             print(f"Failed to launch {' '.join(cmd)}: {exc}")
             continue
-    print("Failed to auto-start local render service: pnpm/npm command not found")
+    print("Failed to auto-start local render service: uv/python uvicorn command not found")
     return None
 
 def _ensure_api_available(api_url: str, timeout_sec: int = 45) -> bool:
@@ -1212,7 +1177,7 @@ def _generate_via_api_with_autostart(
             diagnostics["failure_stage"] = "api_connectivity"
             diagnostics["failure_reason"] = reason
         return False
-    print("API unreachable, auto-starting local renderer: pnpm dev:agent:render")
+    print("API unreachable, auto-starting local renderer: uv run uvicorn main:app --host 0.0.0.0 --port 8124")
     if not _ensure_api_available(api_url):
         reason = "Local render service failed to become healthy; cannot retry API"
         print(reason)

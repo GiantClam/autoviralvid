@@ -51,8 +51,8 @@ _DEFAULT_ROUTE_RECOMMENDATION = RouteRecommendationConfig()
 
 
 def _catalog_path() -> Path:
-    # <repo>/agent/src/ppt_template_catalog.py -> <repo>/scripts/minimax/templates/template-catalog.json
-    return Path(__file__).resolve().parents[2] / "scripts" / "minimax" / "templates" / "template-catalog.json"
+    # Python-owned catalog location (Node-free export path).
+    return Path(__file__).resolve().parent / "ppt_specs" / "template-catalog.json"
 
 
 def _as_dict(value: Any) -> Dict[str, Any]:

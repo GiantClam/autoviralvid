@@ -14,12 +14,9 @@ PPT 功能 E2E 测试 — 覆盖所有场景
 10. 并发安全
 """
 
-import asyncio
-import json
 import os
 import sys
 import pytest
-import httpx
 from fastapi.testclient import TestClient
 
 # 添加项目根目录到 path
@@ -31,12 +28,8 @@ from src.schemas.ppt import (
     SlideElement,
     SlideContent,
     SlideBackground,
-    ParsedDocument,
     VideoRenderConfig,
-    RenderJob,
     OutlineRequest,
-    ContentRequest,
-    ExportRequest,
     ParseRequest,
     VideoRenderRequest,
     ApiResponse,
@@ -632,11 +625,11 @@ class TestConcurrency:
 class TestPptxExport:
     """PPTX 导出脚本验证"""
 
-    def test_generate_pptx_script_exists(self):
+    def test_generate_pptx_node_script_removed(self):
         script = os.path.join(
             os.path.dirname(__file__), "..", "..", "scripts", "generate-pptx-minimax.mjs"
         )
-        assert os.path.exists(script), f"Script not found: {script}"
+        assert not os.path.exists(script), f"Legacy Node export script should be removed: {script}"
 
     def test_render_script_exists(self):
         script = os.path.join(
@@ -766,7 +759,6 @@ class TestPlanCompleteness:
         "src/components/RenderProgress.tsx",
         "src/components/PPTPreview.tsx",
         # Scripts
-        "scripts/generate-pptx-minimax.mjs",
         "scripts/render-presentation.mjs",
         # Plan doc
         "docs/PPT_VIDEO_FINAL_PLAN.md",
