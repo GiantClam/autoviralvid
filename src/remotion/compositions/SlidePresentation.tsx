@@ -11,19 +11,40 @@
 import React from 'react';
 import {
   AbsoluteFill,
-  Sequence,
   Audio,
   Img,
   interpolate,
   useCurrentFrame,
   useVideoConfig,
   spring,
-  Easing,
 } from 'remotion';
-import { TransitionSeries, linearTiming, springTiming } from '@remotion/transitions';
+import { TransitionSeries, springTiming } from '@remotion/transitions';
 import { fade } from '@remotion/transitions/fade';
 import { slide } from '@remotion/transitions/slide';
 import { wipe } from '@remotion/transitions/wipe';
+
+type ElementStyle = React.CSSProperties & {
+  align?: React.CSSProperties['textAlign'];
+  fontFamily?: string;
+  fontSize?: number;
+  color?: string;
+  backgroundColor?: string;
+  borderRadius?: number;
+  padding?: number;
+  bold?: boolean;
+  italic?: boolean;
+};
+
+interface ChartDataset {
+  data?: number[];
+}
+
+interface ChartData {
+  labels?: string[];
+  datasets?: ChartDataset[];
+}
+
+type TransitionPresentation = ReturnType<typeof fade>;
 
 // ── Types ──────────────────────────────────────────────────────────
 
@@ -43,8 +64,8 @@ interface SlideElement {
   id: string;
   type: 'text' | 'image' | 'shape' | 'chart' | 'table' | 'latex' | 'video' | 'audio';
   left: number; top: number; width: number; height: number;
-  content?: string; src?: string; style?: Record<string, any>;
-  chartType?: string; chartData?: Record<string, any>;
+  content?: string; src?: string; style?: ElementStyle;
+  chartType?: string; chartData?: ChartData;
   tableRows?: string[][];
 }
 
@@ -61,20 +82,20 @@ interface SlideContent {
   narration: string; narrationAudioUrl?: string; duration: number;
 }
 
-export interface SlidePresentationProps {
+export type SlidePresentationProps = Record<string, unknown> & {
   slides: SlideContent[];
   bgmUrl?: string; bgmVolume?: number;
   defaultTransition?: 'fade' | 'slide' | 'wipe';
-}
+};
 
 // ── 转场映射 ───────────────────────────────────────────────────────
 
-function getPresentation(type: string) {
+function getPresentation(type: string): TransitionPresentation {
   switch (type) {
-    case 'slide': return slide({ direction: 'from-right' }) as any;
-    case 'wipe': return wipe({ direction: 'from-top-left' }) as any;
+    case 'slide': return slide({ direction: 'from-right' }) as unknown as TransitionPresentation;
+    case 'wipe': return wipe({ direction: 'from-top-left' }) as unknown as TransitionPresentation;
     case 'fade':
-    default: return fade() as any;
+    default: return fade();
   }
 }
 
@@ -130,9 +151,6 @@ export default function SlidePresentation({
 // ── 单页幻灯片 ─────────────────────────────────────────────────────
 
 function SingleSlide({ slide }: { slide: SlideContent }) {
-  const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
-
   // 背景
   const bgStyle = getBackgroundStyle(slide.background);
 
@@ -283,7 +301,7 @@ function ElementRenderer({ element, bg }: { element: SlideElement; bg?: SlideBac
 
 // ── 图表渲染器 ─────────────────────────────────────────────────────
 
-function ChartRenderer({ chartType, chartData }: { chartType: string; chartData: Record<string, any> }) {
+function ChartRenderer({ chartType, chartData }: { chartType: string; chartData: ChartData }) {
   const labels: string[] = chartData.labels || [];
   const datasets = chartData.datasets || [];
   const data: number[] = datasets[0]?.data || [];

@@ -7,6 +7,10 @@ import { createRequire } from "node:module";
 import { normalizeRenderInput, validateRenderInput } from "./render-contract.mjs";
 
 const localRequire = createRequire(import.meta.url);
+const MODULE_DIR = path.dirname(fileURLToPath(import.meta.url));
+const SCENE_RULEBOOK_PATH = path.resolve(MODULE_DIR, "../../agent/src/configs/ppt_scene_rulebook.json");
+
+let _sceneRulebookCache = null;
 
 function asArray(value) {
   return Array.isArray(value) ? value : [];
@@ -15,6 +19,57 @@ function asArray(value) {
 function normalizeText(value, fallback = "") {
   const text = String(value || "").trim();
   return text || fallback;
+}
+
+function normalizeSceneRuleProfile(value) {
+  const key = normalizeText(value, "").toLowerCase();
+  return ["status_report", "investor_pitch", "training_deck"].includes(key) ? key : "";
+}
+
+function loadSceneRulebook() {
+  if (_sceneRulebookCache) return _sceneRulebookCache;
+  try {
+    const parsed = JSON.parse(readFileSync(SCENE_RULEBOOK_PATH, "utf-8"));
+    _sceneRulebookCache = parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    _sceneRulebookCache = {};
+  }
+  return _sceneRulebookCache;
+}
+
+function scenePromptDirectives(profile, slideType = "") {
+  const scene = normalizeSceneRuleProfile(profile);
+  if (!scene) return [];
+  const catalog = loadSceneRulebook();
+  const rule = catalog?.[scene];
+  if (!rule || typeof rule !== "object") return [];
+  const promptGuidance = rule?.prompt_guidance && typeof rule.prompt_guidance === "object" ? rule.prompt_guidance : {};
+  const shared = promptGuidance?.shared && typeof promptGuidance.shared === "object" ? promptGuidance.shared : {};
+  const slideBucket = promptGuidance?.[normalizeText(slideType, "").toLowerCase()];
+  const scoped = slideBucket && typeof slideBucket === "object" ? slideBucket : {};
+  const label = normalizeText(rule?.label, scene);
+  const levels = [
+    ["must", "Must", 2],
+    ["key", "Key", 2],
+    ["bonus", "Bonus", 1],
+  ];
+  const out = [];
+  const seen = new Set();
+  for (const [key, weight, limit] of levels) {
+    const values = [];
+    for (const row of [...asArray(shared?.[key]), ...asArray(scoped?.[key])]) {
+      const text = normalizeText(row, "");
+      if (text) values.push(text);
+    }
+    for (const text of values.slice(0, limit)) {
+      const line = `[${label}|${weight}] ${text}`;
+      const dedupeKey = line.toLowerCase();
+      if (seen.has(dedupeKey)) continue;
+      seen.add(dedupeKey);
+      out.push(line);
+    }
+  }
+  return out;
 }
 
 function isGenericSlideTitle(value) {
@@ -303,7 +358,7 @@ export async function loadSlideModules(manifestOrPath) {
         delete localRequire.cache[resolved];
       }
       imported = localRequire(modulePath);
-    } catch (_) {
+    } catch {
       const moduleUrl = pathToFileURL(modulePath);
       moduleUrl.searchParams.set("v", `${Date.now()}-${Math.random().toString(36).slice(2)}`);
       imported = await import(moduleUrl.href);
@@ -355,7 +410,7 @@ function safeReadJsonFile(filePath) {
     const raw = readFileSync(absPath, "utf-8");
     const parsed = JSON.parse(raw.charCodeAt(0) === 0xfeff ? raw.slice(1) : raw);
     return parsed && typeof parsed === "object" ? parsed : null;
-  } catch (_) {
+  } catch {
     return null;
   }
 }
@@ -374,7 +429,6 @@ function buildSlidePatchFromRenderSpec(renderSpec, expectedSlideId) {
   ) || null;
 
   const patch = {};
-  const isGenericTitle = (value) => /^slide\s*\d+$/i.test(String(value || "").trim());
   const isSpecificSlideType = (value) =>
     new Set(["cover", "summary", "toc", "divider", "section", "timeline", "image_showcase"]).has(
       normalizeText(value, "").toLowerCase(),
@@ -657,10 +711,6 @@ function buildChartDataFromSlide(slide) {
   };
 }
 
-function fallbackBodyText(slide, suffix = 1) {
-  return pickDerivedText(slide, { index: Math.max(0, Number(suffix) - 1) });
-}
-
 function pushBodyBlock(slide, suffix = 1) {
   const blocks = ensureBlocksArray(slide);
   const existing = blocks.map((block) => blockText(block));
@@ -861,7 +911,7 @@ function extractJsonFromText(value) {
   try {
     const parsed = JSON.parse(text);
     if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) return parsed;
-  } catch (_) {
+  } catch {
     // continue scanning lines
   }
   const lines = text.split(/\r?\n/).reverse();
@@ -871,7 +921,7 @@ function extractJsonFromText(value) {
     try {
       const parsed = JSON.parse(row);
       if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) return parsed;
-    } catch (_) {
+    } catch {
       // ignore parse error
     }
   }
@@ -886,7 +936,7 @@ function parseExecutorArgs(rawValue = "") {
     if (Array.isArray(parsed)) {
       return parsed.map((item) => normalizeText(item, "")).filter(Boolean);
     }
-  } catch (_) {
+  } catch {
     // ignore json parse error
   }
   return text.split(/\s+/).map((item) => item.trim()).filter(Boolean);
@@ -949,6 +999,10 @@ function buildSubagentPrompt(moduleRow, context = {}) {
   const imagePolicy = moduleRow?.slide_data?.image_policy && typeof moduleRow.slide_data.image_policy === "object"
     ? moduleRow.slide_data.image_policy
     : {};
+  const qualityProfile = normalizeSceneRuleProfile(
+    moduleRow?.slide_data?.quality_profile || moduleRow?.quality_profile || context?.qualityProfile,
+  );
+  const sceneRules = scenePromptDirectives(qualityProfile, slideType);
   const objective = [
     `You are ${agentType}.`,
     `Regenerate slide ${slideId} (${slideType}) with render_path=${renderPath}.`,
@@ -972,6 +1026,7 @@ function buildSubagentPrompt(moduleRow, context = {}) {
     slideType === "content" && ["split_2", "asymmetric_2"].includes(normalizeText(moduleRow?.layout_grid, "").toLowerCase())
       ? "Layout rules: do not overload the text column in left-right layouts."
       : "",
+    ...sceneRules.map((item) => `Scene rules: ${item}`),
     pageDesignIntent ? `Page design intent: ${pageDesignIntent}` : "",
     ...slideDirectives.map((item) => `Skill directive: ${item}`),
     ...Object.entries(textConstraints).map(([key, value]) => `Text constraint ${key}: ${value}`),
@@ -1089,6 +1144,7 @@ export async function renderSlideModulesInParallel({
       const prompt = buildSubagentPrompt(moduleRow, {
         deckTitle: assembled?.title,
         retryHint: assembled?.retry_hint,
+        qualityProfile: assembled?.quality_profile,
       });
       const loadSkills = dedupeSkillList(moduleRow.load_skills || []);
       const taskPayload = {

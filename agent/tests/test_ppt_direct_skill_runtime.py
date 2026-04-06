@@ -80,6 +80,25 @@ def test_execute_direct_skill_runtime_cover_prefers_hero_template_when_generic_i
     assert isinstance(directives, list) and len(directives) > 0
 
 
+def test_execute_direct_skill_runtime_injects_scene_rule_guidance():
+    out = runtime_mod.execute_direct_skill_runtime(
+        {
+            "requested_skills": ["ppt-orchestra-skill", "slide-making-skill"],
+            "slide": {
+                "slide_id": "s-training",
+                "slide_type": "cover",
+                "title": "Python 入门",
+                "quality_profile": "training_deck",
+            },
+            "deck": {"title": "Python 入门", "quality_profile": "training_deck"},
+        }
+    )
+    context = out.get("context") if isinstance(out.get("context"), dict) else {}
+    directives = context.get("page_skill_directives")
+    assert isinstance(directives, list) and directives
+    assert any("课程讲义" in str(item) for item in directives)
+
+
 def test_execute_direct_skill_runtime_rotates_content_layout_with_history():
     payload = {
         "requested_skills": ["slide-making-skill", "ppt-orchestra-skill"],

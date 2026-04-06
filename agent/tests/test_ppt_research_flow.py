@@ -4,6 +4,7 @@ from pydantic import ValidationError
 import src.ppt_service as ppt_service
 from src.ppt_service import PPTService
 from src.schemas.ppt_outline import OutlinePlan, OutlinePlanRequest, StickyNote
+from src.schemas.ppt_pipeline import PPTPipelineRequest
 from src.schemas.ppt_plan import ContentBlock, PresentationPlanRequest
 from src.schemas.ppt_research import ResearchContext, ResearchQuestion, ResearchRequest
 
@@ -122,10 +123,15 @@ async def test_classroom_outline_uses_pedagogical_storyline():
         OutlinePlanRequest(research=research, total_pages=10)
     )
     titles = [str(note.core_message) for note in outline.notes]
-    assert titles[1] == "内容导航"
-    research_titles = [str(item) for item in research.key_data_points[:7]]
-    assert titles[2:9] == research_titles
-    assert titles[-1] == "总结与启示"
+    assert titles[1] == "课程导航"
+    assert titles[2] == "什么是立法过程"
+    assert titles[3] == "立法过程中的关键角色"
+    assert titles[4] == "立法过程与国际关系的交汇"
+    assert titles[5] == "国际关系中的制度接口"
+    assert titles[6] == "案例分析：立法过程的国际关系影响"
+    assert titles[7] == "未来趋势与思考"
+    assert titles[8] == "课堂总结"
+    assert titles[-1] == "谢谢"
     assert outline.theme_suggestion == "education_charts"
     assert outline.style_suggestion == "rounded"
 
@@ -157,6 +163,94 @@ async def test_classroom_presentation_plan_preserves_storyline_titles():
     assert slide_titles[-1] == outline.notes[-1].core_message
     assert plan.slides[1].slide_type == "toc"
     assert plan.slides[-1].slide_type == "summary"
+
+
+def test_profile_field_ownership_overrides_slide_level_profile_drift():
+    payload = {
+        "quality_profile": "training_deck",
+        "slides": [
+            {"slide_id": "s1", "quality_profile": "high_density_consulting", "hardness_profile": "strict"},
+            {"slide_id": "s2", "quality_profile": "high_density_consulting", "hardness_profile": "strict"},
+        ],
+    }
+    out = ppt_service._enforce_profile_field_ownership(
+        payload,
+        quality_profile="training_deck",
+        hardness_profile="balanced",
+    )
+    assert out.get("quality_profile") == "training_deck"
+    assert out.get("hardness_profile") == "balanced"
+    for slide in out.get("slides") or []:
+        assert slide.get("quality_profile") == "training_deck"
+        assert slide.get("hardness_profile") == "balanced"
+
+
+@pytest.mark.asyncio
+async def test_classroom_pipeline_strips_instructional_boilerplate_from_content_blocks(monkeypatch):
+    monkeypatch.setenv("PPT_DEV_FAST_FAIL", "false")
+    from src.ppt_quality_gate import QualityResult
+
+    monkeypatch.setattr("src.ppt_quality_gate.validate_layout_diversity", lambda *_args, **_kwargs: QualityResult(ok=True, issues=[]))
+    svc = PPTService()
+    result = await svc.run_ppt_pipeline(
+        PPTPipelineRequest(
+            topic="请制作一份高中课堂展示课件，主题为“解码立法过程：理解其对国际关系的影响”",
+            audience="high school students",
+            purpose="classroom presentation",
+            style_preference="clear educational",
+            total_pages=8,
+            route_mode="fast",
+            quality_profile="lenient_draft",
+            web_enrichment=False,
+            with_export=False,
+            save_artifacts=False,
+            execution_profile="prod_safe",
+        )
+    )
+    content_slides = [
+        slide for slide in (result.artifacts.render_payload.get("slides") or [])
+        if isinstance(slide, dict) and str(slide.get("slide_type") or "") == "content"
+    ]
+    assert content_slides
+    flattened = "\n".join(
+        str((block or {}).get("content") or "")
+        for slide in content_slides
+        for block in (slide.get("blocks") or [])
+        if isinstance(block, dict)
+    )
+    for prefix in ("核心信息：", "核心问题：", "课堂提示：", "案例背景：", "争议焦点："):
+        assert prefix not in flattened
+
+
+@pytest.mark.asyncio
+async def test_classroom_pipeline_reclassifies_non_terminal_hero_layout_as_section(monkeypatch):
+    monkeypatch.setenv("PPT_DEV_FAST_FAIL", "false")
+    from src.ppt_quality_gate import QualityResult
+
+    monkeypatch.setattr("src.ppt_quality_gate.validate_layout_diversity", lambda *_args, **_kwargs: QualityResult(ok=True, issues=[]))
+    svc = PPTService()
+    result = await svc.run_ppt_pipeline(
+        PPTPipelineRequest(
+            topic="请制作一份高中课堂展示课件，主题为“解码立法过程：理解其对国际关系的影响”",
+            audience="high school students",
+            purpose="classroom presentation",
+            style_preference="clear educational",
+            total_pages=8,
+            route_mode="fast",
+            quality_profile="lenient_draft",
+            web_enrichment=False,
+            with_export=False,
+            save_artifacts=False,
+            execution_profile="prod_safe",
+        )
+    )
+    for slide in result.artifacts.render_payload.get("slides") or []:
+        if not isinstance(slide, dict):
+            continue
+        slide_type = str(slide.get("slide_type") or "")
+        layout_grid = str(slide.get("layout_grid") or "")
+        if layout_grid == "hero_1":
+            assert slide_type in {"cover", "summary", "toc", "divider", "hero_1", "section"}
 
 
 @pytest.mark.asyncio

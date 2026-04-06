@@ -36,6 +36,14 @@ export type SlideElementType =
   | "video"
   | "audio";
 
+export interface PptStyleMap {
+  [key: string]: string | number | boolean | undefined;
+}
+
+export interface PptObjectMap {
+  [key: string]: unknown;
+}
+
 export interface SlideElement {
   id: string;
   blockId?: string;
@@ -46,9 +54,9 @@ export interface SlideElement {
   height: number;
   content?: string;
   src?: string;
-  style?: Record<string, any>;
+  style?: PptStyleMap;
   chartType?: string;
-  chartData?: Record<string, any>;
+  chartData?: PptObjectMap;
   tableRows?: string[][];
   tableColWidths?: number[];
   latexFormula?: string;
@@ -152,16 +160,16 @@ export interface ExportResponse {
   deck_id?: string;
   attempts?: number;
   retry_scope?: "deck" | "slide" | "block";
-  diagnostics?: Record<string, any>[];
+  diagnostics?: PptObjectMap[];
   route_mode?: "fast" | "standard" | "refine" | string;
-  quality_score?: Record<string, any>;
-  visual_qa?: Record<string, any>;
-  observability_report?: Record<string, any>;
+  quality_score?: PptObjectMap;
+  visual_qa?: PptObjectMap;
+  observability_report?: PptObjectMap;
   skill?: "minimax_pptx_generator" | string;
   video_mode?: string;
   video_slide_count?: number;
-  video_slides?: Record<string, any>[];
-  generator_meta?: Record<string, any>;
+  video_slides?: PptObjectMap[];
+  generator_meta?: PptObjectMap;
 }
 
 export interface ParseRequest {
@@ -182,7 +190,7 @@ export interface EnhanceRequest {
   voiceStyle: string;
 }
 
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
   success: boolean;
   data?: T;
   error?: string;

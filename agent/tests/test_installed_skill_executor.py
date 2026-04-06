@@ -147,6 +147,26 @@ def test_execute_installed_skill_request_emits_page_skill_directives(monkeypatch
     assert isinstance(ctx.get("image_policy"), dict)
 
 
+def test_execute_installed_skill_request_includes_scene_rule_guidance(monkeypatch):
+    monkeypatch.setenv("PPT_DIRECT_SKILL_RUNTIME_ENABLED", "false")
+    monkeypatch.setenv("PPT_DIRECT_SKILL_RUNTIME_REQUIRE", "false")
+    payload = {
+        "requested_skills": ["slide-making-skill", "ppt-orchestra-skill"],
+        "slide": {
+            "slide_id": "s-pitch",
+            "slide_type": "cover",
+            "title": "AI 路演",
+            "quality_profile": "investor_pitch",
+        },
+        "deck": {"title": "AI 路演", "quality_profile": "investor_pitch"},
+    }
+    out = exec_mod.execute_installed_skill_request(payload)
+    ctx = out.get("context") if isinstance(out.get("context"), dict) else {}
+    directives = ctx.get("page_skill_directives")
+    assert isinstance(directives, list) and directives
+    assert any("融资路演" in str(item) for item in directives)
+
+
 def test_execute_installed_skill_request_rotates_content_layout_with_history(monkeypatch):
     monkeypatch.setenv("PPT_DIRECT_SKILL_RUNTIME_ENABLED", "false")
     monkeypatch.setenv("PPT_DIRECT_SKILL_RUNTIME_REQUIRE", "false")

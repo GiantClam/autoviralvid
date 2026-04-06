@@ -5,26 +5,23 @@
 
 import type React from 'react';
 import { Composition, registerRoot } from 'remotion';
+import type { AnyZodObject } from 'remotion';
 import SlidePresentation from './compositions/SlidePresentation';
 import VideoTemplate from './compositions/VideoTemplate';
 import ImageSlideshow from './compositions/ImageSlideshow';
 import type { SlidePresentationProps } from './compositions/SlidePresentation';
 import type { ImageSlideshowProps } from './compositions/ImageSlideshow';
+import type { VideoTemplateProps } from './compositions/VideoTemplate';
 
 const defaultSlides: SlidePresentationProps['slides'] = [];
-const SlidePresentationComponent =
-  SlidePresentation as React.ComponentType<SlidePresentationProps>;
-const VideoTemplateComponent = VideoTemplate as React.ComponentType;
-const ImageSlideshowComponent =
-  ImageSlideshow as React.ComponentType<ImageSlideshowProps>;
 
 export const RemotionRoot: React.FC = () => {
   return (
     <>
       {/* PPT 讲解视频 - Feature B */}
-      <Composition
+      <Composition<AnyZodObject, SlidePresentationProps>
         id="SlidePresentation"
-        component={SlidePresentationComponent}
+        component={SlidePresentation}
         durationInFrames={3600}
         fps={30}
         width={1920}
@@ -38,9 +35,9 @@ export const RemotionRoot: React.FC = () => {
       />
 
       {/* 通用视频模板 */}
-      <Composition
+      <Composition<AnyZodObject, VideoTemplateProps>
         id="VideoTemplate"
-        component={VideoTemplateComponent}
+        component={VideoTemplate}
         durationInFrames={900}
         fps={30}
         width={1920}
@@ -48,17 +45,21 @@ export const RemotionRoot: React.FC = () => {
         defaultProps={{
           clips: [],
           subtitles: [],
-          transitionType: 'fade' as const,
-          templateStyle: 'modern' as const,
-          voiceover: undefined,
-          brandName: 'AutoViralVid',
+          bgmUrl: undefined,
+          bgmVolume: 0.15,
+          transition: 'fade' as const,
+          style: {
+            fontFamily: 'Plus Jakarta Sans, Inter, sans-serif',
+          },
+          introText: 'AutoViralVid',
+          outroText: 'Thanks for watching',
         }}
       />
 
       {/* 截图幻灯片 - HTML截图 + 音频 -> 视频 */}
-      <Composition
+      <Composition<AnyZodObject, ImageSlideshowProps>
         id="ImageSlideshow"
-        component={ImageSlideshowComponent}
+        component={ImageSlideshow}
         durationInFrames={3600}
         fps={30}
         width={1920}

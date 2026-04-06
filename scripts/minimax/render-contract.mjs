@@ -62,6 +62,13 @@ function asNumber(value, fallback = 0) {
   return n;
 }
 
+function normalizeKey(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_\u4e00-\u9fff]+/g, "_");
+}
+
 function normalizeRenderPath(value) {
   const normalized = asText(value, "").toLowerCase();
   if (["pptxgenjs", "svg", "png_fallback"].includes(normalized)) return normalized;
@@ -180,9 +187,10 @@ function normalizeSlide(
   const blocks = asArray(source.blocks).map((item, blockIdx) => normalizeBlock(item, blockIdx));
   const requestedTemplate = asText(source.template_family ?? source.template_id, deckTemplateId || "auto");
   const templateLock = Boolean(source.template_lock);
+  const explicitTemplate = normalizeKey(requestedTemplate) !== "auto";
   const resolvedTemplate = resolveTemplateFamilyForSlide({
     sourceSlide: source,
-    requestedTemplateFamily: templateLock ? (requestedTemplate || "auto") : "auto",
+    requestedTemplateFamily: explicitTemplate ? requestedTemplate : (templateLock ? (requestedTemplate || "auto") : "auto"),
     explicitType: slideType,
     layoutGrid,
     desiredDensity: asText(source.content_density, deckDesiredDensity || "balanced"),
@@ -209,17 +217,17 @@ function normalizeSlide(
     archetype_candidates: asArray(archetypePlan.candidates).slice(0, 3),
     archetype_plan: archetypePlan,
     layout_grid: layoutGrid,
-    template_family: profiles.template_id,
-    template_id: templateLock ? asText(source.template_id, profiles.template_id) : profiles.template_id,
-    skill_profile: templateLock ? asText(source.skill_profile, profiles.skill_profile) : profiles.skill_profile,
-    hardness_profile: templateLock
+    template_family: explicitTemplate ? asText(source.template_family, profiles.template_id) : profiles.template_id,
+    template_id: (templateLock || explicitTemplate) ? asText(source.template_id, profiles.template_id) : profiles.template_id,
+    skill_profile: (templateLock || explicitTemplate) ? asText(source.skill_profile, profiles.skill_profile) : profiles.skill_profile,
+    hardness_profile: (templateLock || explicitTemplate)
       ? asText(source.hardness_profile, profiles.hardness_profile)
       : profiles.hardness_profile,
-    schema_profile: templateLock ? asText(source.schema_profile, profiles.schema_profile) : profiles.schema_profile,
-    contract_profile: templateLock
+    schema_profile: (templateLock || explicitTemplate) ? asText(source.schema_profile, profiles.schema_profile) : profiles.schema_profile,
+    contract_profile: (templateLock || explicitTemplate)
       ? asText(source.contract_profile, profiles.contract_profile)
       : profiles.contract_profile,
-    quality_profile: templateLock
+    quality_profile: (templateLock || explicitTemplate)
       ? asText(source.quality_profile, profiles.quality_profile)
       : profiles.quality_profile,
     theme_recipe: normalizeThemeRecipeValue(

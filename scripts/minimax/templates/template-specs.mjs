@@ -114,6 +114,11 @@ export const TEMPLATE_SPECS = {
       { x: 6.56, y: 1.14, w: 2.7, h: 3.9 },
     ],
   },
+  education_textbook_light: {
+    left: { x: 0.68, y: 1.18, w: 4.02, h: 3.82, radius: 0.06 },
+    right: { x: 4.98, y: 1.18, w: 4.34, h: 3.82, radius: 0.06 },
+    footer: { x: 0.68, y: 5.14, w: 8.64, h: 0.22 },
+  },
   quote_hero_dark: {
     quotePanel: { x: 0.9, y: 1.34, w: 8.24, h: 3.24, radius: 0.1 },
     quote: { x: 1.18, y: 1.78, w: 7.68, h: 2.06, fontSize: 36 },

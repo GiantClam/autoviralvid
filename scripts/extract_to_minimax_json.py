@@ -1496,13 +1496,10 @@ def main():
 
     args = parser.parse_args()
 
-    if not args.input:
-        parser.error("--input is required")
-
-    args = parser.parse_args()
-
     # Reference PPT path
     ref_path = args.input
+    if not ref_path:
+        parser.error("--input is required")
 
     print("=== 从参考PPT提取信息 ===")
     print(f"输入文件: {ref_path}")
@@ -1543,6 +1540,10 @@ def main():
     # Load target JSON for comparison (unless --no-compare is set)
     if args.no_compare:
         print("=== 对比已跳过 (--no-compare) ===")
+        return
+
+    if not str(args.target or "").strip():
+        print("=== 未提供对比目标，跳过对比 ===")
         return
 
     target_path = Path(args.target)

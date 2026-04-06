@@ -31,6 +31,8 @@ export interface SlideData {
   emphasisWords?: string[];
 }
 
+type StatItem = NonNullable<SlideData['stats']>[number];
+
 // ── 动画 Hook ──────────────────────────────────────────────────────
 
 function useReveal(delay: number = 0) {
@@ -46,7 +48,6 @@ function useReveal(delay: number = 0) {
 
 function useCountUp(target: number, delay: number = 0, durationFrames: number = 60) {
   const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
   const progress = interpolate(frame - delay, [0, durationFrames], [0, 1], {
     extrapolateLeft: 'clamp', extrapolateRight: 'clamp', easing: Easing.out(Easing.cubic),
   });
@@ -64,6 +65,71 @@ function Highlight({ text, words }: { text: string; words: string[] }) {
       ? <span key={i} style={{ color: '#38bdf8', fontWeight: 800 }}>{p}</span>
       : <span key={i}>{p}</span>
   )}</>;
+}
+
+function RevealPointCard({ point, index, emphasisWords }: { point: string; index: number; emphasisWords: string[] }) {
+  const reveal = useReveal(index * 8);
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'flex-start', gap: 16,
+      opacity: reveal.opacity, transform: `translateY(${reveal.y}px)`,
+      background: 'rgba(255,255,255,0.03)', borderRadius: 12, padding: '16px 24px',
+      borderLeft: '3px solid rgba(56,189,248,0.3)',
+    }}>
+      <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#38bdf8', marginTop: 8, flexShrink: 0 }} />
+      <div style={{ fontSize: 26, color: '#e2e8f0', lineHeight: 1.5 }}>
+        <Highlight text={point} words={emphasisWords} />
+      </div>
+    </div>
+  );
+}
+
+function StatCard({ stat, index }: { stat: StatItem; index: number }) {
+  const reveal = useReveal(index * 15);
+  const num = parseFloat(stat.number.replace(/[^0-9.]/g, '')) || 0;
+  const displayNum = useCountUp(num, index * 15, 60);
+
+  return (
+    <div style={{ textAlign: 'center', opacity: reveal.opacity, transform: `translateY(${reveal.y}px) scale(${reveal.scale})` }}>
+      <div style={{ fontSize: 96, fontWeight: 900, background: 'linear-gradient(135deg, #38bdf8, #a78bfa)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', lineHeight: 1 }}>
+        {stat.number.includes('%') ? `${displayNum}%` : displayNum}
+        {stat.unit && <span style={{ fontSize: 36, marginLeft: 4 }}>{stat.unit}</span>}
+      </div>
+      <div style={{ fontSize: 20, color: '#94a3b8', marginTop: 12 }}>{stat.label}</div>
+    </div>
+  );
+}
+
+function VersusItem({ item, color, emphasisWords, delay }: { item: string; color: string; emphasisWords: string[]; delay: number }) {
+  const reveal = useReveal(delay);
+  return (
+    <div style={{ display: 'flex', gap: 12, padding: '10px 0', opacity: reveal.opacity, transform: `translateY(${reveal.y}px)` }}>
+      <div style={{ color, fontSize: 20, marginTop: 2 }}>&#10003;</div>
+      <div style={{ fontSize: 22, color: '#e2e8f0', lineHeight: 1.5 }}>
+        <Highlight text={item} words={emphasisWords} />
+      </div>
+    </div>
+  );
+}
+
+function VersusColumn({ title, items, color, emphasisWords, index }: { title: string; items: string[]; color: string; emphasisWords: string[]; index: number }) {
+  const reveal = useReveal(index * 10);
+  return (
+    <div style={{ flex: 1, opacity: reveal.opacity, transform: `translateY(${reveal.y}px)` }}>
+      <div style={{ background: color, borderRadius: 12, padding: '14px 24px', marginBottom: 20 }}>
+        <div style={{ fontSize: 24, fontWeight: 700, color: '#fff' }}>{title}</div>
+      </div>
+      {items.map((item, itemIndex) => (
+        <VersusItem
+          key={`${title}-${itemIndex}`}
+          item={item}
+          color={color}
+          emphasisWords={emphasisWords}
+          delay={index * 10 + itemIndex * 5 + 10}
+        />
+      ))}
+    </div>
+  );
 }
 
 // ── 背景组件 ───────────────────────────────────────────────────────
@@ -132,7 +198,6 @@ export function HeroSlide({ data }: { data: SlideData }) {
 
 export function PointsSlide({ data }: { data: SlideData }) {
   const points = data.points || [];
-  const isDark = true;
 
   return (
     <AbsoluteFill>
@@ -143,22 +208,9 @@ export function PointsSlide({ data }: { data: SlideData }) {
       <div style={{ position: 'absolute', top: 130, left: 80, right: 80, bottom: 60, display: 'flex', gap: 40 }}>
         <div style={{ width: 6, background: 'linear-gradient(180deg, #38bdf8, #8b5cf6)', borderRadius: 3, flexShrink: 0 }} />
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 20 }}>
-          {points.map((p, i) => {
-            const a = useReveal(i * 8);
-            return (
-              <div key={i} style={{
-                display: 'flex', alignItems: 'flex-start', gap: 16,
-                opacity: a.opacity, transform: `translateY(${a.y}px)`,
-                background: 'rgba(255,255,255,0.03)', borderRadius: 12, padding: '16px 24px',
-                borderLeft: '3px solid rgba(56,189,248,0.3)',
-              }}>
-                <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#38bdf8', marginTop: 8, flexShrink: 0 }} />
-                <div style={{ fontSize: 26, color: '#e2e8f0', lineHeight: 1.5 }}>
-                  <Highlight text={p} words={data.emphasisWords || []} />
-                </div>
-              </div>
-            );
-          })}
+          {points.map((point, index) => (
+            <RevealPointCard key={index} point={point} index={index} emphasisWords={data.emphasisWords || []} />
+          ))}
         </div>
         {data.emphasisWords && data.emphasisWords.length > 0 && (
           <div style={{
@@ -185,20 +237,9 @@ export function StatsSlide({ data }: { data: SlideData }) {
       <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', padding: '0 80px' }}>
         <div style={{ fontSize: 28, color: '#94a3b8', marginBottom: 40, letterSpacing: 4, textTransform: 'uppercase' }}>{data.title}</div>
         <div style={{ display: 'flex', gap: 80, justifyContent: 'center' }}>
-          {stats.map((s, i) => {
-            const a = useReveal(i * 15);
-            const num = parseFloat(s.number.replace(/[^0-9.]/g, '')) || 0;
-            const displayNum = useCountUp(num, i * 15, 60);
-            return (
-              <div key={i} style={{ textAlign: 'center', opacity: a.opacity, transform: `translateY(${a.y}px) scale(${a.scale})` }}>
-                <div style={{ fontSize: 96, fontWeight: 900, background: 'linear-gradient(135deg, #38bdf8, #a78bfa)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', lineHeight: 1 }}>
-                  {s.number.includes('%') ? `${displayNum}%` : displayNum}
-                  {s.unit && <span style={{ fontSize: 36, marginLeft: 4 }}>{s.unit}</span>}
-                </div>
-                <div style={{ fontSize: 20, color: '#94a3b8', marginTop: 12 }}>{s.label}</div>
-              </div>
-            );
-          })}
+          {stats.map((stat, index) => (
+            <StatCard key={index} stat={stat} index={index} />
+          ))}
         </div>
       </div>
     </AbsoluteFill>
@@ -215,7 +256,7 @@ export function QuoteSlide({ data }: { data: SlideData }) {
     <AbsoluteFill>
       <PremiumBg variant="dark" />
       <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', padding: '0 160px' }}>
-        <div style={{ fontSize: 72, color: '#38bdf8', opacity: 0.3, marginBottom: -20 }}>"</div>
+        <div style={{ fontSize: 72, color: '#38bdf8', opacity: 0.3, marginBottom: -20 }}>“</div>
         <div style={{ fontSize: 44, color: '#f1f5f9', textAlign: 'center', lineHeight: 1.6, fontStyle: 'italic', opacity: a1.opacity, transform: `translateY(${a1.y}px)` }}>
           <Highlight text={data.quote || ''} words={data.emphasisWords || []} />
         </div>
@@ -239,27 +280,16 @@ export function VersusSlide({ data }: { data: SlideData }) {
         {[
           { title: data.leftTitle || '', items: data.leftPoints || [], color: '#2563eb' },
           { title: data.rightTitle || '', items: data.rightPoints || [], color: '#8b5cf6' },
-        ].map((col, ci) => {
-          const a = useReveal(ci * 10);
-          return (
-            <div key={ci} style={{ flex: 1, opacity: a.opacity, transform: `translateY(${a.y}px)` }}>
-              <div style={{ background: col.color, borderRadius: 12, padding: '14px 24px', marginBottom: 20 }}>
-                <div style={{ fontSize: 24, fontWeight: 700, color: '#fff' }}>{col.title}</div>
-              </div>
-              {col.items.map((item, ii) => {
-                const ia = useReveal(ci * 10 + ii * 5 + 10);
-                return (
-                  <div key={ii} style={{ display: 'flex', gap: 12, padding: '10px 0', opacity: ia.opacity, transform: `translateY(${ia.y}px)` }}>
-                    <div style={{ color: col.color, fontSize: 20, marginTop: 2 }}>&#10003;</div>
-                    <div style={{ fontSize: 22, color: '#e2e8f0', lineHeight: 1.5 }}>
-                      <Highlight text={item} words={data.emphasisWords || []} />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          );
-        })}
+        ].map((column, index) => (
+          <VersusColumn
+            key={index}
+            title={column.title}
+            items={column.items}
+            color={column.color}
+            emphasisWords={data.emphasisWords || []}
+            index={index}
+          />
+        ))}
       </div>
     </AbsoluteFill>
   );

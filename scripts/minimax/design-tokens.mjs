@@ -16,6 +16,7 @@ export const TEMPLATE_FAMILIES = [
   "image_showcase_light",
   "process_flow_dark",
   "comparison_cards_light",
+  "education_textbook_light",
   "quote_hero_dark",
 ];
 
@@ -25,6 +26,7 @@ const LIGHT_TEMPLATE_FAMILIES = new Set([
   "consulting_warm_light",
   "image_showcase_light",
   "comparison_cards_light",
+  "education_textbook_light",
 ]);
 
 function defaultTemplateFamilyForLayout(layoutGrid = "") {
@@ -104,17 +106,6 @@ function contrastRatio(fgHex, bgHex) {
   const bright = Math.max(l1, l2);
   const dark = Math.min(l1, l2);
   return (bright + 0.05) / (dark + 0.05);
-}
-
-function pickReadableTextColor(preferredHex, bgHex, minContrast = 4.5) {
-  const preferred = cleanHex(preferredHex, "FFFFFF");
-  const bg = cleanHex(bgHex, "000000");
-  if (contrastRatio(preferred, bg) >= minContrast) return preferred;
-  const darkCandidate = "0F172A";
-  const lightCandidate = "F8FAFC";
-  const darkRatio = contrastRatio(darkCandidate, bg);
-  const lightRatio = contrastRatio(lightCandidate, bg);
-  return darkRatio >= lightRatio ? darkCandidate : lightCandidate;
 }
 
 function mixHex(baseHex, overlayHex, ratio = 0.5) {

@@ -34,6 +34,26 @@ _BOILERPLATE_PREFIXES = {
     "说明",
     "指出",
     "讨论",
+    "核心问题",
+    "课堂提示",
+    "关键主体",
+    "角色分工",
+    "互动关系",
+    "起点",
+    "推进",
+    "转折点",
+    "传导起点",
+    "外部影响",
+    "反馈效应",
+    "案例背景",
+    "关键证据",
+    "课堂结论",
+    "争议焦点",
+    "现实约束",
+    "延伸思考",
+    "核心信息",
+    "逻辑关系",
+    "结论提示",
 }
 
 
@@ -73,10 +93,16 @@ def _dedupe_points(data_points: Sequence[str], topic_seed: str) -> List[str]:
 def _semantic_profile(point: str) -> dict:
     text = str(point or "")
     lower = text.lower()
+    if text.startswith("什么是") or lower.startswith("what is"):
+        return {"layout": "split_2", "density": "medium", "elements": ["definition", "list"], "anchor": "concept"}
     if any(token in text for token in ("定义", "背景", "概念", "是什么")):
         return {"layout": "split_2", "density": "medium", "elements": ["definition", "list"], "anchor": "concept"}
     if any(token in text for token in ("参与方", "角色", "职责", "主体", "要素")):
         return {"layout": "asymmetric_2", "density": "medium", "elements": ["roles", "comparison", "list"], "anchor": "roles"}
+    if any(token in text for token in ("交汇", "影响路径", "双向影响", "联动")):
+        return {"layout": "split_2", "density": "medium", "elements": ["insight", "comparison", "list"], "anchor": "impact"}
+    if any(token in text for token in ("接口", "条约", "批准", "转化", "一元论", "二元论", "制度接口")):
+        return {"layout": "timeline", "density": "medium", "elements": ["process", "timeline", "list"], "anchor": "process"}
     if any(token in text for token in ("流程", "步骤", "阶段", "路径", "机制", "结构")):
         return {"layout": "split_2", "density": "medium", "elements": ["process", "timeline", "list"], "anchor": "process"}
     if any(token in text for token in ("案例", "证据", "数据", "实证", "example", "case")):
@@ -110,7 +136,11 @@ def _compact_focus_seed(text: str) -> str:
     value = str(text or "").strip(" ：:")
     if not value:
         return ""
-    value = re.sub(r"^(理解|认识|解码|解析|探究|把握|观察|说明|分析|其对|它对|关于)\s*", "", value)
+    while True:
+        next_value = re.sub(r"^(理解|认识|解码|解析|探究|把握|观察|说明|分析|其对|它对|关于|对)\s*", "", value)
+        if next_value == value:
+            break
+        value = next_value
     value = re.sub(r"^(如何|怎样|为什么)\s*", "", value)
     value = re.sub(r"的(影响|意义|作用|启示|联系|路径)$", "", value)
     value = re.sub(r"^(对|在)\s*", "", value)
@@ -140,25 +170,45 @@ def build_instructional_topic_points(topic_seed: str, *, prefer_zh: bool) -> Lis
     subject = _compact_focus_seed(subject) or subject
     focus_seed = _compact_focus_seed(focus)
     if prefer_zh:
-        rows = [
-            f"什么是{subject}",
-            f"{subject}的关键阶段",
-            f"{subject}中的主要角色",
-            f"{subject}的核心规则与程序",
-            f"{subject}如何影响{focus_seed}" if focus_seed else f"{subject}的现实影响",
-            f"与{subject}相关的案例与证据",
-            f"{subject}中的争议与思考",
-        ]
+        rows = [f"什么是{subject}", f"{subject}中的关键角色"]
+        if focus_seed:
+            rows.extend(
+                [
+                    f"{subject}与{focus_seed}的交汇",
+                    f"{focus_seed}中的制度接口",
+                    f"案例分析：{subject}的{focus_seed}影响",
+                ]
+            )
+        else:
+            rows.extend(
+                [
+                    f"{subject}与现实问题的交汇",
+                    f"{subject}中的制度接口",
+                    f"{subject}的现实影响路径",
+                    f"案例分析：{subject}的现实影响",
+                ]
+            )
+        rows.append("未来趋势与思考")
     else:
-        rows = [
-            f"What is {subject}",
-            f"Key stages of {subject}",
-            f"Main actors in {subject}",
-            f"Rules and procedures behind {subject}",
-            f"How {subject} shapes {focus_seed}" if focus_seed else f"Real-world impact of {subject}",
-            f"Cases and evidence around {subject}",
-            f"Debates and takeaways on {subject}",
-        ]
+        rows = [f"What is {subject}", f"Key actors in {subject}"]
+        if focus_seed:
+            rows.extend(
+                [
+                    f"Where {subject} meets {focus_seed}",
+                    f"Institutional interfaces inside {focus_seed}",
+                    f"Case study: how {subject} shapes {focus_seed}",
+                ]
+            )
+        else:
+            rows.extend(
+                [
+                    f"Where {subject} meets real-world issues",
+                    f"Institutional interfaces inside {subject}",
+                    f"Real-world impact path of {subject}",
+                    f"Case study: real-world effects of {subject}",
+                ]
+            )
+        rows.append("Future trends and reflection")
     return _dedupe_point_rows(rows, title=topic_seed)
 
 
@@ -174,12 +224,16 @@ def build_research_storyline_notes(
     topic_seed = _extract_topic_seed(topic)
     points = _dedupe_points(data_points, topic_seed)
     prefer_zh = bool(re.search(r"[\u4e00-\u9fff]", topic_seed))
-    navigation_title = "内容导航" if prefer_zh else "Table of Contents"
-    ending_title = "总结与启示" if prefer_zh else "Summary & Takeaways"
+    navigation_title = "课程导航" if prefer_zh and instructional_context else ("内容导航" if prefer_zh else "Table of Contents")
+    classroom_summary_title = "课堂总结" if prefer_zh else "Lesson Summary"
+    ending_title = "谢谢" if prefer_zh and instructional_context else ("总结与启示" if prefer_zh else "Summary & Takeaways")
+    reserve_terminal_summary = instructional_context and total_pages >= 9
 
     slots = total_pages - 2
     use_navigation = total_pages >= 8
     if use_navigation:
+        slots -= 1
+    if reserve_terminal_summary:
         slots -= 1
 
     middle_points = points[: max(0, slots)]
@@ -257,7 +311,8 @@ def build_research_storyline_notes(
         )
         page_number += 1
 
-    while page_number < total_pages:
+    terminal_start_page = total_pages - 1 if reserve_terminal_summary else total_pages
+    while page_number < terminal_start_page:
         notes.append(
             StickyNote(
                 page_number=page_number,
@@ -271,6 +326,20 @@ def build_research_storyline_notes(
             )
         )
         page_number += 1
+
+    if reserve_terminal_summary:
+        notes.append(
+            StickyNote(
+                page_number=max(1, total_pages - 1),
+                core_message=_normalize_point(str(page_anchors.get(total_pages - 1) or classroom_summary_title), classroom_summary_title),
+                layout_hint="asymmetric_2",
+                content_density="low",
+                data_elements=["summary", "question"],
+                visual_anchor="summary",
+                key_points=(points[-3:] if len(points) >= 3 else [topic_seed, topic_seed, topic_seed]),
+                speaker_notes=classroom_summary_title[:200],
+            )
+        )
 
     notes.append(
         StickyNote(

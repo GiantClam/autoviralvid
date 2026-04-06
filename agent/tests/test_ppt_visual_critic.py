@@ -43,6 +43,7 @@ def test_build_visual_critic_patch_collects_targets_and_actions():
     row2 = next(row for row in patch["targets"] if row["slide_id"] == "s2")
     assert row1["actions"]["layout_grid"] == "split_2"
     assert row2["actions"]["visual_patch"]["force_high_contrast"] is True
+    assert row2["actions"]["render_path"] == "pptxgenjs"
 
 
 def test_apply_visual_critic_patch_mutates_slide_payload():
@@ -93,3 +94,76 @@ def test_apply_visual_critic_patch_mutates_slide_payload():
     assert any(str(item.get("type")) == "image" for item in slides[0]["elements"])
     assert len(str(slides[0]["elements"][0].get("content") or "")) <= 180
 
+
+def test_build_visual_critic_patch_routes_structural_exception_slide_to_svg():
+    slides = [
+        {
+            "slide_id": "s-arch",
+            "slide_type": "architecture",
+            "layout_grid": "architecture",
+            "structural_expression_failure": True,
+            "elements": [{"type": "diagram", "content": "mesh"}],
+        }
+    ]
+    visual_audit = {
+        "slides": [
+            {"slide": 1, "local_issues": [], "multimodal_issues": ["card_overlap"]},
+        ]
+    }
+    gate_issues = [
+        QualityIssue(
+            slide_id="s-arch",
+            code="visual_card_overlap_ratio_high",
+            message="cards overlap",
+            retry_scope="slide",
+            retry_target_ids=["s-arch"],
+        )
+    ]
+
+    patch = build_visual_critic_patch(
+        visual_audit=visual_audit,
+        gate_issues=gate_issues,
+        slides=slides,
+        max_target_slides=4,
+    )
+
+    row = next(row for row in patch["targets"] if row["slide_id"] == "s-arch")
+    assert row["actions"]["render_path"] == "svg"
+
+
+def test_build_visual_critic_patch_does_not_route_svg_from_storyline_intent_only():
+    slides = [
+        {
+            "slide_id": "s-story",
+            "slide_type": "content",
+            "layout_grid": "split_2",
+            "split_merge_exhausted": True,
+            "intent": "workflow storyline architecture",
+            "layout_intent": "storyline",
+            "elements": [{"type": "text", "content": "Narrative-driven page"}],
+        }
+    ]
+    visual_audit = {
+        "slides": [
+            {"slide": 1, "local_issues": [], "multimodal_issues": ["card_overlap"]},
+        ]
+    }
+    gate_issues = [
+        QualityIssue(
+            slide_id="s-story",
+            code="visual_card_overlap_ratio_high",
+            message="cards overlap",
+            retry_scope="slide",
+            retry_target_ids=["s-story"],
+        )
+    ]
+
+    patch = build_visual_critic_patch(
+        visual_audit=visual_audit,
+        gate_issues=gate_issues,
+        slides=slides,
+        max_target_slides=4,
+    )
+
+    row = next(row for row in patch["targets"] if row["slide_id"] == "s-story")
+    assert row["actions"]["render_path"] != "svg"

@@ -52,7 +52,7 @@ export const LAYOUT_ZONES: Record<string, string[]> = {
 
 // ── 动作: 画红圈 ───────────────────────────────────────────────────
 
-export function DrawCircleAction({ targetArea, width = 200, height = 200 }: {
+export function DrawCircleAction({ width = 200, height = 200 }: {
   targetArea?: string; width?: number; height?: number;
 }) {
   const frame = useCurrentFrame();

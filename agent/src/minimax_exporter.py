@@ -26,6 +26,7 @@ from src.ppt_template_catalog import (
 )
 from src.ppt_master_design_spec import apply_render_paths, build_design_spec
 from src.ppt_visual_identity import canonicalize_theme_recipe, resolve_style_variant, resolve_tone
+from src.pptx_theme_patch import patch_pptx_theme_colors
 
 logger = logging.getLogger("minimax_exporter")
 
@@ -625,6 +626,7 @@ def build_payload(
     visual_priority: bool = True,
     visual_preset: str = "auto",
     visual_density: str = "balanced",
+    deck_archetype_profile: str = "",
     constraint_hardness: str = "minimal",
     svg_mode: str = "on",
     template_family: str = "auto",
@@ -702,6 +704,12 @@ def build_payload(
         decision_filled_slides,
         svg_mode=str(svg_mode or "on"),
     )
+    if str(deck_archetype_profile or "").strip().lower() == "education_textbook":
+        for slide in normalized_slides:
+            if not isinstance(slide, dict):
+                continue
+            if str(slide.get("slide_type") or "").strip().lower() == "content":
+                slide["render_path"] = "pptxgenjs"
     primary_template = (
         str(normalized_slides[0].get("template_family") or "dashboard_dark")
         if normalized_slides
@@ -755,6 +763,7 @@ def build_payload(
         "visual_priority": bool(visual_priority),
         "visual_preset": str(visual_preset or "auto"),
         "visual_density": str(visual_density or "balanced"),
+        "deck_archetype_profile": str(deck_archetype_profile or "").strip().lower(),
         "constraint_hardness": str(constraint_hardness or "minimal"),
         "svg_mode": str(svg_mode or "on"),
         "template_family": str(resolved_template_family or resolved_template_id or "auto"),
@@ -795,6 +804,7 @@ def export_minimax_pptx(
     visual_priority: bool = True,
     visual_preset: str = "auto",
     visual_density: str = "balanced",
+    deck_archetype_profile: str = "",
     constraint_hardness: str = "minimal",
     svg_mode: str = "on",
     template_family: str = "auto",
@@ -839,6 +849,7 @@ def export_minimax_pptx(
         visual_priority=visual_priority,
         visual_preset=visual_preset,
         visual_density=visual_density,
+        deck_archetype_profile=deck_archetype_profile,
         constraint_hardness=constraint_hardness,
         svg_mode=svg_mode,
         template_family=template_family,
@@ -939,7 +950,6 @@ def export_minimax_pptx(
                 export_cmd,
                 capture_output=True,
                 text=True,
-                encoding="utf-8",
                 timeout=max(30, int(cmd_timeout)),
             )
 
@@ -1065,8 +1075,12 @@ def export_minimax_pptx(
             generator_meta["channel_fallback_reason"] = channel_fallback_reason
         generator_meta["render_channel"] = effective_channel
 
+        themed_bytes = patch_pptx_theme_colors(
+            output_path.read_bytes(),
+            payload.get("minimax_palette_key") or payload.get("theme", {}).get("palette") or "",
+        )
         return {
-            "pptx_bytes": output_path.read_bytes(),
+            "pptx_bytes": themed_bytes,
             "generator_meta": generator_meta,
             "render_spec": render_spec,
             "input_payload": {

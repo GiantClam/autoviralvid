@@ -100,6 +100,7 @@ from src.ppt_storyline_planning import (
     is_instructional_context,
 )
 from src.ppt_visual_identity import canonicalize_theme_recipe, resolve_style_variant, resolve_tone, style_variant_for_theme_recipe, suggest_theme_recipe_from_context
+import src.r2 as r2
 
 logger = logging.getLogger("ppt_service")
 
@@ -128,6 +129,64 @@ def _normalize_execution_profile(value: Any) -> str:
     if text in {"prod", "safe", "prod_safe"}:
         return "prod_safe"
     return ""
+
+
+def _derive_deck_archetype_profile(
+    *,
+    topic: str = "",
+    audience: str = "",
+    purpose: str = "",
+    quality_profile: str = "",
+    theme_recipe: str = "",
+) -> str:
+    profile = str(quality_profile or "").strip().lower()
+    recipe = str(theme_recipe or "").strip().lower()
+    blob = " ".join([str(topic or ""), str(audience or ""), str(purpose or "")]).lower()
+    if profile == "training_deck" or recipe == "classroom_soft" or any(token in blob for token in ("classroom", "teaching", "lesson", "education", "training", "课堂", "教学", "教育", "课程", "培训", "高中", "学生")):
+        return "education_textbook"
+    if profile in {"investor_pitch", "marketing_pitch"} or any(token in blob for token in ("investor", "pitch", "融资", "路演", "marketing", "campaign", "品牌")):
+        return "consulting_argument"
+    if profile == "tech_review" or any(token in blob for token in ("architecture", "engineering", "技术评审", "架构评审", "technical review")):
+        return "technical_review"
+    return "general_presentation"
+
+
+def _default_palette_for_archetype(archetype_profile: str, fallback: str = "auto") -> str:
+    archetype = str(archetype_profile or "").strip().lower()
+    if archetype == "education_textbook":
+        return "education_office_classic"
+    return str(fallback or "auto").strip() or "auto"
+
+
+def _enforce_profile_field_ownership(
+    payload: Dict[str, Any],
+    *,
+    quality_profile: str = "",
+    hardness_profile: str = "",
+    deck_archetype_profile: str = "",
+) -> Dict[str, Any]:
+    out = dict(payload or {})
+    slides = out.get("slides") if isinstance(out.get("slides"), list) else []
+    normalized_quality = str(quality_profile or "").strip().lower()
+    normalized_hardness = str(hardness_profile or "").strip().lower()
+    normalized_archetype = str(deck_archetype_profile or "").strip().lower()
+    if normalized_quality and normalized_quality != "auto":
+        out["quality_profile"] = normalized_quality
+    if normalized_hardness and normalized_hardness != "auto":
+        out["hardness_profile"] = normalized_hardness
+    if normalized_archetype:
+        out["deck_archetype_profile"] = normalized_archetype
+    for slide in slides:
+        if not isinstance(slide, dict):
+            continue
+        if normalized_quality and normalized_quality != "auto":
+            slide["quality_profile"] = normalized_quality
+        if normalized_hardness and normalized_hardness != "auto":
+            slide["hardness_profile"] = normalized_hardness
+        if normalized_archetype:
+            slide["deck_archetype_profile"] = normalized_archetype
+    out["slides"] = slides
+    return out
 
 
 def _canonicalize_pipeline_palette(
@@ -269,8 +328,10 @@ def _normalize_retry_scope(value: Any) -> str:
 
 
 def _resolve_retry_budget(*, env_max_attempts: int, route_mode: str, route_policy_max: int) -> int:
-    # Align with refactor plan:
-    # default max retry budget is 2; refine can go up to 3.
+    explicit_env = str(os.getenv("PPT_RETRY_MAX_ATTEMPTS", "")).strip()
+    if explicit_env:
+        return max(1, int(env_max_attempts))
+
     phase_retry_caps = {
         "fast": 1,
         "standard": 2,
@@ -278,6 +339,61 @@ def _resolve_retry_budget(*, env_max_attempts: int, route_mode: str, route_polic
     }
     cap = phase_retry_caps.get(str(route_mode or "").strip().lower(), 2)
     return max(1, min(int(env_max_attempts), int(route_policy_max), int(cap)))
+
+
+_RELAXED_LAYOUT_ISSUE_CODES_PIPELINE = {
+    "layout_homogeneous",
+    "layout_top2_homogeneous",
+    "layout_adjacent_repeat",
+    "template_family_switch_frequent",
+    "template_family_abab_repeat",
+    "template_family_homogeneous",
+    "template_family_top2_homogeneous",
+}
+
+_RELAXED_LAYOUT_ISSUE_CODES_EXPORT = {
+    "layout_homogeneous",
+    "layout_top2_homogeneous",
+    "layout_adjacent_repeat",
+    "template_family_homogeneous",
+    "template_family_top2_homogeneous",
+}
+
+_REFERENCE_RECONSTRUCT_RELAXED_LAYOUT_ISSUE_CODES = {
+    "layout_variety_low",
+    "layout_density_window_missing_breathing",
+    "layout_terminal_summary_missing",
+}
+
+_ACCURACY_HARD_FAIL_CODES = {
+    "placeholder_kpi_data",
+    "placeholder_chart_data",
+    "placeholder_pollution",
+}
+
+
+def _relaxed_quality_issue_codes(
+    *,
+    route_mode: str,
+    quality_profile: str,
+    use_reference_reconstruct: bool,
+    requested_execution_profile: str,
+    include_template_switch_relaxation: bool,
+) -> set[str]:
+    if str(requested_execution_profile or "").strip().lower() == "dev_strict":
+        return set()
+    relaxed_codes: set[str] = set()
+    fast_relaxed_set = (
+        _RELAXED_LAYOUT_ISSUE_CODES_PIPELINE
+        if include_template_switch_relaxation
+        else _RELAXED_LAYOUT_ISSUE_CODES_EXPORT
+    )
+    if str(route_mode or "").strip().lower() == "fast" or str(quality_profile or "").strip().lower() == "lenient_draft":
+        relaxed_codes.update(fast_relaxed_set)
+    if use_reference_reconstruct:
+        relaxed_codes.update(_RELAXED_LAYOUT_ISSUE_CODES_EXPORT)
+        relaxed_codes.update(_REFERENCE_RECONSTRUCT_RELAXED_LAYOUT_ISSUE_CODES)
+    return {code for code in relaxed_codes if code not in _ACCURACY_HARD_FAIL_CODES}
 
 
 def _load_local_env() -> Dict[str, str]:
@@ -2734,8 +2850,24 @@ def _apply_layout_solution_actions(
 
         elif status == "underflow":
             if "add_visual_anchor" in underflow_actions:
-                has_image = any(_as_block_type(block) == "image" for block in blocks)
-                if not has_image:
+                slide_type = str(slide.get("slide_type") or "content").strip().lower() or "content"
+                has_visual_anchor = any(_as_block_type(block) in _VISUAL_BLOCK_TYPES for block in blocks)
+                if slide_type == "content" and not has_visual_anchor and _prefers_text_first_visual_fallback(slide):
+                    title_text = str(slide.get("title") or slide.get("slide_id") or "").strip()
+                    prefer_zh = _prefer_zh(title_text, slide.get("narration"), slide.get("speaker_notes"))
+                    keypoints = _extract_slide_keypoints(slide, title_text) or [title_text]
+                    table_rows = _table_data_from_keypoints(keypoints, prefer_zh=prefer_zh)
+                    blocks.append(
+                        {
+                            "block_type": "table",
+                            "card_id": f"{sid}-solver-table",
+                            "position": "right",
+                            "content": {"table_rows": table_rows},
+                            "data": {"table_rows": table_rows, "source": "layout_solver"},
+                        }
+                    )
+                    changed = True
+                elif slide_type == "content" and not has_visual_anchor:
                     blocks.append(
                         {
                             "block_type": "image",
@@ -3144,7 +3276,7 @@ def _extract_slide_keypoints(slide: Dict[str, Any], title_text: str) -> List[str
             if len(phrase) > max_phrase_len:
                 phrase = phrase[:max_phrase_len].rstrip(" ,，；;。")
             key = _normalize_text_key(phrase)
-            if not key or key in seen:
+            if not key or key in seen or _is_low_signal_point_text(phrase):
                 continue
             seen.add(key)
             phrases.append(phrase)
@@ -3277,8 +3409,7 @@ def _chart_data_from_keypoints(
         if len(points) >= len(labels):
             break
     while len(points) < len(labels):
-        seed = 58.0 + (len(points) * 11.0)
-        points.append(round(seed, 2))
+        points.append(float(len(points) + 1))
 
     return {
         "labels": labels,
@@ -3289,6 +3420,48 @@ def _chart_data_from_keypoints(
             }
         ],
     }
+
+
+def _table_data_from_keypoints(
+    keypoints: List[str],
+    *,
+    prefer_zh: bool,
+) -> List[List[str]]:
+    rows: List[List[str]] = [["序号", "要点"] if prefer_zh else ["No.", "Point"]]
+    seen = set()
+    for idx, item in enumerate(keypoints):
+        text = str(item or "").strip()
+        key = _normalize_text_key(text)
+        if not text or not key or key in seen or _is_low_signal_point_text(text):
+            continue
+        seen.add(key)
+        rows.append([str(idx + 1), text[:42]])
+        if len(rows) >= 5:
+            break
+    if len(rows) == 1:
+        rows.append(["1", "核心信息" if prefer_zh else "Key idea"])
+    return rows
+
+
+def _is_synthetic_ordinal_chart_block(block: Dict[str, Any]) -> bool:
+    if str(block.get("block_type") or "").strip().lower() != "chart":
+        return False
+    payload = block.get("data") if isinstance(block.get("data"), dict) else block.get("content")
+    if not isinstance(payload, dict):
+        return False
+    datasets = payload.get("datasets") if isinstance(payload.get("datasets"), list) else []
+    first = datasets[0] if datasets and isinstance(datasets[0], dict) else {}
+    values = first.get("data") if isinstance(first.get("data"), list) else []
+    if len(values) < 3:
+        return False
+    for idx, value in enumerate(values):
+        try:
+            numeric = float(value)
+        except Exception:
+            return False
+        if numeric != float(idx + 1):
+            return False
+    return True
 
 
 _DATA_SEMANTIC_HINTS = {
@@ -3328,6 +3501,61 @@ _EDUCATION_SEMANTIC_HINTS = {
     "高中",
     "学生",
 }
+
+_LOW_SIGNAL_POINT_KEYS = {
+    "text",
+    "trend",
+    "roles",
+    "role",
+    "case",
+    "impact",
+    "summary",
+    "content",
+    "topic",
+    "body",
+    "list",
+    "chart",
+    "kpi",
+    "workflow",
+    "diagram",
+    "title",
+    "subtitle",
+    "toc",
+    "agenda",
+    "hero",
+}
+
+
+def _is_low_signal_point_text(text: str) -> bool:
+    key = _normalize_text_key(text)
+    if not key:
+        return True
+    if key in _LOW_SIGNAL_POINT_KEYS:
+        return True
+    if re.fullmatch(r"[0-9]+", key):
+        return True
+    return False
+
+
+def _prefers_text_first_visual_fallback(slide: Dict[str, Any]) -> bool:
+    quality_profile = str(slide.get("quality_profile") or "").strip().lower()
+    deck_profile = str(slide.get("deck_archetype_profile") or "").strip().lower()
+    theme_recipe = str(slide.get("theme_recipe") or "").strip().lower()
+    blob = " ".join(
+        [
+            str(slide.get("title") or ""),
+            str(slide.get("narration") or ""),
+            str(slide.get("purpose") or ""),
+            str(slide.get("audience") or ""),
+        ]
+    ).lower()
+    if quality_profile == "training_deck":
+        return True
+    if deck_profile == "education_textbook":
+        return True
+    if theme_recipe == "classroom_soft":
+        return True
+    return any(token in blob for token in _EDUCATION_SEMANTIC_HINTS)
 
 
 def _infer_visual_semantic_mode(
@@ -3369,6 +3597,7 @@ def _make_visual_contract_block(
     requested = [str(item or "").strip().lower() for item in preferred_types if str(item or "").strip()]
     requested_set = set(requested)
     label = keypoints[0] if keypoints else ("核心指标" if prefer_zh else "Key metric")
+    education_like = any(token in str(semantic_text or "").lower() for token in ("classroom", "training", "education", "课程", "课堂", "教学", "培训", "education_textbook"))
 
     known_types = {"image", "workflow", "diagram", "kpi", "chart", "table"}
     target_type = next((item for item in requested if item in known_types), "")
@@ -3384,10 +3613,18 @@ def _make_visual_contract_block(
             target_type = "workflow"
         elif "diagram" in requested_set or semantic_mode == "process":
             target_type = "diagram"
-        elif "image" in requested_set or semantic_mode in {"education", "general"}:
+        elif "image" in requested_set:
             target_type = "image"
+        elif semantic_mode == "education":
+            target_type = "table"
         else:
             target_type = "chart" if numeric_values else "image"
+
+    if education_like and not numeric_values:
+        if semantic_mode == "process":
+            target_type = "workflow"
+        else:
+            target_type = "table"
 
     if target_type == "image":
         image_title = label[:48] if label else ("核心视觉" if prefer_zh else "Visual Focus")
@@ -3432,10 +3669,25 @@ def _make_visual_contract_block(
     if target_type == "kpi" and not numeric_values:
         if semantic_mode == "process":
             target_type = "workflow"
-        elif semantic_mode in {"education", "general"}:
-            target_type = "image"
+        elif semantic_mode == "education":
+            target_type = "table"
         else:
             target_type = "chart"
+    if target_type == "chart" and not numeric_values:
+        if semantic_mode == "process":
+            target_type = "workflow"
+        elif semantic_mode == "education":
+            target_type = "table"
+    if target_type == "table":
+        table_rows = _table_data_from_keypoints(keypoints, prefer_zh=prefer_zh)
+        return {
+            "block_type": "table",
+            "card_id": card_id,
+            "position": position,
+            "content": {"table_rows": table_rows, "source_type": "synthetic_table"},
+            "data": {"table_rows": table_rows, "source_type": "synthetic_table"},
+            "emphasis": keypoints[:2] or [label[:14]],
+        }
     if target_type == "image":
         image_title = label[:48] if label else ("核心视觉" if prefer_zh else "Visual Focus")
         image_keywords = [item[:24] for item in keypoints[:4] if str(item or "").strip()]
@@ -3634,6 +3886,7 @@ def _collect_strict_contract_issues(
         slide,
         require_image_anchor=require_image_anchor,
     )
+    text_first_contract = _prefers_text_first_visual_fallback(slide)
 
     has_title = any(_as_block_type(block) == "title" for block in blocks)
     has_body_or_list = any(_as_block_type(block) in {"body", "list"} for block in blocks)
@@ -3646,7 +3899,7 @@ def _collect_strict_contract_issues(
         issues.append("missing_title_block")
     if not has_body_or_list:
         issues.append("missing_body_or_list_block")
-    if not has_anchor:
+    if not has_anchor and not text_first_contract:
         issues.append("missing_visual_anchor_block")
     if image_anchor_required and not has_image_anchor:
         issues.append("missing_image_anchor_block")
@@ -3688,6 +3941,9 @@ def _collect_strict_contract_issues(
     for group in required_groups:
         if not group:
             continue
+        visual_only_group = all(str(item or "").strip().lower() in set(_VISUAL_BLOCK_TYPES) for item in group)
+        if visual_only_group and text_first_contract:
+            continue
         if not any(_as_block_type(block) in set(group) for block in blocks):
             issues.append("missing_required_group:" + "|".join(group))
 
@@ -3707,7 +3963,7 @@ def _collect_strict_contract_issues(
         effective_min_text = max(1, contract_min_text - reduction)
     if text_non_visual_count < effective_min_text:
         issues.append(f"insufficient_text_blocks:{text_non_visual_count}<{effective_min_text}")
-    if visual_count < contract_min_visual:
+    if visual_count < contract_min_visual and not text_first_contract:
         issues.append(f"insufficient_visual_blocks:{visual_count}<{contract_min_visual}")
 
     layout = str(slide.get("layout_grid") or slide.get("layout") or "").strip().lower()
@@ -4021,6 +4277,8 @@ def _ensure_content_contract(
             str(out.get("page_type") or ""),
             str(out.get("page_role") or ""),
             str(out.get("visual_anchor") or ""),
+            str(out.get("deck_archetype_profile") or ""),
+            str(out.get("quality_profile") or ""),
         ]
     ).strip()
     semantic_mode = _infer_visual_semantic_mode(
@@ -4173,6 +4431,8 @@ def _ensure_content_contract(
             if not group or _has_any(group):
                 continue
             visual_candidates = [item for item in group if item in visual_union]
+            if visual_candidates and _prefers_text_first_visual_fallback(out) and semantic_mode in {"education", "general"} and not numeric_values:
+                continue
             if visual_candidates:
                 fixed.append(
                     _make_visual_contract_block(
@@ -4610,6 +4870,7 @@ def _apply_visual_orchestration(render_payload: Dict[str, Any]) -> Dict[str, Any
         return out
     quality_id = str(out.get("quality_profile") or "default").strip().lower() or "default"
     quality_cfg = shared_quality_profile(quality_id)
+    allow_quality_template_unlock = quality_id == "training_deck"
     min_content_blocks = max(1, int(quality_cfg.get("min_content_blocks") or 2))
     orchestration_cfg = (
         quality_cfg.get("orchestration")
@@ -5963,6 +6224,7 @@ def _apply_visual_orchestration(render_payload: Dict[str, Any]) -> Dict[str, Any
     def _apply_education_light_template_policy() -> None:
         if not theme_cohesion_enabled:
             return
+        deck_profile = str(out.get("deck_archetype_profile") or "").strip().lower()
         preferred_tone = _infer_content_preferred_tone(str(out.get("template_family") or ""))
         if preferred_tone not in {"light", "dark"}:
             return
@@ -5975,10 +6237,16 @@ def _apply_visual_orchestration(render_payload: Dict[str, Any]) -> Dict[str, Any
         for slide in out.get("slides") or []:
             if not isinstance(slide, dict):
                 continue
-            if bool(slide.get("template_lock")):
+            if bool(slide.get("template_lock")) and not allow_quality_template_unlock:
                 continue
             slide_type = str(slide.get("slide_type") or "").strip().lower() or "content"
+            if deck_profile == "education_textbook" and slide_type in {"cover", "toc", "summary", "divider"}:
+                _set_slide_family(slide, "hero_dark")
+                continue
             if slide_type in skip_types:
+                continue
+            if deck_profile == "education_textbook" and slide_type == "content":
+                _set_slide_family(slide, "education_textbook_light")
                 continue
             current_family = str(slide.get("template_family") or slide.get("template_id") or "").strip().lower()
             current_tone = _template_family_tone(current_family)
@@ -6258,7 +6526,7 @@ def _apply_visual_orchestration(render_payload: Dict[str, Any]) -> Dict[str, Any
             slide_type = str(slide.get("slide_type") or "").strip().lower()
             if slide_type in family_skip_types:
                 continue
-            if bool(slide.get("template_lock")):
+            if bool(slide.get("template_lock")) and not allow_quality_template_unlock:
                 # Respect explicitly locked families from upstream inputs.
                 continue
             layout_grid = str(slide.get("layout_grid") or "").strip().lower() or "split_2"
@@ -6587,6 +6855,12 @@ def _apply_visual_orchestration(render_payload: Dict[str, Any]) -> Dict[str, Any
         [slide for slide in out.get("slides") or [] if isinstance(slide, dict)],
         svg_mode=svg_mode,
     )
+    if str(out.get("deck_archetype_profile") or "").strip().lower() == "education_textbook":
+        for slide in out.get("slides") or []:
+            if not isinstance(slide, dict):
+                continue
+            if str(slide.get("slide_type") or "").strip().lower() == "content":
+                slide["render_path"] = "pptxgenjs"
     out["design_spec"] = build_design_spec(
         theme=theme_obj,
         template_family=str(out.get("template_family") or ""),
@@ -6647,7 +6921,32 @@ def _apply_visual_orchestration(render_payload: Dict[str, Any]) -> Dict[str, Any
             if isinstance(archetype_plan.get("candidates"), list)
             else []
         )[:3]
+        slide_type = str(slide.get("slide_type") or "").strip().lower()
+        layout_grid = str(slide.get("layout_grid") or "").strip().lower()
+        if slide_type not in {"cover", "summary", "toc", "divider", "hero_1", "section"} and layout_grid == "hero_1":
+            slide["slide_type"] = "section"
         normalized_slides.append(slide)
+    if str(out.get("deck_archetype_profile") or "").strip().lower() == "education_textbook":
+        for slide in normalized_slides:
+            if not isinstance(slide, dict):
+                continue
+            slide_type = str(slide.get("slide_type") or "").strip().lower()
+            if slide_type == "content":
+                _set_slide_family(slide, "education_textbook_light")
+                slide["render_path"] = "pptxgenjs"
+                blocks = slide.get("blocks") if isinstance(slide.get("blocks"), list) else []
+                for block in blocks:
+                    if not isinstance(block, dict):
+                        continue
+                    if not _is_synthetic_ordinal_chart_block(block):
+                        continue
+                    payload = block.get("data") if isinstance(block.get("data"), dict) else block.get("content")
+                    labels = payload.get("labels") if isinstance(payload, dict) and isinstance(payload.get("labels"), list) else []
+                    prefer_zh = _prefer_zh(slide.get("title"), slide.get("narration"), labels)
+                    table_rows = _table_data_from_keypoints([str(item or "").strip() for item in labels if str(item or "").strip()], prefer_zh=prefer_zh)
+                    block["block_type"] = "table"
+                    block["data"] = {"table_rows": table_rows, "source_type": "synthetic_table"}
+                    block["content"] = {"table_rows": table_rows, "source_type": "synthetic_table"}
     out["slides"] = normalized_slides
     out["presentation_contract_v2"] = _build_presentation_contract_v2(out)
     contract_rows = (
@@ -9017,16 +9316,19 @@ class PPTService:
             for idx, note in enumerate(notes)
         ]
         if instructional_context:
+            classroom_cycle = ["split_2", "asymmetric_2", "grid_3", "timeline", "grid_4", "split_2"]
+            classroom_cursor = 0
+            adjusted_notes = []
+            for idx, note in enumerate(notes):
+                current_layout = str(note.layout_hint or "").strip().lower()
+                if 0 < idx < max(0, total_pages - 1) and current_layout not in {"toc", "summary", "cover", "divider"}:
+                    current_layout = classroom_cycle[classroom_cursor % len(classroom_cycle)]
+                    classroom_cursor += 1
+                adjusted_notes.append(note.model_copy(update={"layout_hint": current_layout}))
+            notes = adjusted_notes
+            fixed_layouts = enforce_layout_diversity([note.layout_hint for note in notes])
             notes = [
-                note.model_copy(
-                    update={
-                        "layout_hint": (
-                            recommend_layout(note, idx, total_pages)
-                            if 0 < idx < max(0, total_pages - 1) and str(note.layout_hint or "").strip().lower() == "hero_1"
-                            else note.layout_hint
-                        )
-                    }
-                )
+                note.model_copy(update={"layout_hint": fixed_layouts[idx]})
                 for idx, note in enumerate(notes)
             ]
 
@@ -9104,6 +9406,8 @@ class PPTService:
                     overlap_like += 1
                 if len(item) <= (18 if is_zh else 32) and not re.search(r"[，。；;,.!?：:]", item):
                     short_heading_like += 1
+            if len(meaningful) >= 3 and overlap_like < len(meaningful):
+                return False
             return overlap_like >= max(1, len(meaningful) - 1) or short_heading_like == len(meaningful)
 
         placeholder_patterns = (
@@ -9152,6 +9456,12 @@ class PPTService:
             def _normalize_candidate(value: str) -> str:
                 normalized = re.sub(r"\s+", " ", str(value or "").strip())
                 normalized = normalized.replace("\ufffd", " ")
+                normalized = re.sub(
+                    r"^(?:核心问题|课堂提示|关键主体|角色分工|互动关系|起点|推进|转折点|传导起点|外部影响|反馈效应|案例背景|关键证据|课堂结论|争议焦点|现实约束|延伸思考|核心信息|逻辑关系|结论提示)\s*[:：-]\s*",
+                    "",
+                    normalized,
+                    flags=re.IGNORECASE,
+                )
                 normalized = re.sub(r"[?？]{2,}", " ", normalized)
                 normalized = re.sub(r"\b(?:xxxx|todo|tbd|placeholder)\b", " ", normalized, flags=re.IGNORECASE)
                 normalized = re.sub(
@@ -9226,6 +9536,14 @@ class PPTService:
                     continue
                 return candidate[:72]
             return ""
+
+        def _build_learning_goal_note(points: List[str], title_text: str) -> str:
+            normalized = [str(item or "").strip() for item in points if str(item or "").strip()]
+            primary = normalized[0] if normalized else (title_text[:20] or ("核心概念" if is_zh else "core concept"))
+            secondary = normalized[1] if len(normalized) > 1 else (title_text[:20] or ("关键问题" if is_zh else "key issue"))
+            if is_zh:
+                return f"学习目标：你将能够识别{primary}，并分析{secondary}。"[:96]
+            return f"Learning goal: you will be able to identify {primary} and analyze {secondary}."[:120]
 
         def _split_points_for_two_columns(points: List[str]) -> tuple[List[str], List[str]]:
             unique: List[str] = []
@@ -9355,6 +9673,23 @@ class PPTService:
                 for point in compact_points
                 if _normalize_text_key(point) not in {"", outline_title_key, title_key}
             ] or compact_points
+            if classroom_context and note_slide_type not in {"cover", "toc", "summary"}:
+                expanded_points = expand_semantic_support_points(
+                    core_message=title_text,
+                    related_points=[*compact_points, *(strategy.evidence or []), *(note.key_points or [])],
+                    instructional_context=True,
+                )
+                merged_points = _compact_points(
+                    [*expanded_points, *compact_points],
+                    max_points=4,
+                    max_chars=96,
+                )
+                compact_points = [
+                    point
+                    for point in merged_points
+                    if _normalize_text_key(point) not in {"", outline_title_key, title_key}
+                    and not _is_low_signal_point_text(point)
+                ] or compact_points
             layout_plan = build_content_layout_plan(
                 title=title_text,
                 evidence=compact_points,
@@ -9400,6 +9735,19 @@ class PPTService:
                             emphasis=["value"],
                         )
                     )
+            elif classroom_context and note_slide_type == "toc":
+                blocks.append(
+                    ContentBlock(
+                        block_type="subtitle",
+                        position="top_right",
+                        content=_sanitize_block_text(
+                            _build_learning_goal_note(compact_points, title_text),
+                            fallback=(title_text[:24] or str(req.outline.title or "")[:24]),
+                            max_chars=160,
+                        ),
+                        emphasis=["学习目标"] if is_zh else ["learning goal"],
+                    )
+                )
             elif note.layout_hint == "summary":
                 blocks.append(
                     ContentBlock(
@@ -9437,6 +9785,76 @@ class PPTService:
                         )
                         if fallback_seed:
                             right_points = [fallback_seed]
+                classroom_anchor = str(note.visual_anchor or "").strip().lower()
+                if classroom_context and note_slide_type == "content":
+                    if classroom_anchor == "roles":
+                        blocks.append(
+                            ContentBlock(
+                                block_type="comparison",
+                                position="center",
+                                content={
+                                    "left_title": "关键角色" if is_zh else "Key actors",
+                                    "left_items": left_points[:3],
+                                    "right_title": "核心职能" if is_zh else "Core functions",
+                                    "right_items": right_points[:3],
+                                    "summary": compact_points[-1] if compact_points else title_text,
+                                },
+                                emphasis=["角色"] if is_zh else ["actors"],
+                            )
+                        )
+                        need_chart = need_kpi = need_image = False
+                        need_comparison = False
+                        use_dual_text = False
+                    elif classroom_anchor == "impact":
+                        blocks.append(
+                            ContentBlock(
+                                block_type="comparison",
+                                position="center",
+                                content={
+                                    "left_title": "内部变化" if is_zh else "Internal change",
+                                    "left_items": left_points[:3],
+                                    "right_title": "外部影响" if is_zh else "External impact",
+                                    "right_items": right_points[:3],
+                                    "summary": compact_points[-1] if compact_points else title_text,
+                                },
+                                emphasis=["影响"] if is_zh else ["impact"],
+                            )
+                        )
+                        need_chart = need_kpi = need_image = False
+                        need_comparison = False
+                        use_dual_text = False
+                    elif classroom_anchor == "process":
+                        blocks.append(
+                            ContentBlock(
+                                block_type="workflow",
+                                position="center",
+                                content=" -> ".join((compact_points[:4] or [title_text])[:4]),
+                                emphasis=compact_points[:2] or [title_text[:16]],
+                            )
+                        )
+                        need_chart = need_kpi = need_image = False
+                        need_comparison = False
+                        use_dual_text = False
+                    elif classroom_anchor == "case":
+                        blocks.append(
+                            ContentBlock(
+                                block_type="quote",
+                                position="right",
+                                content=right_points[0] if right_points else (compact_points[-1] if compact_points else title_text),
+                                emphasis=["案例"] if is_zh else ["case"],
+                            )
+                        )
+                        need_chart = need_kpi = need_image = False
+                    elif classroom_anchor == "trend":
+                        blocks.append(
+                            ContentBlock(
+                                block_type="quote",
+                                position="right",
+                                content=right_points[0] if right_points else (compact_points[-1] if compact_points else title_text),
+                                emphasis=["趋势"] if is_zh else ["trend"],
+                            )
+                        )
+                        need_chart = need_kpi = need_image = False
                 if need_kpi:
                     kpi_value = _kpi_seed(note.page_number)
                     blocks.append(
@@ -9621,6 +10039,7 @@ class PPTService:
     async def run_ppt_pipeline(self, req: PPTPipelineRequest) -> PPTPipelineResult:
         from src.minimax_exporter import export_minimax_pptx
         from src.ppt_quality_gate import (
+            score_visual_professional_metrics,
             score_deck_quality,
             validate_deck,
             validate_layout_diversity,
@@ -9652,6 +10071,13 @@ class PPTService:
         requested_skill_profile = str(getattr(req, "skill_profile", "auto") or "auto").strip() or "auto"
         requested_theme_recipe = str(getattr(req, "theme_recipe", "auto") or "auto").strip().lower() or "auto"
         requested_tone = str(getattr(req, "tone", "auto") or "auto").strip().lower() or "auto"
+        requested_deck_archetype_profile = _derive_deck_archetype_profile(
+            topic=req.topic,
+            audience=req.audience,
+            purpose=req.purpose,
+            quality_profile=requested_quality_profile,
+            theme_recipe=requested_theme_recipe,
+        )
         if requested_tone not in {"auto", "light", "dark"}:
             requested_tone = "auto"
         requested_template_file_url = str(getattr(req, "template_file_url", "") or "").strip()
@@ -9837,6 +10263,7 @@ class PPTService:
             base_render_payload["audience"] = req.audience
             base_render_payload["purpose"] = req.purpose
             base_render_payload["style_preference"] = req.style_preference
+            base_render_payload["deck_archetype_profile"] = requested_deck_archetype_profile
             base_render_payload = _apply_pipeline_template_hints(base_render_payload)
             base_render_payload = _apply_skill_planning_to_render_payload(
                 base_render_payload,
@@ -9849,13 +10276,15 @@ class PPTService:
             render_payload = _apply_pipeline_template_hints(render_payload)
             if pipeline_image_asset_enrichment:
                 render_payload = await _hydrate_image_assets(render_payload)
-        if requested_execution_profile == "dev_strict":
+        if requested_execution_profile == "dev_strict" and bool(req.with_export):
             image_issues = _collect_image_asset_issues(render_payload)
             if image_issues:
-                raise ValueError(
-                    "Image asset stage failed (dev_strict): "
-                    + "; ".join(image_issues[:8])
-                )
+                if requested_quality_profile in _STRICT_QUALITY_PROFILES or route_policy.mode == "refine":
+                    raise ValueError(
+                        "Image asset stage failed (dev_strict): "
+                        + "; ".join(image_issues[:8])
+                    )
+                render_payload["image_asset_warnings"] = image_issues[:8]
         else:
             render_payload = _ensure_image_block_placeholders(render_payload)
 
@@ -9874,7 +10303,12 @@ class PPTService:
                 if str(code or "").strip()
             ],
         ]
-        if requested_execution_profile == "dev_strict" and preflight_issue_codes:
+        render_payload = _enforce_profile_field_ownership(
+            render_payload,
+            quality_profile=requested_quality_profile,
+            deck_archetype_profile=requested_deck_archetype_profile,
+        )
+        if requested_execution_profile == "dev_strict" and bool(req.with_export) and preflight_issue_codes:
             _append_stage(
                 "quality_gate",
                 quality_started,
@@ -9882,13 +10316,7 @@ class PPTService:
                 ["design_preflight_failed", *preflight_issue_codes[:8]],
             )
             raise ValueError("Design preflight failed: " + "; ".join(preflight_issue_codes[:6]))
-        quality_profile = _resolve_quality_profile_id(
-            str(render_payload.get("quality_profile") or req.quality_profile or "auto"),
-            topic=req.topic,
-            purpose=req.purpose,
-            audience=req.audience,
-            total_pages=req.total_pages,
-        )
+        quality_profile = requested_quality_profile
         pipeline_strict_quality_mode = _is_strict_quality_mode(
             constraint_hardness="minimal",
             hardness_profile=render_payload.get("hardness_profile"),
@@ -9915,39 +10343,13 @@ class PPTService:
             )
             content_issues = list(content_gate.issues)
             layout_issues = list(layout_gate.issues)
-            relaxed_codes: set[str] = set()
-            if route_policy.mode == "fast" or quality_profile == "lenient_draft":
-                relaxed_codes.update(
-                    {
-                        "layout_homogeneous",
-                        "layout_top2_homogeneous",
-                        "layout_adjacent_repeat",
-                        "template_family_switch_frequent",
-                        "template_family_abab_repeat",
-                        "template_family_homogeneous",
-                        "template_family_top2_homogeneous",
-                        "placeholder_kpi_data",
-                        "placeholder_pollution",
-                    }
-                )
-            if use_reference_reconstruct:
-                relaxed_codes.update(
-                    {
-                        "layout_homogeneous",
-                        "layout_top2_homogeneous",
-                        "layout_adjacent_repeat",
-                        "layout_variety_low",
-                        "layout_density_window_missing_breathing",
-                        "layout_terminal_summary_missing",
-                        "template_family_homogeneous",
-                        "template_family_top2_homogeneous",
-                        "placeholder_kpi_data",
-                        "placeholder_chart_data",
-                        "placeholder_pollution",
-                    }
-                )
-            if requested_execution_profile == "dev_strict":
-                relaxed_codes.clear()
+            relaxed_codes = _relaxed_quality_issue_codes(
+                route_mode=route_policy.mode,
+                quality_profile=quality_profile,
+                use_reference_reconstruct=use_reference_reconstruct,
+                requested_execution_profile=requested_execution_profile,
+                include_template_switch_relaxation=True,
+            )
             if relaxed_codes:
                 content_issues = [
                     issue
@@ -10029,7 +10431,10 @@ class PPTService:
             layer1_runtime: Dict[str, Any] = {}
             pipeline_style_variant = str(req.minimax_style_variant or "auto")
             pipeline_palette_key = _canonicalize_pipeline_palette(
-                str(req.minimax_palette_key or "auto"),
+                _default_palette_for_archetype(
+                    requested_deck_archetype_profile,
+                    str(req.minimax_palette_key or "auto"),
+                ),
                 context_parts=[
                     req.title or presentation_plan.title,
                     req.topic,
@@ -10038,6 +10443,8 @@ class PPTService:
                 ],
                 fallback="auto",
             )
+            if requested_deck_archetype_profile == "education_textbook":
+                pipeline_palette_key = "education_office_classic"
             pipeline_theme_recipe = str(
                 req.theme_recipe
                 or render_payload.get("theme_recipe")
@@ -10151,7 +10558,10 @@ class PPTService:
                         str(
                             render_payload.get("palette_key")
                             or pipeline_layer1_design.get("palette_key")
-                            or req.minimax_palette_key
+                            or _default_palette_for_archetype(
+                                requested_deck_archetype_profile,
+                                str(req.minimax_palette_key or "auto"),
+                            )
                         ),
                         context_parts=[
                             req.title or presentation_plan.title,
@@ -10162,6 +10572,8 @@ class PPTService:
                         ],
                         fallback="auto",
                     )
+                    if requested_deck_archetype_profile == "education_textbook":
+                        pipeline_palette_key = "education_office_classic"
                     pipeline_template_family = str(
                         render_payload.get("template_family")
                         or pipeline_layer1_design.get("template_family")
@@ -10226,6 +10638,7 @@ class PPTService:
                                 visual_priority=True,
                                 visual_preset=str(req.visual_preset or "auto"),
                                 visual_density="balanced",
+                                deck_archetype_profile=requested_deck_archetype_profile,
                                 constraint_hardness=pipeline_constraint_hardness,
                                 svg_mode="on",
                                 template_family=pipeline_template_family,
@@ -10271,9 +10684,7 @@ class PPTService:
                 if isinstance(pptx_bytes, (bytes, bytearray)):
                     if export_channel == "remote":
                         try:
-                            from src.r2 import upload_bytes_to_r2
-
-                            pptx_url = await upload_bytes_to_r2(
+                            pptx_url = await r2.upload_bytes_to_r2(
                                 bytes(pptx_bytes),
                                 key=f"projects/{run_id}/pptx/pipeline.pptx",
                                 content_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
@@ -10388,7 +10799,7 @@ class PPTService:
             )
             effective_style_variant = str(layer1_design.get("style_variant") or req.minimax_style_variant)
             effective_palette_key = _canonicalize_pipeline_palette(
-                str(layer1_design.get("palette_key") or req.minimax_palette_key),
+                str(layer1_design.get("palette_key") or _default_palette_for_archetype(requested_deck_archetype_profile, str(req.minimax_palette_key or "auto"))),
                 context_parts=[
                     req.title,
                     req.author,
@@ -10397,6 +10808,8 @@ class PPTService:
                 ],
                 fallback="auto",
             )
+            if requested_deck_archetype_profile == "education_textbook":
+                effective_palette_key = "education_office_classic"
             effective_template_family = str(layer1_design.get("template_family") or req.template_family)
             effective_skill_profile = str(layer1_design.get("skill_profile") or req.skill_profile)
             effective_theme_recipe = str(layer1_design.get("theme_recipe") or req.theme_recipe or "auto")
@@ -10409,6 +10822,13 @@ class PPTService:
                 purpose=req.retry_hint,
                 audience=req.author,
                 total_pages=len(slides_data),
+            )
+            requested_deck_archetype_profile = _derive_deck_archetype_profile(
+                topic=req.title,
+                audience=req.author,
+                purpose=req.retry_hint,
+                quality_profile=requested_quality_profile,
+                theme_recipe=effective_theme_recipe,
             )
             visual_seed = await _hydrate_image_assets(
                 _apply_visual_orchestration(
@@ -10431,6 +10851,7 @@ class PPTService:
                             "schema_profile": req.schema_profile,
                             "contract_profile": req.contract_profile,
                             "quality_profile": requested_quality_profile,
+                            "deck_archetype_profile": requested_deck_archetype_profile,
                             "svg_mode": req.svg_mode,
                             "execution_profile": requested_execution_profile,
                         },
@@ -10439,12 +10860,10 @@ class PPTService:
                         )
                 )
             )
-            if dev_fast_fail:
+            if dev_fast_fail and not str(req.template_file_url or "").strip():
                 image_issues = _collect_image_asset_issues(visual_seed)
                 if image_issues:
-                    raise ValueError(
-                        "image_asset_stage_failed(dev_strict): " + "; ".join(image_issues[:8])
-                    )
+                    build_decision_meta["image_asset_issues"] = image_issues[:8]
             build_decision_meta["decision_source"] = "layer1+skill_planning"
             build_decision_meta["requested_quality_profile"] = requested_quality_profile
             build_decision_meta["style_variant"] = effective_style_variant
@@ -10495,10 +10914,6 @@ class PPTService:
         except Exception:
             visual_critic_max_target_slides = 6
         max_retry_attempts = max(1, int(os.getenv("PPT_RETRY_MAX_ATTEMPTS", "3")))
-        if dev_fast_fail:
-            # Keep deterministic scoped retry enabled in development to surface
-            # concrete schema root causes instead of failing on first pass.
-            visual_critic_repair_enabled = False
         route_policy = resolve_route_policy(
             req.route_mode,
             slide_count=len(slides_data),
@@ -10532,22 +10947,22 @@ class PPTService:
         retry_hint = req.retry_hint
         deck_id = req.deck_id or _new_id()
         export_channel = _resolve_export_channel(req.export_channel)
-        quality_profile = _resolve_quality_profile_id(
-            str(req.quality_profile or visual_seed.get("quality_profile") or "auto"),
-            topic=req.title,
-            purpose=req.retry_hint,
-            audience=req.author,
-            total_pages=len(slides_data),
-        )
+        quality_profile = requested_quality_profile
         requested_constraint_hardness = _normalize_constraint_hardness(req.constraint_hardness)
         strict_quality_mode = _is_strict_quality_mode(
             constraint_hardness=requested_constraint_hardness,
-            hardness_profile=req.hardness_profile or visual_seed.get("hardness_profile"),
+            hardness_profile=req.hardness_profile,
             route_mode=route_policy.mode,
             quality_profile=quality_profile,
         )
         if strict_quality_mode and requested_constraint_hardness != "strict":
             requested_constraint_hardness = "strict"
+        visual_seed = _enforce_profile_field_ownership(
+            visual_seed,
+            quality_profile=quality_profile,
+            hardness_profile=requested_constraint_hardness,
+            deck_archetype_profile=requested_deck_archetype_profile,
+        )
         template_file_url = str(req.template_file_url or "").strip()
         if template_file_url:
             template_bytes = await _download_remote_file_bytes(template_file_url, suffix=".pptx")
@@ -10618,7 +11033,7 @@ class PPTService:
             )
             project_id = _new_id()
             key = f"projects/{project_id}/pptx/presentation.pptx"
-            url = await upload_bytes_to_r2(
+            url = await r2.upload_bytes_to_r2(
                 template_result["pptx_bytes"],
                 key,
                 content_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
@@ -10818,6 +11233,30 @@ class PPTService:
             )
             repaired_slides = repaired.get("slides")
             if isinstance(repaired_slides, list) and repaired_slides:
+                critic_repair_by_slide: Dict[str, Dict[str, Any]] = {}
+                for idx, raw_slide in enumerate(seed_slides):
+                    if not isinstance(raw_slide, dict):
+                        continue
+                    raw_visual = raw_slide.get("visual")
+                    critic_repair = raw_visual.get("critic_repair") if isinstance(raw_visual, dict) else None
+                    if not isinstance(critic_repair, dict) or not critic_repair:
+                        continue
+                    slide_id = str(raw_slide.get("slide_id") or raw_slide.get("id") or f"slide-{idx + 1}").strip()
+                    if slide_id:
+                        critic_repair_by_slide[slide_id] = dict(critic_repair)
+                if critic_repair_by_slide:
+                    for idx, repaired_slide in enumerate(repaired_slides):
+                        if not isinstance(repaired_slide, dict):
+                            continue
+                        slide_id = str(repaired_slide.get("slide_id") or repaired_slide.get("id") or f"slide-{idx + 1}").strip()
+                        critic_repair = critic_repair_by_slide.get(slide_id)
+                        if not isinstance(critic_repair, dict):
+                            continue
+                        visual = repaired_slide.get("visual")
+                        if not isinstance(visual, dict):
+                            visual = {}
+                            repaired_slide["visual"] = visual
+                        visual["critic_repair"] = dict(critic_repair)
                 next_decision = normalize_design_decision_v1(
                     repaired.get("design_decision_v1")
                     or effective_design_decision
@@ -10958,6 +11397,7 @@ class PPTService:
                     visual_priority=bool(req.visual_priority),
                     visual_preset=effective_visual_preset,
                     visual_density=str(req.visual_density or "balanced"),
+                    deck_archetype_profile=requested_deck_archetype_profile,
                     constraint_hardness=requested_constraint_hardness,
                     svg_mode=str(req.svg_mode or "on"),
                     template_family=str(effective_template_family or "auto"),
@@ -11000,6 +11440,7 @@ class PPTService:
                         visual_priority=bool(req.visual_priority),
                         visual_preset=effective_visual_preset,
                         visual_density=str(req.visual_density or "balanced"),
+                        deck_archetype_profile=requested_deck_archetype_profile,
                         constraint_hardness=requested_constraint_hardness,
                         svg_mode=str(req.svg_mode or "on"),
                         template_family=str(effective_template_family or "auto"),
@@ -11049,17 +11490,13 @@ class PPTService:
                 )
                 content_issues = list(content_gate.issues)
                 layout_issues = list(layout_gate.issues)
-                relaxed_codes: set[str] = set()
-                if route_policy.mode == "fast" or quality_profile == "lenient_draft":
-                    relaxed_codes = {
-                        "layout_homogeneous",
-                        "layout_top2_homogeneous",
-                        "layout_adjacent_repeat",
-                        "template_family_homogeneous",
-                        "template_family_top2_homogeneous",
-                        "placeholder_kpi_data",
-                        "placeholder_pollution",
-                    }
+                relaxed_codes = _relaxed_quality_issue_codes(
+                    route_mode=route_policy.mode,
+                    quality_profile=quality_profile,
+                    use_reference_reconstruct=False,
+                    requested_execution_profile=requested_execution_profile,
+                    include_template_switch_relaxation=False,
+                )
                 if relaxed_codes:
                     content_issues = [
                         issue for issue in content_issues if str(getattr(issue, "code", "")).strip() not in relaxed_codes
@@ -11138,6 +11575,46 @@ class PPTService:
                         seed_slides = (current_result.get("input_payload") or {}).get("slides")
                         if not isinstance(seed_slides, list) or not seed_slides:
                             seed_slides = slides_data
+                        visual_issue_codes_by_slide: Dict[str, List[str]] = {}
+                        for issue in gate_issues:
+                            issue_code = str(getattr(issue, "code", "") or "").strip()
+                            if not issue_code:
+                                continue
+                            raw_targets = getattr(issue, "retry_target_ids", None)
+                            target_ids = [
+                                str(item).strip()
+                                for item in (raw_targets if isinstance(raw_targets, list) else [getattr(issue, "slide_id", "")])
+                                if str(item).strip() and str(item).strip().lower() != "deck"
+                            ]
+                            for slide_id in target_ids:
+                                bucket = visual_issue_codes_by_slide.setdefault(slide_id, [])
+                                if issue_code not in bucket:
+                                    bucket.append(issue_code)
+                        if visual_issue_codes_by_slide:
+                            for idx, slide in enumerate(seed_slides):
+                                if not isinstance(slide, dict):
+                                    continue
+                                slide_id = str(slide.get("slide_id") or slide.get("id") or f"slide-{idx + 1}").strip()
+                                issue_codes = visual_issue_codes_by_slide.get(slide_id)
+                                if not issue_codes:
+                                    continue
+                                visual = slide.get("visual")
+                                if not isinstance(visual, dict):
+                                    visual = {}
+                                    slide["visual"] = visual
+                                if any(
+                                    str(code).strip().lower() in {"low_contrast", "visual_low_contrast_ratio_high"}
+                                    for code in issue_codes
+                                ):
+                                    visual["force_high_contrast"] = True
+                                visual["critic_repair"] = {
+                                    "enabled": True,
+                                    "issue_codes": list(issue_codes),
+                                }
+                            slides_data = freeze_retry_visual_identity(
+                                seed_slides,
+                                effective_design_decision,
+                            )
                         critic_patch: Dict[str, Any] = {}
                         critic_apply: Dict[str, Any] = {"applied": False}
                         if visual_critic_repair_enabled and isinstance(visual_audit, dict):
@@ -11159,7 +11636,46 @@ class PPTService:
                                     "apply_result": critic_apply,
                                 }
                             )
+                            if bool(critic_patch.get("enabled")):
+                                target_rows = critic_patch.get("targets") if isinstance(critic_patch.get("targets"), list) else []
+                                critic_targets_by_slide = {
+                                    str(row.get("slide_id") or "").strip(): row
+                                    for row in target_rows
+                                    if isinstance(row, dict) and str(row.get("slide_id") or "").strip()
+                                }
+                                if critic_targets_by_slide:
+                                    for idx, slide in enumerate(seed_slides):
+                                        if not isinstance(slide, dict):
+                                            continue
+                                        slide_id = str(slide.get("slide_id") or slide.get("id") or f"slide-{idx + 1}").strip()
+                                        target_row = critic_targets_by_slide.get(slide_id)
+                                        if not isinstance(target_row, dict):
+                                            continue
+                                        issue_codes = list(target_row.get("issue_codes") or [])
+                                        actions = target_row.get("actions") if isinstance(target_row.get("actions"), dict) else {}
+                                        visual = slide.get("visual")
+                                        if not isinstance(visual, dict):
+                                            visual = {}
+                                            slide["visual"] = visual
+                                        visual_patch = actions.get("visual_patch") if isinstance(actions.get("visual_patch"), dict) else {}
+                                        for key, value in visual_patch.items():
+                                            visual[key] = value
+                                        visual["critic_repair"] = {
+                                            "enabled": True,
+                                            "issue_codes": list(issue_codes),
+                                        }
+                                        render_path = str(actions.get("render_path") or "").strip().lower()
+                                        if render_path:
+                                            slide["render_path"] = render_path
+                                    slides_data = freeze_retry_visual_identity(
+                                        seed_slides,
+                                        effective_design_decision,
+                                    )
                             if bool(critic_apply.get("applied")):
+                                slides_data = freeze_retry_visual_identity(
+                                    seed_slides,
+                                    effective_design_decision,
+                                )
                                 if partial_retry_enabled:
                                     repair_targets = [
                                         str(item).strip()
@@ -11722,13 +12238,11 @@ class PPTService:
 
         url = ""
         export_data: Dict[str, Any] = {"url": url, "skill": skill}
+        project_id = _new_id()
         if export_channel == "remote":
-            project_id = _new_id()
             key = f"projects/{project_id}/pptx/presentation.pptx"
             try:
-                from src.r2 import upload_bytes_to_r2
-
-                url = await upload_bytes_to_r2(
+                url = await r2.upload_bytes_to_r2(
                     export_result["pptx_bytes"],
                     key,
                     content_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
@@ -11850,7 +12364,7 @@ class PPTService:
             if (not png_bytes_list) and route_policy.force_rasterization:
                 png_bytes_list = rasterize_pptx_bytes_to_png_bytes(export_result["pptx_bytes"])
             for idx, png_bytes in enumerate(png_bytes_list):
-                image_url = await upload_bytes_to_r2(
+                image_url = await r2.upload_bytes_to_r2(
                     png_bytes,
                     key=f"projects/{project_id}/slides/slide_{idx + 1:03d}.png",
                     content_type="image/png",
@@ -11904,6 +12418,11 @@ class PPTService:
             export_data["visual_qa"] = final_visual_audit
         if final_text_qa:
             export_data["text_qa"] = final_text_qa
+        text_issue_codes = (
+            [str(item).strip() for item in (final_text_qa.get("issue_codes") or []) if str(item).strip()]
+            if isinstance(final_text_qa, dict)
+            else []
+        )
         issue_codes = sorted(
             {
                 str(issue.code)
@@ -11911,6 +12430,25 @@ class PPTService:
                 if getattr(issue, "code", None)
             }
         )
+        if final_quality_score is not None:
+            visual_professional_score = score_visual_professional_metrics(
+                slides=(export_result.get("input_payload") or {}).get("slides") or slides_data,
+                quality_score=final_quality_score,
+                issue_codes=issue_codes,
+                text_issue_codes=text_issue_codes,
+                visual_audit=final_visual_audit if isinstance(final_visual_audit, dict) else None,
+                profile=quality_profile,
+            )
+            export_data["visual_professional_score"] = {
+                "color_consistency_score": float(visual_professional_score.color_consistency_score),
+                "layout_order_score": float(visual_professional_score.layout_order_score),
+                "hierarchy_clarity_score": float(visual_professional_score.hierarchy_clarity_score),
+                "visual_avg_score": float(visual_professional_score.visual_avg_score),
+                "accuracy_gate_passed": bool(visual_professional_score.accuracy_gate_passed),
+                "abnormal_tags": list(visual_professional_score.abnormal_tags),
+                "diagnostics": dict(visual_professional_score.diagnostics),
+                "scorer_version": "v1",
+            }
         layout_homogeneous_count = len(
             [code for code in issue_codes if str(code).strip().lower() == "layout_homogeneous"]
         )
@@ -11928,6 +12466,7 @@ class PPTService:
             "has_visual_qa": bool(final_visual_audit),
             "has_text_qa": bool(final_text_qa),
             "has_quality_score": bool(final_quality_score),
+            "has_visual_professional_score": isinstance(export_data.get("visual_professional_score"), dict),
             "issue_codes": issue_codes,
         }
         if isinstance(export_data.get("quality_score"), dict):
@@ -11939,6 +12478,10 @@ class PPTService:
             )
         if template_renderer_summary:
             export_data["observability_report"]["template_renderer_summary"] = template_renderer_summary
+        if isinstance(export_data.get("visual_professional_score"), dict):
+            export_data["observability_report"]["visual_professional_score"] = export_data.get(
+                "visual_professional_score"
+            )
         if final_text_qa:
             export_data["observability_report"]["text_qa"] = final_text_qa
             text_issue_codes = final_text_qa.get("issue_codes") if isinstance(final_text_qa.get("issue_codes"), list) else []

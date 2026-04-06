@@ -7,13 +7,9 @@
 import React from 'react';
 import {
   AbsoluteFill,
-  Sequence,
   Audio,
   Img,
-  useCurrentFrame,
   useVideoConfig,
-  interpolate,
-  Easing,
 } from 'remotion';
 import { TransitionSeries, linearTiming } from '@remotion/transitions';
 import { fade } from '@remotion/transitions/fade';
@@ -24,9 +20,9 @@ interface SlideData {
   duration: number; // seconds
 }
 
-export interface ImageSlideshowProps {
+export type ImageSlideshowProps = Record<string, unknown> & {
   slides: SlideData[];
-}
+};
 
 export default function ImageSlideshow({ slides }: ImageSlideshowProps) {
   const { fps } = useVideoConfig();

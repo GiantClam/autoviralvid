@@ -273,7 +273,7 @@ def test_build_slide_content_strategy_enforces_assertive_title_for_generic_messa
     assert strategy.evidence
 
 
-def test_build_slide_content_strategy_routes_timeline_to_svg():
+def test_build_slide_content_strategy_keeps_timeline_on_pptxgenjs_before_exception_markers():
     note = StickyNote(
         page_number=4,
         core_message="Execution timeline",
@@ -285,6 +285,6 @@ def test_build_slide_content_strategy_routes_timeline_to_svg():
         speaker_notes="",
     )
     strategy = build_slide_content_strategy(note, is_zh=False, research_points=[])
-    assert strategy.render_path == "svg"
+    assert strategy.render_path == "pptxgenjs"
     assert strategy.page_role == "transition"
     assert strategy.density_hint == "medium"

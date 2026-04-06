@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from collections import Counter
 from typing import Any, Dict, List
 
+from src.ppt_render_path_policy import choose_render_path_by_policy
 from src.schemas.ppt_outline import LayoutType, StickyNote
 
 
@@ -381,12 +382,13 @@ def _infer_page_role(note: StickyNote, lower_elements: List[str]) -> str:
 
 
 def _infer_render_path(note: StickyNote, lower_elements: List[str]) -> str:
-    layout = str(note.layout_hint or "").strip().lower()
-    if layout == "timeline":
-        return "svg"
-    if set(lower_elements) & _SVG_ROUTE_ELEMENTS:
-        return "svg"
-    return "pptxgenjs"
+    slide = {
+        "slide_type": "content",
+        "layout_grid": str(note.layout_hint or "").strip().lower(),
+        "blocks": [{"block_type": item} for item in lower_elements if str(item or "").strip()],
+        "content_density": str(note.content_density or "").strip().lower(),
+    }
+    return choose_render_path_by_policy(slide, svg_mode="on")
 
 
 def _build_assertion_title(

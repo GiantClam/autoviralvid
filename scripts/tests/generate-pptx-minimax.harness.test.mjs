@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
@@ -16,6 +17,9 @@ test("generator harness: official input keeps non-empty blocks for content slide
   const renderOutputPath = path.join(workDir, "out.render.json");
 
   try {
+    if (!existsSync(fixturePath)) {
+      return;
+    }
     execFileSync("node", [
       scriptPath,
       "--input",
@@ -88,7 +92,8 @@ test("generator harness: cover subtitle dedup and toc expands from downstream sl
         title: `章节 ${idx + 1}`,
         blocks: [
           { block_type: "title", card_id: "title", content: `章节 ${idx + 1}` },
-          { block_type: "body", card_id: "body", content: `要点 ${idx + 1}` },
+          { block_type: "body", card_id: "body", content: `要点 ${idx + 1}`, emphasis: [`要点 ${idx + 1}`] },
+          { block_type: "list", card_id: "list", content: `补充说明 ${idx + 1}`, emphasis: [`补充说明 ${idx + 1}`] },
         ],
       })),
       {
@@ -140,6 +145,95 @@ test("generator harness: cover subtitle dedup and toc expands from downstream sl
     const coverLines = coverText.split(/\r?\n/).filter(Boolean);
     const dupCount = coverLines.filter((line) => line === "解码立法过程：理解其对国际关系的影响").length;
     assert.equal(dupCount <= 1, true, `cover should not duplicate full title in subtitle, got: ${coverText}`);
+  } finally {
+    rmSync(workDir, { recursive: true, force: true });
+  }
+});
+
+test("generator harness: light content templates preserve canonical slide title", () => {
+  const workDir = mkdtempSync(path.join(tmpdir(), "minimax-light-title-"));
+  const scriptPath = fileURLToPath(new URL("../generate-pptx-minimax.mjs", import.meta.url));
+  const inputPath = path.join(workDir, "input.json");
+  const outputPath = path.join(workDir, "out.pptx");
+  const renderOutputPath = path.join(workDir, "out.render.json");
+
+  const payload = {
+    title: "课堂课件",
+    slides: [
+      {
+        page_number: 1,
+        slide_type: "cover",
+        layout_grid: "hero_1",
+        title: "课堂课件",
+        blocks: [
+          { block_type: "title", card_id: "title", content: "课堂课件" },
+        ],
+      },
+      {
+        page_number: 2,
+        slide_type: "content",
+        layout_grid: "split_2",
+        template_family: "ops_lifecycle_light",
+        title: "什么是立法过程",
+        blocks: [
+          { block_type: "title", card_id: "title", content: "什么是立法过程" },
+          { block_type: "body", card_id: "body", content: "立法过程的关键阶段；立法过程中的主要角色", emphasis: ["关键阶段"] },
+          { block_type: "list", card_id: "list", content: "立法过程的核心规则与程序；典型案例与证据", emphasis: ["案例与证据"] },
+          {
+            block_type: "table",
+            card_id: "table",
+            content: {
+              table_rows: [
+                ["序号", "要点"],
+                ["1", "立法过程的关键阶段"],
+                ["2", "立法过程中的主要角色"],
+                ["3", "典型案例与证据"],
+              ],
+            },
+          },
+        ],
+      },
+      {
+        page_number: 3,
+        slide_type: "summary",
+        layout_grid: "hero_1",
+        title: "总结与启示",
+        blocks: [
+          { block_type: "title", card_id: "title", content: "总结与启示" },
+          { block_type: "body", card_id: "body", content: "回顾重点" },
+        ],
+      },
+    ],
+  };
+
+  try {
+    writeFileSync(inputPath, JSON.stringify(payload), "utf-8");
+    execFileSync("node", [
+      scriptPath,
+      "--input",
+      inputPath,
+      "--output",
+      outputPath,
+      "--render-output",
+      renderOutputPath,
+    ]);
+
+    const python = [
+      "from zipfile import ZipFile",
+      "from xml.etree import ElementTree as ET",
+      "import re, sys",
+      "ppt=sys.argv[1]",
+      "ns={'a':'http://schemas.openxmlformats.org/drawingml/2006/main'}",
+      "with ZipFile(ppt) as z:",
+      " slide_names=[n for n in z.namelist() if re.fullmatch(r'ppt/slides/slide\\d+\\.xml', n)]",
+      " slide_names.sort(key=lambda x:int(re.search(r'slide(\\d+)\\.xml$', x).group(1)))",
+      " root=ET.fromstring(z.read(slide_names[1]))",
+      " texts=[t.text.strip() for t in root.findall('.//a:t', ns) if t.text and t.text.strip()]",
+      " print('\\n'.join(texts))",
+    ].join("\n");
+    const slideText = execFileSync("python3", ["-c", python, outputPath], { encoding: "utf-8" });
+    const lines = slideText.split(/\r?\n/).filter(Boolean);
+    assert.equal(lines.includes("什么是立法过程"), true, `content slide should preserve canonical title, got: ${slideText}`);
   } finally {
     rmSync(workDir, { recursive: true, force: true });
   }

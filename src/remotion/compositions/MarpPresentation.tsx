@@ -49,17 +49,19 @@ export interface MarpPresentationProps {
   slides: V7Slide[];
 }
 
+type TransitionPresentation = ReturnType<typeof fade>;
+
 const transitionTiming = springTiming({
   durationInFrames: 18,
   config: {damping: 200},
 });
 
-const getTransition = (from: V7SlideType, to: V7SlideType): any => {
+const getTransition = (from: V7SlideType, to: V7SlideType): TransitionPresentation => {
   if (to === 'divider') return fade();
-  if (to === 'quote_stat') return wipe({direction: 'from-left'});
-  if (from === 'cover') return slide({direction: 'from-right'});
-  if (to === 'summary') return slide({direction: 'from-bottom'});
-  return slide({direction: 'from-bottom'});
+  if (to === 'quote_stat') return wipe({direction: 'from-left'}) as unknown as TransitionPresentation;
+  if (from === 'cover') return slide({direction: 'from-right'}) as unknown as TransitionPresentation;
+  if (to === 'summary') return slide({direction: 'from-bottom'}) as unknown as TransitionPresentation;
+  return slide({direction: 'from-bottom'}) as unknown as TransitionPresentation;
 };
 
 const KeywordPulse: React.FC<{keyword: string; startFrame: number}> = ({keyword, startFrame}) => {

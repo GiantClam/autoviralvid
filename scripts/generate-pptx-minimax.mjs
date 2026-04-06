@@ -35,9 +35,7 @@ import {
 } from "./minimax/templates/template-registry.mjs";
 import {
   hasTemplateContentRenderer,
-  hasTemplateCoverRenderer,
   renderTemplateContent,
-  renderTemplateCover,
 } from "./minimax/templates/template-renderers.mjs";
 import {
   canonicalizePaletteKey as canonicalizePaletteFromCatalog,
@@ -113,6 +111,7 @@ const designDecision = payload?.design_decision_v1 && typeof payload.design_deci
 const deckDecision = designDecision?.deck && typeof designDecision.deck === "object"
   ? designDecision.deck
   : {};
+const deckArchetypeProfile = String(payload.deck_archetype_profile || payload.deckArchetypeProfile || "").trim().toLowerCase();
 const slideDecisionsRaw = Array.isArray(designDecision?.slides) ? designDecision.slides : [];
 
 function normalizeAutoText(value) {
@@ -127,8 +126,14 @@ function deckDecisionValue(key) {
   return normalizeAutoText(deckDecision?.[key]);
 }
 
-const requestedStyle = normalizeAutoText(rawRequestedStyle) || deckDecisionValue("style_variant") || "auto";
-const requestedPalette = normalizeAutoText(rawRequestedPalette) || deckDecisionValue("palette_key") || "auto";
+const requestedStyle = deckDecisionValue("style_variant") || normalizeAutoText(rawRequestedStyle) || "auto";
+const requestedPalette = deckDecisionValue("palette_key") || normalizeAutoText(rawRequestedPalette) || "auto";
+const effectiveRequestedPalette = (
+  deckArchetypeProfile === "education_textbook"
+  && ["", "auto", "education_charts"].includes(normalizeKey(requestedPalette || ""))
+)
+  ? "education_office_classic"
+  : requestedPalette;
 
 function parseCsv(rawValue) {
   return String(rawValue || "")
@@ -191,14 +196,16 @@ const effectiveVerbatimContent = verbatimContent;
 const requestedVisualPreset = String(values["visual-preset"] || payload.visual_preset || "auto");
 const requestedVisualDensity = String(values["visual-density"] || payload.visual_density || "balanced");
 const requestedThemeRecipe = String(
-  values["theme-recipe"]
+  deckDecisionValue("theme_recipe")
+  || values["theme-recipe"]
   || payload.theme_recipe
   || payload?.theme?.theme_recipe
   || payload?.design_spec?.visual?.theme_recipe
   || "auto",
 );
 const requestedTone = String(
-  values.tone
+  deckDecisionValue("tone")
+  || values.tone
   || payload.tone
   || payload.theme_tone
   || payload?.theme?.tone
@@ -208,6 +215,7 @@ const requestedTone = String(
 const requestedConstraintHardness = String(
   values["constraint-hardness"] || payload.constraint_hardness || "minimal",
 );
+
 const requestedSvgMode = String(values["svg-mode"] || payload.svg_mode || "auto");
 const rawRequestedTemplateFamily = String(values["template-family"] || parsedInput.template_family || "auto");
 const requestedTemplateFamily = normalizeAutoText(rawRequestedTemplateFamily)
@@ -351,18 +359,41 @@ const STYLE_RECIPES = {
   },
 };
 
-const FONT_BY_STYLE = {
+let FONT_BY_STYLE = {
   sharp: { enTitle: "Bahnschrift SemiBold", enBody: "Segoe UI" },
   soft: { enTitle: "Aptos Display", enBody: "Aptos" },
   rounded: { enTitle: "Trebuchet MS", enBody: "Segoe UI" },
   pill: { enTitle: "Gill Sans MT", enBody: "Segoe UI" },
 };
-const FONT_ZH = "Microsoft YaHei";
+let FONT_ZH = "Microsoft YaHei";
+const ARCHETYPE_FONT_OVERRIDES = {
+  education_textbook: {
+    zh: "Calibri",
+    styles: {
+      sharp: { enTitle: "Arial", enBody: "Calibri" },
+      soft: { enTitle: "Arial", enBody: "Calibri" },
+      rounded: { enTitle: "Arial", enBody: "Calibri" },
+      pill: { enTitle: "Arial", enBody: "Calibri" },
+    },
+  },
+};
+if (deckArchetypeProfile && ARCHETYPE_FONT_OVERRIDES[deckArchetypeProfile]) {
+  const override = ARCHETYPE_FONT_OVERRIDES[deckArchetypeProfile];
+  FONT_BY_STYLE = { ...FONT_BY_STYLE, ...override.styles };
+  FONT_ZH = override.zh || FONT_ZH;
+}
 const SLIDE_WIDTH = 10;
 const SLIDE_HEIGHT = 5.625;
 const DECOR_INSET = 0.12;
 
 const VISUAL_PRESETS = {
+  education_office_classic: {
+    themeRecipe: "classroom_soft",
+    palette: "education_office_classic",
+    maxBullets: 5,
+    backdrop: "minimal-grid",
+    tone: "light",
+  },
   tech_cinematic: {
     themeRecipe: "tech_cinematic",
     palette: "pure_tech_blue",
@@ -406,12 +437,15 @@ const BACKDROP_VARIANTS = [
 ];
 let backdropRenderCounter = 0;
 
-function normalizeVisualPreset(input, topicText = "") {
+function normalizeVisualPreset(input, topicText = "", archetype = "") {
   const normalized = normalizeKey(input || "");
   if (normalized && normalized !== "auto" && VISUAL_PRESETS[normalized]) return normalized;
+  if (String(archetype || "").toLowerCase() === "education_textbook") {
+    return "education_office_classic";
+  }
   const topic = String(topicText || "").toLowerCase();
   if (/(education|teaching|training|classroom|lesson|school|学生|课堂|教学|教育|培训)/.test(topic)) {
-    return "premium_light";
+    return "education_office_classic";
   }
   if (/(ai|cloud|tech|科技|数字|智能|digital)/.test(topic)) return "tech_cinematic";
   if (/(premium|高端|luxury|investor|融资)/.test(topic)) return "premium_light";
@@ -443,9 +477,16 @@ function resolveSlideDecision(sourceSlide = {}, index = -1) {
 
 function resolveSlideTemplateFamily(sourceSlide) {
   const slideDecision = resolveSlideDecision(sourceSlide);
+  const deckArchetype = String(sourceSlide?.deck_archetype_profile || deckArchetypeProfile || "").trim().toLowerCase();
   const explicitType = normalizeKey(
     pick(sourceSlide || {}, ["page_type", "pageType", "slide_type", "slideType", "subtype"], ""),
   ) || "content";
+  if (deckArchetype === "education_textbook") {
+    if (["cover", "toc", "summary", "divider", "section", "hero_1"].includes(explicitType)) {
+      return "hero_dark";
+    }
+    return "education_textbook_light";
+  }
   const layoutGrid = normalizeKey(String(sourceSlide?.layout_grid || sourceSlide?.layout || "")) || "split_2";
   const perSlideTemplate = String(
     pick(sourceSlide || {}, ["template_family", "template_id"], ""),
@@ -599,6 +640,14 @@ function resolveRenderPath(sourceSlide) {
 
 function maybeAddSvgLayer(slide, sourceSlide, theme, fallbackLayout = "split_2") {
   if (!slide) return false;
+  if (
+    deckArchetypeProfile === "education_textbook"
+    && !["cover", "toc", "summary", "divider", "section", "hero_1"].includes(
+      String(sourceSlide?.slide_type || "content").trim().toLowerCase(),
+    )
+  ) {
+    return false;
+  }
   const renderPath = resolveRenderPath(sourceSlide || {});
   const svgMarkup = resolveSlideSvgMarkup(sourceSlide || {});
   if (svgModeEnabled && renderPath === "svg" && svgMarkup) {
@@ -645,7 +694,7 @@ function maybeAddSvgLayer(slide, sourceSlide, theme, fallbackLayout = "split_2")
 }
 
 function resolveVisualConfig(topicText = "") {
-  const presetKey = normalizeVisualPreset(requestedVisualPreset, topicText);
+  const presetKey = normalizeVisualPreset(requestedVisualPreset, topicText, deckArchetypeProfile);
   const preset = VISUAL_PRESETS[presetKey] || VISUAL_PRESETS.executive_brief;
   const recipeFromPreset = canonicalizeThemeRecipeFromCatalog(preset.themeRecipe || "auto");
   const requestedRecipe = normalizeAutoText(requestedThemeRecipe) || deckDecisionValue("theme_recipe") || "auto";
@@ -680,7 +729,7 @@ function resolveVisualConfig(topicText = "") {
     themeRecipe: resolvedThemeRecipe,
     tone: resolvedTone,
     surfaceProfile: String(recipeConfig?.surface_profile || "clean"),
-    enforcePreset: false,
+    enforcePreset: deckArchetypeProfile === "education_textbook",
     showDecorations: !(
       constraintHardness === "minimal" || constraintHardness === "strict" || density === "sparse"
     ),
@@ -1069,7 +1118,7 @@ function resolveTocSections(sourceSlide, allSlides, fallbackBullets = []) {
     })
     .map((slide, idx) => htmlToText(String(pick(slide, ["title"], `Section ${idx + 1}`))).trim())
     .filter(Boolean)
-    .slice(0, 6);
+    .slice(0, 7);
   const merged = [];
   const seen = new Set();
   for (const item of [...downstreamTitles, ...fallback]) {
@@ -1078,9 +1127,22 @@ function resolveTocSections(sourceSlide, allSlides, fallbackBullets = []) {
     if (!text || !key || seen.has(key)) continue;
     seen.add(key);
     merged.push(text);
-    if (merged.length >= 6) break;
+    if (merged.length >= 7) break;
   }
   return merged.length ? merged : ["Overview", "Core Content", "Summary"];
+}
+
+function extractSupportNoteFromSlide(sourceSlide = {}, fallback = "") {
+  const blocks = Array.isArray(sourceSlide?.blocks) ? sourceSlide.blocks : [];
+  const texts = [];
+  for (const block of blocks) {
+    const type = String(block?.block_type || block?.type || "").trim().toLowerCase();
+    if (!["subtitle", "body", "quote", "list", "icon_text"].includes(type)) continue;
+    const text = blockText(block);
+    if (text) texts.push(htmlToText(text).trim());
+  }
+  const merged = texts.filter(Boolean).join(" ").trim();
+  return merged || String(fallback || "").trim();
 }
 
 function hasNumericSignal(lines) {
@@ -1548,36 +1610,6 @@ function addVisualBackdrop(slide, theme, visualConfig, mode = "content") {
   });
 }
 
-function addKpiChip(slide, text, x, y, theme, style) {
-  const w = Math.max(0.95, Math.min(2.2, 0.75 + String(text || "").length * 0.12));
-  const chipFill = cleanHex(theme.secondary || theme.accentStrong || "2563EB", "2563EB");
-  const chipText = pickReadableTextColorForFill(chipFill, theme);
-  slide.addShape("roundRect", {
-    x,
-    y,
-    w,
-    h: 0.34,
-    rectRadius: Math.min(0.1, STYLE_RECIPES[style].badgeRadius + 0.03),
-    fill: { color: chipFill, transparency: 20 },
-    line: { color: chipFill, pt: 0 },
-  });
-  slide.addText(String(text || ""), {
-    x,
-    y,
-    w,
-    h: 0.34,
-    fontFace: FONT_BY_STYLE[style].enBody,
-    fontSize: 10,
-    bold: true,
-    color: chipText,
-    fill: { color: chipFill, transparency: 20 },
-    align: "center",
-    valign: "mid",
-    margin: 0,
-  });
-  return w;
-}
-
 function toBoundedInt(value, fallback, minValue, maxValue) {
   const raw = Number(value);
   const safe = Number.isFinite(raw) ? Math.round(raw) : fallback;
@@ -1639,17 +1671,23 @@ function sanitizeSubtitleText(text, constraints) {
   return clipped.slice(0, maxLines).join("\n");
 }
 
-function addCover(pres, title, subtitle, theme, style, visualConfig, sourceSlide = undefined, templateFamily = "hero_dark") {
+function addCover(pres, title, subtitle, theme, style, visualConfig, sourceSlide = undefined) {
   const textConstraints = resolveSlideTextConstraints(sourceSlide || {}, "cover", 5);
   const safeSubtitle = sanitizeSubtitleText(subtitle, textConstraints);
   const slide = setSlideThemeContext(pres.addSlide(), theme);
   slide.background = { color: theme.bg };
-  const svg = buildTerminalPageSvg("cover", {
-    title,
-    subtitle: safeSubtitle,
-    pageLabel: "01",
-  }, theme, 1280, 720);
-  addSvgOverlay(slide, svg, { x: 0, y: 0, w: 10, h: 5.625 });
+  const useEducationClassic = deckArchetypeProfile === "education_textbook";
+  if (!useEducationClassic) {
+    const svg = buildTerminalPageSvg("cover", {
+      title,
+      subtitle: safeSubtitle,
+      pageLabel: "01",
+    }, theme, 1280, 720);
+    addSvgOverlay(slide, svg, { x: 0, y: 0, w: 10, h: 5.625 });
+  } else {
+    slide.addShape("line", { x: 0.62, y: 0.92, w: 1.1, h: 0, line: { color: "1F497D", pt: 2.5 } });
+    slide.addShape("line", { x: 0.62, y: 0.99, w: 0.58, h: 0, line: { color: "4F81BD", pt: 1.4 } });
+  }
   const titleCardBg = cleanHex(theme.white || theme.cardBg || theme.bg || "FFFFFF", "FFFFFF");
   const coverTitleColor = ensureReadableTextColor(theme.primary, titleCardBg, theme, 4.8);
   const coverSubtitleColor = ensureReadableTextColor(
@@ -1663,9 +1701,17 @@ function addCover(pres, title, subtitle, theme, style, visualConfig, sourceSlide
   const titleParts = titleText.split(/[：:]/).map((item) => item.trim()).filter(Boolean);
   const line1 = titleParts[0] || titleText;
   const line2 = titleParts.length > 1 ? titleParts.slice(1).join("：") : "";
+  const mergedSubtitle = [safeSubtitle]
+    .flatMap((item) => String(item || "").split(/\r?\n/))
+    .map((item) => String(item || "").trim())
+    .filter(Boolean)
+    .filter((item) => item !== line1 && item !== line2)
+    .filter((item, idx, arr) => arr.findIndex((x) => x === item) === idx)
+    .join("\n");
   const coverMinTitleFont = toBoundedInt(textConstraints.min_title_font_pt, 30, 20, 56);
-  const titleSizeBase = titleText.length > 22 ? 34 : 40;
+  const titleSizeBase = titleText.length > 22 ? 32 : 40;
   const titleSize = Math.max(coverMinTitleFont, titleSizeBase);
+  const renderLine2AsTitle = !useEducationClassic && Boolean(line2);
   slide.addText(line1, {
     x: 0.48,
     y: 1.75,
@@ -1677,7 +1723,7 @@ function addCover(pres, title, subtitle, theme, style, visualConfig, sourceSlide
     color: coverTitleColor,
     margin: 0,
   });
-  if (line2) {
+  if (renderLine2AsTitle) {
     slide.addText(line2, {
       x: 0.48,
       y: 2.28,
@@ -1690,11 +1736,14 @@ function addCover(pres, title, subtitle, theme, style, visualConfig, sourceSlide
       margin: 0,
     });
   }
-  const subtitleText = safeSubtitle;
+  const subtitleText = [
+    useEducationClassic ? line2 : "",
+    mergedSubtitle,
+  ].map((item) => String(item || "").trim()).filter(Boolean).filter((item, idx, arr) => arr.findIndex((x) => x === item) === idx).join("\n");
   if (subtitleText) {
     slide.addText(subtitleText, {
       x: 0.48,
-      y: 3.16,
+      y: 3.08,
       w: 5.4,
       h: 0.75,
       fontFace: FONT_BY_STYLE[style].enBody,
@@ -1711,52 +1760,97 @@ function addToc(pres, sectionTitles, theme, style, visualConfig, pageNumber = 2,
   slide.background = { color: theme.bg };
   const tocTitle = htmlToText(String(pick(sourceSlide || {}, ["title"], ""))).trim()
     || (preferZhText(sourceSlide?.title, sectionTitles) ? "内容导航" : "Table of Contents");
-  const svg = buildTerminalPageSvg("toc", {
-    title: tocTitle,
-    sections: sectionTitles,
-    focus: htmlToText(String(pick(sourceSlide || {}, ["narration", "speaker_notes"], ""))).trim(),
-  }, theme, 1280, 720);
-  addSvgOverlay(slide, svg, { x: 0, y: 0, w: 10, h: 5.625 });
-  slide.addText(tocTitle, {
-    x: 0.52,
-    y: 1.58,
-    w: 2.2,
-    h: 0.42,
-    fontFace: FONT_ZH,
-    fontSize: 26,
-    bold: true,
-    color: "FFFFFF",
-    margin: 0,
-  });
-
-  sectionTitles.slice(0, 6).forEach((name, idx) => {
-    const y = 1.47 + idx * 0.86;
-    slide.addText(String(idx + 1).padStart(2, "0"), {
-      x: 3.63,
-      y,
-      w: 0.38,
-      h: 0.34,
-      fontFace: FONT_BY_STYLE[style].enBody,
-      fontSize: 15,
-      bold: true,
-      color: idx % 2 === 0 ? theme.primary : "FFFFFF",
-      align: "center",
-      valign: "mid",
-      margin: 0,
-    });
-    slide.addText(name, {
-      x: 4.3,
-      y: y - 0.01,
-      w: 4.8,
-      h: 0.4,
+  const useEducationClassic = deckArchetypeProfile === "education_textbook";
+  if (!useEducationClassic) {
+    const svg = buildTerminalPageSvg("toc", {
+      title: tocTitle,
+      sections: sectionTitles,
+      focus: htmlToText(String(pick(sourceSlide || {}, ["narration", "speaker_notes"], ""))).trim(),
+    }, theme, 1280, 720);
+    addSvgOverlay(slide, svg, { x: 0, y: 0, w: 10, h: 5.625 });
+    slide.addText(tocTitle, {
+      x: 0.52,
+      y: 1.58,
+      w: 2.2,
+      h: 0.42,
       fontFace: FONT_ZH,
-      fontSize: 17,
-      color: theme.darkText,
+      fontSize: 26,
+      bold: true,
+      color: "FFFFFF",
       margin: 0,
+    });
+  } else {
+    slide.addShape("line", { x: 0.64, y: 0.9, w: 1.1, h: 0, line: { color: "1F497D", pt: 2.5 } });
+    slide.addText(tocTitle, {
+      x: 0.78,
+      y: 1.02,
+      w: 3.2,
+      h: 0.42,
+      fontFace: FONT_ZH,
+      fontSize: 24,
+      bold: true,
+      color: "1F1F1F",
+      margin: 0,
+    });
+    const tocSupport = extractSupportNoteFromSlide(
+      sourceSlide,
+      htmlToText(String(pick(sourceSlide || {}, ["narration", "speaker_notes"], ""))).trim(),
+    );
+    if (tocSupport) {
+      const tocSupportText = String(tocSupport).length > 68 ? `${String(tocSupport).slice(0, 67).trim()}…` : String(tocSupport);
+      slide.addText(tocSupportText, {
+        x: 5.42,
+        y: 1.03,
+        w: 3.55,
+        h: 0.42,
+        fontFace: FONT_ZH,
+        fontSize: 12,
+        color: "5F6B7A",
+        margin: 0,
+        fit: "shrink",
+      });
+    }
+  }
+  const tocItems = sectionTitles.slice(0, 7);
+  const tocColumns = useEducationClassic
+    ? [tocItems.slice(0, 4), tocItems.slice(4, 7)]
+    : [tocItems, []];
+  tocColumns.forEach((column, columnIndex) => {
+    column.forEach((name, rowIndex) => {
+      const itemIndex = (columnIndex === 0 ? rowIndex : rowIndex + tocColumns[0].length);
+      const baseX = useEducationClassic ? (columnIndex === 0 ? 0.92 : 5.3) : 3.63;
+      const textX = useEducationClassic ? (columnIndex === 0 ? 1.52 : 5.9) : 4.3;
+      const y = useEducationClassic ? (1.46 + rowIndex * 0.62) : (1.47 + itemIndex * 0.86);
+      slide.addText(String(itemIndex + 1).padStart(2, "0"), {
+        x: baseX,
+        y,
+        w: useEducationClassic ? 0.42 : 0.38,
+        h: 0.30,
+        fontFace: FONT_BY_STYLE[style].enBody,
+        fontSize: useEducationClassic ? 12 : 15,
+        bold: true,
+        color: useEducationClassic ? "1F497D" : (itemIndex % 2 === 0 ? theme.primary : "FFFFFF"),
+        align: "center",
+        valign: "mid",
+        margin: 0,
+      });
+      slide.addText(name, {
+        x: textX,
+        y: y - 0.01,
+        w: useEducationClassic ? 3.55 : 4.8,
+        h: 0.34,
+        fontFace: FONT_ZH,
+        fontSize: useEducationClassic ? 14 : 17,
+        color: useEducationClassic ? "1F1F1F" : theme.darkText,
+        margin: 0,
+        fit: "shrink",
+      });
     });
   });
 
-  addPageBadge(slide, pageNumber, theme, style);
+  if (!useEducationClassic) {
+    addPageBadge(slide, pageNumber, theme, style);
+  }
 }
 
 function addHeader(slide, title, theme, style, visualConfig, templateFamily = "dashboard_dark", textConstraints = undefined) {
@@ -2081,6 +2175,7 @@ function splitComparison(bullets) {
 }
 
 function addSectionDivider(slide, title, pageNumber, theme, style) {
+  const useEducationClassic = deckArchetypeProfile === "education_textbook";
   slide.background = { color: theme.primary };
   slide.addShape("roundRect", {
     x: 0.9,
@@ -2113,7 +2208,9 @@ function addSectionDivider(slide, title, pageNumber, theme, style) {
     color: theme.white,
     margin: 0,
   });
-  addPageBadge(slide, pageNumber, theme, style);
+  if (!useEducationClassic) {
+    addPageBadge(slide, pageNumber, theme, style);
+  }
 }
 
 function addContentSlide(
@@ -2126,14 +2223,22 @@ function addContentSlide(
   forcedSubtype = "",
   templateFamily = "dashboard_dark",
 ) {
+  const useEducationClassic = deckArchetypeProfile === "education_textbook";
   const recipe = STYLE_RECIPES[style];
   const title = htmlToText(String(pick(slideData, ["title"], `Slide ${pageNumber}`))) || `Slide ${pageNumber}`;
   const narration = htmlToText(String(pick(slideData, ["narration", "speaker_notes", "speakerNotes"], "")));
   const bullets = collectBullets(slideData, narration);
-  const subtype = resolveSubtypeByTemplate(
+  let subtype = resolveSubtypeByTemplate(
     normalizeKey(forcedSubtype || "") || inferSubtype(slideData),
     templateFamily,
   );
+  if (deckArchetypeProfile === 'education_textbook' && templateFamily === 'education_textbook_light') {
+    const archetypeKey = String(slideData?.archetype || slideData?.archetype_plan?.selected || '').trim().toLowerCase();
+    if (archetypeKey === 'chart_dual_compare') subtype = 'comparison';
+    else if (archetypeKey === 'chart_single_focus') subtype = 'content';
+    else if (archetypeKey === 'process_flow_4step' || normalizeKey(slideData?.layout_grid || '') === 'timeline') subtype = 'timeline';
+    else if (['mixed_media', 'image_showcase', 'data', 'data_visualization'].includes(subtype)) subtype = 'content';
+  }
   const maxBullets = Math.max(3, visualConfig?.maxBullets || 5);
   const textConstraints = resolveSlideTextConstraints(slideData || {}, subtype, maxBullets);
   const constrainedMaxBullets = Math.max(
@@ -2176,6 +2281,16 @@ function addContentSlide(
   }
 
   const templateContentCandidate = !["mixed_media", "image_showcase"].includes(subtype) && !skipTemplateRenderer;
+  if (process.env.DEBUG_EDU_TEMPLATE === '1') {
+    console.error('[addContentSlide]', JSON.stringify({
+      title,
+      templateFamily,
+      subtype,
+      templateContentCandidate,
+      skipTemplateRenderer,
+      capability: templateCapability,
+    }));
+  }
   if (templateContentCandidate) {
     const isLightTemplate = String(templateFamily || "").endsWith("_light");
     const lightBg = templateFamily === "consulting_warm_light" ? "F7F3EE" : "F4F7FC";
@@ -2578,12 +2693,13 @@ function addContentSlide(
     }
   }
 
-  addPageBadge(slide, pageNumber, theme, style);
+  if (!useEducationClassic) {
+    addPageBadge(slide, pageNumber, theme, style);
+  }
 }
 
 function collectTextLines(slideData, fallbackText = "") {
   const elements = Array.isArray(slideData?.elements) ? slideData.elements : [];
-  const blocks = Array.isArray(slideData?.blocks) ? slideData.blocks : [];
   const textElements = elements
     .filter((el) => String(el?.type || "").toLowerCase() === "text")
     .sort((a, b) => Number(a?.top || 0) - Number(b?.top || 0));
@@ -2671,13 +2787,18 @@ function addSummarySlide(pres, title, bullets, pageNumber, theme, style, visualC
   slide.background = { color: theme.bg };
   const summaryTitle = title || (preferZhText(title, bullets) ? "总结与启示" : "Summary & Takeaways");
   const summarySubtitle = htmlToText(String(pick(sourceSlide || {}, ["narration", "speaker_notes"], ""))).trim();
-  const svg = buildTerminalPageSvg("summary", {
-    title: summaryTitle,
-    subtitle: summarySubtitle,
-    bullets,
-    footerLabel: "THANK YOU",
-  }, theme, 1280, 720);
-  addSvgOverlay(slide, svg, { x: 0, y: 0, w: 10, h: 5.625 });
+  const useEducationClassic = deckArchetypeProfile === "education_textbook";
+  if (!useEducationClassic) {
+    const svg = buildTerminalPageSvg("summary", {
+      title: summaryTitle,
+      subtitle: summarySubtitle,
+      bullets,
+      footerLabel: "THANK YOU",
+    }, theme, 1280, 720);
+    addSvgOverlay(slide, svg, { x: 0, y: 0, w: 10, h: 5.625 });
+  } else {
+    slide.addShape("line", { x: 0.64, y: 0.9, w: 1.1, h: 0, line: { color: "1F497D", pt: 2.5 } });
+  }
   slide.addText(title || "Summary", {
     x: 2.6,
     y: 1.95,
@@ -2941,6 +3062,14 @@ function resolveRenderSlideTypeByTemplate(templateFamily) {
 }
 
 function buildContentRenderSlide(pageNumber, sourceSlide, subtype, title, bullets, templateFamily = "dashboard_dark") {
+  let resolvedSubtype = subtype;
+  if (deckArchetypeProfile === 'education_textbook' && templateFamily === 'education_textbook_light') {
+    const archetypeKey = String(sourceSlide?.archetype || sourceSlide?.archetype_plan?.selected || '').trim().toLowerCase();
+    if (archetypeKey === 'chart_dual_compare') resolvedSubtype = 'comparison';
+    else if (archetypeKey === 'chart_single_focus') resolvedSubtype = 'content';
+    else if (archetypeKey === 'process_flow_4step' || normalizeKey(sourceSlide?.layout_grid || '') === 'timeline') resolvedSubtype = 'timeline';
+    else if (['mixed_media', 'image_showcase', 'data', 'data_visualization'].includes(resolvedSubtype)) resolvedSubtype = 'content';
+  }
   const safeBullets = (bullets.length ? bullets : [title]).slice(0, 6);
   const actions = [];
   const templateProfiles = getTemplateProfiles(templateFamily);
@@ -2953,7 +3082,7 @@ function buildContentRenderSlide(pageNumber, sourceSlide, subtype, title, bullet
       : sourceSlide;
   const renderSlideType =
     (skipTemplateRenderer ? "" : resolveRenderSlideTypeByTemplate(templateFamily))
-    || resolveContentRenderSlideType(layoutSource, subtype);
+    || resolveContentRenderSlideType(layoutSource, resolvedSubtype);
   if (safeBullets.length) {
     actions.push({ type: "appear_items", items: safeBullets.slice(0, 4), startFrame: 24 });
   }
@@ -2962,7 +3091,7 @@ function buildContentRenderSlide(pageNumber, sourceSlide, subtype, title, bullet
     actions.push({ type: "highlight", keyword, startFrame: 36 });
   }
 
-  if (subtype === "section") {
+  if (resolvedSubtype === "section") {
     return {
       ...renderIdentity(pageNumber, sourceSlide),
       page_number: pageNumber,
@@ -2978,7 +3107,7 @@ function buildContentRenderSlide(pageNumber, sourceSlide, subtype, title, bullet
     };
   }
 
-  if (subtype === "timeline") {
+  if (resolvedSubtype === "timeline") {
     return {
       ...renderIdentity(pageNumber, sourceSlide),
       page_number: pageNumber,
@@ -2994,7 +3123,7 @@ function buildContentRenderSlide(pageNumber, sourceSlide, subtype, title, bullet
     };
   }
 
-  if (subtype === "table") {
+  if (resolvedSubtype === "table") {
     const rows = buildTableRows(sourceSlide, safeBullets);
     return {
       ...renderIdentity(pageNumber, sourceSlide),
@@ -3011,7 +3140,7 @@ function buildContentRenderSlide(pageNumber, sourceSlide, subtype, title, bullet
     };
   }
 
-  if (subtype === "comparison") {
+  if (resolvedSubtype === "comparison") {
     const { left, right } = splitComparison(safeBullets);
     return {
       ...renderIdentity(pageNumber, sourceSlide),
@@ -3031,7 +3160,7 @@ function buildContentRenderSlide(pageNumber, sourceSlide, subtype, title, bullet
     };
   }
 
-  if (subtype === "mixed_media") {
+  if (resolvedSubtype === "mixed_media") {
     const lead = safeBullets[0] || title;
     const rest = safeBullets.slice(1);
     return {
@@ -3052,7 +3181,7 @@ function buildContentRenderSlide(pageNumber, sourceSlide, subtype, title, bullet
     };
   }
 
-  if (subtype === "image_showcase") {
+  if (resolvedSubtype === "image_showcase") {
     return {
       ...renderIdentity(pageNumber, sourceSlide),
       page_number: pageNumber,
@@ -3071,7 +3200,7 @@ function buildContentRenderSlide(pageNumber, sourceSlide, subtype, title, bullet
     };
   }
 
-  if (subtype === "data" || subtype === "data_visualization") {
+  if (resolvedSubtype === "data" || resolvedSubtype === "data_visualization") {
     const bars = extractChartSeries(sourceSlide);
     const dataLines = bars && bars.length
       ? bars.map((b) => `- ${mdEscape(b.label)}: <mark>${b.value}</mark>`)
@@ -3180,6 +3309,9 @@ function buildBentoRenderSlide(pageNumber, sourceSlide, title, bullets, template
 
 function shouldAttemptBentoSlide(sourceSlide, templateFamily = "dashboard_dark") {
   if (!canRenderBentoSlide(sourceSlide)) return false;
+  if (String(sourceSlide?.deck_archetype_profile || "").trim().toLowerCase() === "education_textbook") {
+    return false;
+  }
   const explicitType = normalizeKey(
     pick(sourceSlide || {}, ["page_type", "pageType", "slide_type", "slideType", "subtype"], ""),
   );
@@ -3284,11 +3416,11 @@ function buildDeck() {
     : selectStyle(requestedStyle, deckStyleHint, topicText, disableLocalStyleRewrite);
   const paletteKey = visualConfig.enabled
     ? (
-      visualConfig.enforcePreset && normalizeKey(requestedPalette) === "auto"
+      visualConfig.enforcePreset && normalizeKey(effectiveRequestedPalette) === "auto"
         ? visualConfig.paletteOverride
-        : selectPalette(requestedPalette, topicText, disableLocalStyleRewrite)
+        : selectPalette(effectiveRequestedPalette, topicText, disableLocalStyleRewrite)
     )
-    : selectPalette(requestedPalette, topicText, disableLocalStyleRewrite);
+    : selectPalette(effectiveRequestedPalette, topicText, disableLocalStyleRewrite);
   const deckThemeRecipe = String(
     canonicalizeThemeRecipeFromCatalog(visualConfig.themeRecipe || requestedThemeRecipe || "auto"),
   ) || "consulting_clean";
@@ -3311,7 +3443,6 @@ function buildDeck() {
       surfaceProfile: visualConfig.surfaceProfile,
     };
   };
-  const deckTemplateFamily = inferDeckTemplateFamily(slides);
   const theme = buildTheme(resolveSlideThemeContext());
   const renderSlides = [];
   const isPatchMode = retryScope !== "deck";
@@ -3376,11 +3507,6 @@ function buildDeck() {
       }
 
       if (explicitType === "toc") {
-        const tocTemplate = normalizeTemplateFamily(
-          resolveSlideTemplateFamily(sourceSlide),
-          "toc",
-          sourceSlide?.layout_grid || "hero_1",
-        );
         const tocTheme = buildTheme(resolveSlideThemeContext(sourceSlide));
         const tocSections = resolveTocSections(sourceSlide, slides, bullets);
         addToc(pres, tocSections, tocTheme, style, visualConfig, pageNumber, sourceSlide);
@@ -3500,11 +3626,6 @@ function buildDeck() {
         continue;
       }
       if (explicitType === "toc") {
-        const tocTemplate = normalizeTemplateFamily(
-          resolveSlideTemplateFamily(sourceSlide),
-          "toc",
-          sourceSlide?.layout_grid || "hero_1",
-        );
         const tocTheme = buildTheme(resolveSlideThemeContext(sourceSlide));
         const tocSections = resolveTocSections(sourceSlide, slides, bullets);
         addToc(pres, tocSections, tocTheme, style, visualConfig, pageNumber, sourceSlide);
@@ -3581,11 +3702,6 @@ function buildDeck() {
   });
   const tocSourceSlide = explicitTocSlide || slides[1] || slides[0];
   const tocSections = resolveTocSections(tocSourceSlide || slides[0], contentCandidates, collectBullets(tocSourceSlide || {}, ""));
-  const tocTemplate = normalizeTemplateFamily(
-    resolveSlideTemplateFamily(tocSourceSlide || {}),
-    "toc",
-    tocSourceSlide?.layout_grid || "hero_1",
-  );
   const tocTheme = buildTheme(resolveSlideThemeContext(tocSourceSlide || slides[0]));
   addToc(pres, tocSections, tocTheme, style, visualConfig, 2, tocSourceSlide);
   renderSlides.push(buildTocRenderSlide(2, tocSections, slides[1] || slides[0]));

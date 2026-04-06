@@ -8,6 +8,7 @@ from collections import Counter
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
+from src.ppt_scene_rulebook import normalize_scene_rule_profile
 from src.ppt_template_catalog import (
     quality_profile as load_quality_profile,
     template_capabilities as template_catalog_capabilities,
@@ -52,6 +53,17 @@ class QualityScoreResult:
     warn_threshold: float
     dimensions: Dict[str, float]
     issue_counts: Dict[str, int]
+    diagnostics: Dict[str, Any]
+
+
+@dataclass(frozen=True)
+class VisualProfessionalScoreResult:
+    color_consistency_score: float
+    layout_order_score: float
+    hierarchy_clarity_score: float
+    visual_avg_score: float
+    accuracy_gate_passed: bool
+    abnormal_tags: List[str]
     diagnostics: Dict[str, Any]
 
 
@@ -424,6 +436,207 @@ def _switch_ratio(values: List[str]) -> float:
     return switches / max(1, len(values) - 1)
 
 
+_STATUS_REPORT_SUMMARY_RE = re.compile(r"(执行摘要|摘要|核心结论|决策请求)")
+_STATUS_REPORT_GENERIC_TITLE_TOKENS = {
+    "销售分析",
+    "市场分析",
+    "财务分析",
+    "运营分析",
+    "项目汇报",
+    "工作汇报",
+    "项目进展",
+    "市场情况",
+    "销售情况",
+    "用户情况",
+    "问题分析",
+    "解决方案",
+    "行动计划",
+    "行动项",
+    "总结",
+    "概览",
+    "复盘",
+    "计划",
+    "策略",
+}
+_PITCH_MODULE_KEYWORDS = {
+    "problem": ("problem", "pain", "痛点", "问题"),
+    "solution": ("solution", "产品", "解决方案", "demo", "截图"),
+    "market": ("market", "tam", "sam", "som", "市场"),
+    "traction": ("traction", "增长", "用户增长", "arr", "gmv", "营收"),
+    "model": ("model", "商业模式", "ltv", "cac", "毛利"),
+    "competition": ("competition", "竞品", "竞争", "壁垒"),
+    "team": ("team", "founder", "团队", "创始人"),
+    "ask": ("ask", "融资", "募资", "用途", "milestone", "里程碑"),
+}
+_TRAINING_OBJECTIVE_RE = re.compile(r"(学习目标|课程目标|你将能够|能够)")
+_TRAINING_MEASURABLE_VERBS = ("能够", "写出", "分析", "判断", "设计", "搭建", "识别", "完成", "运用")
+_TRAINING_KNOWLEDGE_MAP_RE = re.compile(r"(知识地图|知识框架|课程地图|课程结构|本课结构|目录)")
+_TRAINING_INTERACTION_RE = re.compile(r"(互动|讨论|练习|小测|测验|思考题|挑战)")
+_INVESTOR_ASK_DETAIL_RE = re.compile(r"(\d+\s*(万|亿|m|million)|用途|里程碑|18个月|months?)", re.IGNORECASE)
+
+
+def _resolve_scene_profile(profile: Optional[str | Dict[str, Any]] = None, *, slides: Optional[List[Dict[str, Any]]] = None) -> str:
+    if isinstance(profile, str):
+        normalized = normalize_scene_rule_profile(profile)
+        if normalized:
+            return normalized
+    for slide in slides or []:
+        if not isinstance(slide, dict):
+            continue
+        normalized = normalize_scene_rule_profile(slide.get("quality_profile"))
+        if normalized:
+            return normalized
+    return ""
+
+
+def _slide_text_blob(slide: Dict[str, Any]) -> str:
+    parts: List[str] = []
+    parts.extend(_text_values(slide))
+    for block in slide.get("blocks") or []:
+        if not isinstance(block, dict):
+            continue
+        text = _extract_block_text(block)
+        if text:
+            parts.append(text)
+    return " ".join(part.strip() for part in parts if str(part).strip()).strip()
+
+
+def _find_status_report_summary_slide(slides: List[Dict[str, Any]]) -> Dict[str, Any] | None:
+    for slide in slides[:3]:
+        if not isinstance(slide, dict):
+            continue
+        slide_type = str(slide.get("slide_type") or "").strip().lower()
+        if slide_type == "summary":
+            return slide
+        title_blob = _slide_text_blob(slide)
+        if _STATUS_REPORT_SUMMARY_RE.search(title_blob):
+            return slide
+    return None
+
+
+def _generic_status_report_title(title: str) -> bool:
+    normalized = str(title or "").strip()
+    if not normalized:
+        return False
+    if normalized in _STATUS_REPORT_GENERIC_TITLE_TOKENS:
+        return True
+    compact = normalized.replace(" ", "")
+    if len(compact) <= 8 and any(token in compact for token in ("分析", "情况", "总结", "计划", "汇报", "概览", "策略")):
+        return True
+    return False
+
+
+def _scene_hard_gate_issues(slides: List[Dict[str, Any]], *, profile: Optional[str | Dict[str, Any]] = None) -> List[QualityIssue]:
+    scene = _resolve_scene_profile(profile, slides=slides)
+    if not scene:
+        return []
+    issues: List[QualityIssue] = []
+    if scene == "status_report":
+        summary_slide = _find_status_report_summary_slide(slides)
+        if summary_slide is None:
+            issues.append(
+                QualityIssue(
+                    slide_id="deck",
+                    code="scene_status_report_exec_summary_missing",
+                    message="Status report deck should include an executive summary within the first 3 slides.",
+                    retry_scope="deck",
+                    retry_target_ids=[],
+                )
+            )
+        elif _non_title_block_count(summary_slide) < 4:
+            sid = _slide_id(summary_slide, 1)
+            issues.append(
+                QualityIssue(
+                    slide_id=sid,
+                    code="scene_status_report_exec_summary_incomplete",
+                    message="Executive summary should cover at least 4 independent items.",
+                    retry_scope="slide",
+                    retry_target_ids=[sid],
+                )
+            )
+    elif scene == "investor_pitch":
+        blob = " ".join(_slide_text_blob(slide).lower() for slide in slides if isinstance(slide, dict))
+        missing = [
+            module
+            for module, keywords in _PITCH_MODULE_KEYWORDS.items()
+            if not any(keyword.lower() in blob for keyword in keywords)
+        ]
+        if missing:
+            issues.append(
+                QualityIssue(
+                    slide_id="deck",
+                    code="scene_investor_pitch_modules_missing",
+                    message="Investor pitch is missing core modules: " + ", ".join(missing),
+                    retry_scope="deck",
+                    retry_target_ids=[],
+                )
+            )
+    elif scene == "training_deck":
+        early_slides = [slide for slide in slides[:2] if isinstance(slide, dict)]
+        has_objectives = False
+        for slide in early_slides:
+            blob = _slide_text_blob(slide)
+            if _TRAINING_OBJECTIVE_RE.search(blob) and any(verb in blob for verb in _TRAINING_MEASURABLE_VERBS):
+                has_objectives = True
+                break
+        if not has_objectives:
+            issues.append(
+                QualityIssue(
+                    slide_id="deck",
+                    code="scene_training_deck_learning_goals_missing",
+                    message="Training deck should introduce measurable learning goals within the first 2 slides.",
+                    retry_scope="deck",
+                    retry_target_ids=[],
+                )
+            )
+        map_slides = [slide for slide in slides[:4] if isinstance(slide, dict)]
+        has_map = any(
+            str(slide.get("slide_type") or "").strip().lower() == "toc" or _TRAINING_KNOWLEDGE_MAP_RE.search(_slide_text_blob(slide))
+            for slide in map_slides
+        )
+        if not has_map:
+            issues.append(
+                QualityIssue(
+                    slide_id="deck",
+                    code="scene_training_deck_knowledge_map_missing",
+                    message="Training deck should include a knowledge map / agenda view within the first 4 slides.",
+                    retry_scope="deck",
+                    retry_target_ids=[],
+                )
+            )
+    return issues
+
+
+def _scene_advisory_issue_counts(slides: List[Dict[str, Any]], *, profile: Optional[str | Dict[str, Any]] = None) -> Counter:
+    scene = _resolve_scene_profile(profile, slides=slides)
+    counts: Counter = Counter()
+    if not scene:
+        return counts
+    if scene == "status_report":
+        for slide in slides:
+            if not isinstance(slide, dict):
+                continue
+            slide_type = str(slide.get("slide_type") or "").strip().lower()
+            if slide_type in {"cover", "summary", "toc", "divider"}:
+                continue
+            if _generic_status_report_title(str(slide.get("title") or "")):
+                counts["scene_status_report_title_generic"] += 1
+    elif scene == "investor_pitch":
+        ask_blobs = [
+            _slide_text_blob(slide)
+            for slide in slides
+            if isinstance(slide, dict) and any(token in _slide_text_blob(slide).lower() for token in ("ask", "融资", "募资", "里程碑"))
+        ]
+        if ask_blobs and not any(_INVESTOR_ASK_DETAIL_RE.search(blob) for blob in ask_blobs):
+            counts["scene_investor_pitch_ask_blurry"] += 1
+        elif not ask_blobs:
+            counts["scene_investor_pitch_ask_blurry"] += 1
+    elif scene == "training_deck":
+        if not any(_TRAINING_INTERACTION_RE.search(_slide_text_blob(slide)) for slide in slides if isinstance(slide, dict)):
+            counts["scene_training_deck_interaction_missing"] += 1
+    return counts
+
+
 def validate_slide(
     slide: Dict[str, Any],
     index: int = 0,
@@ -691,6 +904,7 @@ def validate_deck(
     for idx, slide in enumerate(slides):
         result = validate_slide(slide, index=idx, profile=profile)
         all_issues.extend(result.issues)
+    all_issues.extend(_scene_hard_gate_issues(slides, profile=profile))
     return QualityResult(ok=len(all_issues) == 0, issues=all_issues)
 
 
@@ -1329,6 +1543,8 @@ def score_deck_quality(
     )
     all_issues = [*content_result.issues, *layout_result.issues]
     issue_counts = _issue_counter(all_issues)
+    scene_advisory_counts = _scene_advisory_issue_counts(slides, profile=profile)
+    issue_counts.update(scene_advisory_counts)
 
     structure_penalties = {
         "blank_slide": 45,
@@ -1380,6 +1596,9 @@ def score_deck_quality(
         "title_echo": 16,
         "weak_emphasis": 12,
         "flat_typography": 12,
+        "scene_status_report_title_generic": 10,
+        "scene_investor_pitch_ask_blurry": 8,
+        "scene_training_deck_interaction_missing": 8,
     }
 
     def _dimension_score(penalty_map: Dict[str, int]) -> float:
@@ -1485,6 +1704,8 @@ def score_deck_quality(
         issue_counts={code: int(count) for code, count in issue_counts.items()},
         diagnostics={
             "fatal_codes_present": sorted([code for code in issue_counts.keys() if code in fatal_codes]),
+            "scene_rule_profile": _resolve_scene_profile(profile, slides=slides),
+            "scene_rule_advisories": {code: int(count) for code, count in scene_advisory_counts.items()},
             "layout_variety_ratio": (
                 len(set(layout_values)) / max(1, len(layout_values)) if layout_values else 0.0
             ),
@@ -1498,5 +1719,162 @@ def score_deck_quality(
             "visual_issue_pressure": visual_issue_pressure,
             "visual_mean_luminance": mean_luminance,
             "visual_multimodal_score": multimodal_numeric,
+        },
+    )
+
+
+_HIERARCHY_ISSUE_WEIGHTS: Dict[str, float] = {
+    "visual_title_crowded_ratio_high": 1.0,
+    "visual_multi_title_ratio_high": 1.0,
+    "visual_text_overlap_ratio_high": 1.3,
+    "visual_text_overflow_ratio_high": 1.0,
+    "weak_emphasis": 0.9,
+    "flat_typography": 0.9,
+    "title_echo": 1.0,
+}
+
+_LAYOUT_ORDER_ABNORMAL_CODES = {
+    "layout_homogeneous",
+    "layout_top2_homogeneous",
+    "layout_adjacent_repeat",
+    "layout_abab_repeat",
+    "layout_variety_low",
+    "layout_density_consecutive_high",
+    "layout_density_window_missing_breathing",
+    "template_family_switch_frequent",
+}
+
+_ACCURACY_HARD_FAIL_CODES = {
+    "encoding_invalid",
+    "placeholder_pollution",
+    "placeholder_chart_data",
+    "placeholder_kpi_data",
+}
+
+_ACCURACY_TEXT_CODE_HINTS = (
+    "fact",
+    "accuracy",
+    "halluc",
+    "contrad",
+    "mismatch",
+    "incorrect",
+    "fabricat",
+)
+
+
+def _clamp_10(value: float) -> float:
+    return max(0.0, min(10.0, float(value)))
+
+
+def _normalized_issue_codes(issue_codes: Optional[List[str]]) -> List[str]:
+    out: List[str] = []
+    for raw in issue_codes or []:
+        code = str(raw or "").strip().lower()
+        if code:
+            out.append(code)
+    return out
+
+
+def _text_accuracy_failed(text_issue_codes: Optional[List[str]]) -> bool:
+    for code in _normalized_issue_codes(text_issue_codes):
+        if any(hint in code for hint in _ACCURACY_TEXT_CODE_HINTS):
+            return True
+    return False
+
+
+def score_visual_professional_metrics(
+    *,
+    slides: Optional[List[Dict[str, Any]]] = None,
+    quality_score: Optional[QualityScoreResult] = None,
+    issue_codes: Optional[List[str]] = None,
+    text_issue_codes: Optional[List[str]] = None,
+    visual_audit: Optional[Dict[str, Any]] = None,
+    profile: Optional[str | Dict[str, Any]] = None,
+) -> VisualProfessionalScoreResult:
+    """Canonical 0-10 visual-professional scoring used by online/offline flows."""
+    if quality_score is None:
+        quality_score = score_deck_quality(
+            slides=list(slides or []),
+            render_spec={"slides": list(slides or [])},
+            profile=profile,
+            visual_audit=visual_audit,
+        )
+
+    dims = quality_score.dimensions if isinstance(quality_score.dimensions, dict) else {}
+    diags = quality_score.diagnostics if isinstance(quality_score.diagnostics, dict) else {}
+    counts = quality_score.issue_counts if isinstance(quality_score.issue_counts, dict) else {}
+
+    visual_score_10 = _clamp_10(float(dims.get("visual") or 0.0) / 10.0)
+    layout_score_10 = _clamp_10(float(dims.get("layout") or 0.0) / 10.0)
+    consistency_score_10 = _clamp_10(float(dims.get("consistency") or 0.0) / 10.0)
+    style_drift_ratio = max(0.0, min(1.0, float(diags.get("visual_style_drift_ratio") or 0.0)))
+    low_contrast_ratio = max(0.0, min(1.0, float(diags.get("visual_low_contrast_ratio") or 0.0)))
+    issue_pressure = max(0.0, min(1.0, float(diags.get("visual_issue_pressure") or 0.0)))
+
+    color_consistency_score = _clamp_10(
+        (visual_score_10 * 0.60)
+        + (consistency_score_10 * 0.40)
+        - (style_drift_ratio * 2.50)
+        - (low_contrast_ratio * 1.00)
+    )
+    layout_order_score = _clamp_10(
+        (layout_score_10 * 0.70)
+        + (visual_score_10 * 0.30)
+        - (issue_pressure * 2.00)
+    )
+
+    hierarchy_penalty = 0.0
+    for code, weight in _HIERARCHY_ISSUE_WEIGHTS.items():
+        hierarchy_penalty += float(weight) * float(counts.get(code, 0))
+    hierarchy_clarity_score = _clamp_10(
+        (consistency_score_10 * 0.65)
+        + (visual_score_10 * 0.35)
+        - min(4.0, hierarchy_penalty * 0.60)
+    )
+
+    visual_avg_score = round(
+        (color_consistency_score + layout_order_score + hierarchy_clarity_score) / 3.0,
+        4,
+    )
+
+    normalized_issue_codes = _normalized_issue_codes(
+        [*list(counts.keys()), *list(issue_codes or [])]
+    )
+    abnormal_tags: List[str] = []
+    if style_drift_ratio >= 0.25:
+        abnormal_tags.append("style_drift_high")
+    if low_contrast_ratio >= 0.25:
+        abnormal_tags.append("contrast_low")
+    if issue_pressure >= 0.35:
+        abnormal_tags.append("visual_issue_pressure_high")
+    if any(code in _LAYOUT_ORDER_ABNORMAL_CODES for code in normalized_issue_codes):
+        abnormal_tags.append("layout_order_risk")
+    if _text_accuracy_failed(text_issue_codes):
+        abnormal_tags.append("accuracy_risk")
+
+    accuracy_gate_passed = (
+        not any(code in _ACCURACY_HARD_FAIL_CODES for code in normalized_issue_codes)
+        and not _text_accuracy_failed(text_issue_codes)
+    )
+
+    return VisualProfessionalScoreResult(
+        color_consistency_score=round(color_consistency_score, 4),
+        layout_order_score=round(layout_order_score, 4),
+        hierarchy_clarity_score=round(hierarchy_clarity_score, 4),
+        visual_avg_score=round(visual_avg_score, 4),
+        accuracy_gate_passed=bool(accuracy_gate_passed),
+        abnormal_tags=sorted(set(abnormal_tags)),
+        diagnostics={
+            "quality_dimensions": {
+                "visual": round(visual_score_10, 4),
+                "layout": round(layout_score_10, 4),
+                "consistency": round(consistency_score_10, 4),
+            },
+            "style_drift_ratio": round(style_drift_ratio, 4),
+            "low_contrast_ratio": round(low_contrast_ratio, 4),
+            "visual_issue_pressure": round(issue_pressure, 4),
+            "hierarchy_penalty": round(hierarchy_penalty, 4),
+            "source_issue_codes": sorted(set(normalized_issue_codes)),
+            "source_text_issue_codes": sorted(set(_normalized_issue_codes(text_issue_codes))),
         },
     )

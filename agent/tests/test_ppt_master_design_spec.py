@@ -1,8 +1,13 @@
-from src.ppt_master_design_spec import choose_render_path
+from src.ppt_master_design_spec import apply_render_paths, build_design_spec, choose_render_path
 
 
-def test_choose_render_path_uses_svg_for_complex_layouts():
-    slide = {"slide_type": "content", "layout_grid": "workflow", "blocks": []}
+def test_choose_render_path_uses_svg_for_complex_layouts_after_structural_failure_marker():
+    slide = {
+        "slide_type": "content",
+        "layout_grid": "workflow",
+        "structural_expression_failure": True,
+        "blocks": [],
+    }
     assert choose_render_path(slide, svg_mode="on") == "svg"
 
 
@@ -16,12 +21,18 @@ def test_choose_render_path_uses_svg_for_complex_chart_subtypes():
                 "data": {"chart_type": "sankey"},
             }
         ],
+        "split_merge_exhausted": True,
     }
     assert choose_render_path(slide, svg_mode="on") == "svg"
 
 
 def test_choose_render_path_uses_svg_for_semantic_complex_slide_type():
-    slide = {"slide_type": "architecture", "layout_grid": "split_2", "blocks": []}
+    slide = {
+        "slide_type": "architecture",
+        "layout_grid": "split_2",
+        "structural_expression_failure": True,
+        "blocks": [],
+    }
     assert choose_render_path(slide, svg_mode="on") == "svg"
 
 
@@ -32,7 +43,7 @@ def test_choose_render_path_uses_svg_for_data_visualization_semantics():
         "layout_grid": "split_2",
         "blocks": [],
     }
-    assert choose_render_path(slide, svg_mode="on") == "svg"
+    assert choose_render_path(slide, svg_mode="on") == "pptxgenjs"
 
 
 def test_choose_render_path_uses_svg_for_infographic_semantics():
@@ -42,7 +53,7 @@ def test_choose_render_path_uses_svg_for_infographic_semantics():
         "layout_grid": "split_2",
         "blocks": [],
     }
-    assert choose_render_path(slide, svg_mode="on") == "svg"
+    assert choose_render_path(slide, svg_mode="on") == "pptxgenjs"
 
 
 def test_choose_render_path_uses_svg_for_extended_chart_subtype():
@@ -55,6 +66,7 @@ def test_choose_render_path_uses_svg_for_extended_chart_subtype():
                 "data": {"chart_type": "wordcloud"},
             }
         ],
+        "split_merge_exhausted": True,
     }
     assert choose_render_path(slide, svg_mode="on") == "svg"
 
@@ -69,3 +81,87 @@ def test_choose_render_path_keeps_cover_summary_on_pptxgenjs():
 def test_choose_render_path_respects_svg_mode_off():
     slide = {"slide_type": "content", "layout_grid": "workflow", "blocks": []}
     assert choose_render_path(slide, svg_mode="off") == "pptxgenjs"
+
+
+def test_choose_render_path_keeps_text_heavy_template_backed_pages_on_pptxgenjs():
+    slide = {
+        "slide_type": "content",
+        "layout_grid": "split_2",
+        "content_density": "high",
+        "template_family": "consulting_warm_light",
+        "blocks": [
+            {"block_type": "title", "content": "Q3 经营复盘"},
+            {"block_type": "body", "content": "A" * 240},
+            {"block_type": "list", "content": ";".join([f"要点{i}" for i in range(10)])},
+            {"block_type": "chart", "data": {"chart_type": "bar"}},
+        ],
+    }
+    assert choose_render_path(slide, svg_mode="on") == "pptxgenjs"
+
+
+def test_choose_render_path_keeps_continuation_pages_on_pptxgenjs():
+    slide = {
+        "slide_type": "content",
+        "layout_grid": "timeline",
+        "continuation_of": "s1",
+        "continuation_index": 2,
+        "continuation_total": 3,
+        "is_continuation": True,
+        "blocks": [{"block_type": "workflow", "content": "A -> B -> C"}],
+    }
+    assert choose_render_path(slide, svg_mode="on") == "pptxgenjs"
+
+
+def test_apply_render_paths_keeps_mixed_deck_template_consistency():
+    slides = [
+        {"slide_type": "cover", "layout_grid": "hero_1", "blocks": []},
+        {
+            "slide_type": "content",
+            "layout_grid": "split_2",
+            "content_density": "high",
+            "template_family": "consulting_warm_light",
+            "blocks": [
+                {"block_type": "title", "content": "Q3 经营复盘"},
+                {"block_type": "body", "content": "A" * 240},
+                {"block_type": "list", "content": ";".join([f"要点{i}" for i in range(10)])},
+            ],
+        },
+        {
+            "slide_type": "architecture",
+            "layout_grid": "architecture",
+            "structural_expression_failure": True,
+            "blocks": [{"block_type": "diagram", "content": "mesh"}],
+        },
+    ]
+
+    applied = apply_render_paths(slides, svg_mode="on")
+
+    assert [slide["render_path"] for slide in applied] == ["pptxgenjs", "pptxgenjs", "svg"]
+
+
+def test_apply_render_paths_preserves_mixed_deck_consistency():
+    slides = [
+        {"slide_type": "cover", "layout_grid": "hero_1", "blocks": []},
+        {
+            "slide_type": "content",
+            "layout_grid": "split_2",
+            "content_density": "high",
+            "template_family": "consulting_warm_light",
+            "blocks": [{"block_type": "list", "content": ";".join([f"要点{i}" for i in range(8)])}],
+        },
+        {
+            "slide_type": "architecture",
+            "layout_grid": "architecture",
+            "structural_expression_failure": True,
+            "blocks": [{"block_type": "diagram", "content": "mesh"}],
+        },
+    ]
+
+    out = apply_render_paths(slides, svg_mode="on")
+
+    assert [slide["render_path"] for slide in out] == ["pptxgenjs", "pptxgenjs", "svg"]
+
+
+def test_build_design_spec_render_policy_keeps_storyline_as_weak_modifier():
+    spec = build_design_spec(template_family="consulting_warm_light")
+    assert "storyline" not in spec["render_policy"]["svg_complex_layouts"]

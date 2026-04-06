@@ -668,3 +668,150 @@ def test_weighted_quality_score_penalizes_visual_issue_pressure():
         },
     )
     assert degraded.score < baseline.score
+
+
+def test_status_report_requires_executive_summary_with_four_items():
+    slides = [
+        {
+            "slide_id": "cover",
+            "slide_type": "cover",
+            "quality_profile": "status_report",
+            "title": "Q3 利润率回升 4 个点",
+            "blocks": [
+                {"block_type": "title", "content": "Q3 利润率回升 4 个点"},
+                {"block_type": "subtitle", "content": "经营汇报"},
+            ],
+        },
+        {
+            "slide_id": "summary",
+            "slide_type": "summary",
+            "quality_profile": "status_report",
+            "title": "执行摘要",
+            "blocks": [
+                {"block_type": "title", "content": "执行摘要"},
+                {"block_type": "body", "content": "现状快照"},
+                {"block_type": "body", "content": "核心问题"},
+                {"block_type": "body", "content": "建议方案"}
+            ],
+        },
+    ]
+    result = validate_deck(slides, profile="status_report")
+    assert result.ok is False
+    assert any(issue.code == "scene_status_report_exec_summary_incomplete" for issue in result.issues)
+
+
+
+def test_investor_pitch_requires_core_modules_coverage():
+    slides = [
+        {
+            "slide_id": "s1",
+            "slide_type": "cover",
+            "quality_profile": "investor_pitch",
+            "title": "AI 招聘助手",
+            "blocks": [{"block_type": "title", "content": "AI 招聘助手"}],
+        },
+        {
+            "slide_id": "s2",
+            "slide_type": "content",
+            "quality_profile": "investor_pitch",
+            "title": "Problem",
+            "blocks": [
+                {"block_type": "title", "content": "Problem"},
+                {"block_type": "body", "content": "招聘效率低"},
+                {"block_type": "image", "content": {"url": "https://example.com/a.png"}},
+            ],
+        },
+    ]
+    result = validate_deck(slides, profile="investor_pitch")
+    assert result.ok is False
+    assert any(issue.code == "scene_investor_pitch_modules_missing" for issue in result.issues)
+
+
+
+def test_training_deck_requires_learning_goals_and_knowledge_map():
+    slides = [
+        {
+            "slide_id": "cover",
+            "slide_type": "cover",
+            "quality_profile": "training_deck",
+            "title": "Python 入门",
+            "blocks": [
+                {"block_type": "title", "content": "Python 入门"},
+                {"block_type": "subtitle", "content": "第一课"},
+            ],
+        },
+        {
+            "slide_id": "content-1",
+            "slide_type": "content",
+            "quality_profile": "training_deck",
+            "title": "变量",
+            "blocks": [
+                {"block_type": "title", "content": "变量"},
+                {"block_type": "body", "content": "变量是可复用的命名容器", "emphasis": ["变量"]},
+                {"block_type": "list", "content": "a = 1"},
+            ],
+        },
+    ]
+    result = validate_deck(slides, profile="training_deck")
+    assert result.ok is False
+    codes = {issue.code for issue in result.issues}
+    assert "scene_training_deck_learning_goals_missing" in codes
+    assert "scene_training_deck_knowledge_map_missing" in codes
+
+
+
+def test_status_report_generic_title_reduces_score_without_hard_fail():
+    baseline = [
+        {
+            "slide_id": "cover",
+            "slide_type": "cover",
+            "quality_profile": "status_report",
+            "title": "Q3 利润率回升 4 个点",
+            "blocks": [
+                {"block_type": "title", "content": "Q3 利润率回升 4 个点"},
+                {"block_type": "subtitle", "content": "经营汇报"},
+            ],
+        },
+        {
+            "slide_id": "summary",
+            "slide_type": "summary",
+            "quality_profile": "status_report",
+            "title": "执行摘要",
+            "blocks": [
+                {"block_type": "title", "content": "执行摘要"},
+                {"block_type": "body", "content": "现状快照"},
+                {"block_type": "body", "content": "核心问题"},
+                {"block_type": "body", "content": "建议方案"},
+                {"block_type": "body", "content": "所需决策"},
+            ],
+        },
+        {
+            "slide_id": "content-1",
+            "slide_type": "content",
+            "quality_profile": "status_report",
+            "layout_grid": "split_2",
+            "title": "Q3 销售同比增长 23%，主要来自华北区",
+            "blocks": [
+                {"block_type": "title", "content": "Q3 销售同比增长 23%，主要来自华北区"},
+                {"block_type": "body", "content": "华北区渠道扩张拉动收入", "emphasis": ["23%"]},
+                {"block_type": "list", "content": "vs 去年 +23%"},
+                {"block_type": "image", "content": {"url": "https://example.com/chart.png"}},
+            ],
+        },
+    ]
+    degraded = [dict(item) for item in baseline]
+    degraded[2] = {
+        **baseline[2],
+        "title": "销售分析",
+        "blocks": [
+            {"block_type": "title", "content": "销售分析"},
+            {"block_type": "body", "content": "华北区渠道扩张拉动收入", "emphasis": ["23%"]},
+            {"block_type": "list", "content": "vs 去年 +23%"},
+            {"block_type": "image", "content": {"url": "https://example.com/chart.png"}},
+        ],
+    }
+    assert validate_deck(degraded, profile="status_report").ok is True
+    good_score = score_deck_quality(slides=baseline, render_spec={"slides": baseline}, profile="status_report")
+    degraded_score = score_deck_quality(slides=degraded, render_spec={"slides": degraded}, profile="status_report")
+    assert degraded_score.score < good_score.score
+    assert degraded_score.diagnostics.get("scene_rule_advisories", {}).get("scene_status_report_title_generic") == 1

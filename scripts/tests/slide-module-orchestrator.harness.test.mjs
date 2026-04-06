@@ -754,6 +754,48 @@ test("renderSlideModulesInParallel preserves visual identity fields when templat
   }
 });
 
+test("renderSlideModulesInParallel injects scene-specific rulebook guidance into subagent prompt", async () => {
+  const workDir = mkdtempSync(path.join(tmpdir(), "slide-module-scene-guidance-"));
+  const modulesDir = path.join(workDir, "slides");
+  try {
+    const payload = buildPayload();
+    payload.slides[1].quality_profile = "training_deck";
+    payload.slides[1].title = "知识点讲解";
+    const { manifest } = writeSlideModules(payload, modulesDir);
+    const prompts = [];
+    const result = await renderSlideModulesInParallel({
+      manifest,
+      maxParallel: 1,
+      targetSlideIds: ["s-content"],
+      enableSubagentExec: true,
+      subagentExecutor: async (taskPayload) => {
+        prompts.push(String(taskPayload?.prompt || ""));
+        return { slide_patch: { title: "知识点讲解" } };
+      },
+      generatorScriptPath: "scripts/generate-pptx-minimax.mjs",
+      outputDir: path.join(workDir, "rendered"),
+      runner: async (_command, args) => {
+        const renderOutputPath = args[args.indexOf("--render-output") + 1];
+        writeFileSync(
+          renderOutputPath,
+          JSON.stringify({
+            slides: [{ slide_id: "s-content", render_path: "pptxgenjs" }],
+            official_output: { slides: [{ slide_id: "s-content", title: "知识点讲解" }] },
+          }),
+          "utf-8",
+        );
+        return { ok: true };
+      },
+    });
+    assert.equal(result.ok, true);
+    assert.equal(prompts.length, 1);
+    assert.match(prompts[0], /Scene rules:/);
+    assert.match(prompts[0], /课程讲义/);
+  } finally {
+    rmSync(workDir, { recursive: true, force: true });
+  }
+});
+
 test("renderSlideModulesInParallel ignores generic subagent title downgrade", async () => {
   const workDir = mkdtempSync(path.join(tmpdir(), "slide-module-subagent-generic-"));
   const modulesDir = path.join(workDir, "slides");

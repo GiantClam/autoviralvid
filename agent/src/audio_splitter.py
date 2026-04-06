@@ -13,6 +13,7 @@ import tempfile
 import logging
 from typing import List, Optional
 from dataclasses import dataclass
+from functools import partial
 
 import httpx
 
@@ -140,6 +141,38 @@ def _upload_bytes_to_r2(data: bytes, key: str, content_type: str = "audio/mpeg")
     return f"https://pub-{account_id}.r2.dev/{key}"
 
 
+def _is_wav_file(path: str) -> bool:
+    try:
+        with open(path, "rb") as f:
+            header = f.read(12)
+        return len(header) >= 12 and header[:4] == b"RIFF" and header[8:12] == b"WAVE"
+    except Exception:
+        return False
+
+
+def _load_audio_segment(path: str):
+    from pydub import AudioSegment
+
+    try:
+        return AudioSegment.from_file(path)
+    except Exception:
+        if _is_wav_file(path):
+            return AudioSegment.from_wav(path)
+        raise
+
+
+def _export_segment_audio(segment_audio, output_base: str) -> tuple[str, str, str]:
+    try:
+        seg_path = f"{output_base}.mp3"
+        segment_audio.export(seg_path, format="mp3", bitrate="192k")
+        return seg_path, "mp3", "audio/mpeg"
+    except Exception as exc:
+        logger.warning("[audio_splitter] MP3 export unavailable, falling back to WAV: %s", exc)
+        seg_path = f"{output_base}.wav"
+        segment_audio.export(seg_path, format="wav")
+        return seg_path, "wav", "audio/wav"
+
+
 async def get_audio_duration(url: str) -> float:
     """
     获取远程音频文件的时长（秒）
@@ -156,7 +189,7 @@ async def get_audio_duration(url: str) -> float:
     try:
         audio_path = os.path.join(tmpdir, "audio_file")
         await _download_audio(url, audio_path)
-        audio = AudioSegment.from_file(audio_path)
+        audio = _load_audio_segment(audio_path)
         duration_s = len(audio) / 1000.0
         logger.info(f"[audio_splitter] Audio duration: {duration_s:.1f}s")
         return duration_s
@@ -232,7 +265,7 @@ async def split_audio(
         # 1. 下载完整音频
         audio_path = os.path.join(tmpdir, "full_audio")
         await _download_audio(url, audio_path)
-        audio = AudioSegment.from_file(audio_path)
+        audio = _load_audio_segment(audio_path)
         total_ms = len(audio)
         total_s = total_ms / 1000.0
 
@@ -291,9 +324,10 @@ async def split_audio(
             segment_audio = audio[start_ms:end_ms]
             duration_s = (end_ms - start_ms) / 1000.0
 
-            # 导出为 mp3
-            seg_path = os.path.join(tmpdir, f"segment_{i}.mp3")
-            segment_audio.export(seg_path, format="mp3", bitrate="192k")
+            seg_path, file_ext, content_type = _export_segment_audio(
+                segment_audio,
+                os.path.join(tmpdir, f"segment_{i}"),
+            )
             seg_size = os.path.getsize(seg_path)
 
             logger.info(
@@ -305,9 +339,10 @@ async def split_audio(
             with open(seg_path, "rb") as f:
                 seg_data = f.read()
 
-            r2_key = f"{run_id}_dh_audio_seg_{i}.mp3"
+            r2_key = f"{run_id}_dh_audio_seg_{i}.{file_ext}"
             seg_url = await asyncio.get_event_loop().run_in_executor(
-                None, _upload_bytes_to_r2, seg_data, r2_key
+                None,
+                partial(_upload_bytes_to_r2, seg_data, r2_key, content_type=content_type),
             )
 
             segments.append(

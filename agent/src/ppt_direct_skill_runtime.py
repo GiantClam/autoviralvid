@@ -23,6 +23,10 @@ from src.ppt_codex_skill_bridge import (
     resolve_skill_roots,
 )
 from src.ppt_master_skill_adapter import execute_ppt_master_skill
+from src.ppt_scene_rulebook import (
+    normalize_scene_rule_profile as normalize_scene_rule_profile,
+    scene_prompt_directives,
+)
 from src.ppt_template_catalog import (
     list_template_ids as catalog_list_template_ids,
     resolve_template_for_slide as catalog_resolve_template_for_slide,
@@ -184,6 +188,15 @@ def _normalize_execution_profile(value: Any) -> str:
     if text in {"prod", "safe", "prod_safe"}:
         return "prod_safe"
     return ""
+
+
+def _resolve_scene_rule_profile(slide: Dict[str, Any], deck: Dict[str, Any], state: Dict[str, Any]) -> str:
+    return (
+        normalize_scene_rule_profile(state.get("quality_profile"))
+        or normalize_scene_rule_profile(slide.get("quality_profile"))
+        or normalize_scene_rule_profile(deck.get("quality_profile"))
+        or ""
+    )
 
 
 def _normalize_skill_key(value: Any) -> str:
@@ -1018,6 +1031,8 @@ def _build_skill_row(skill: str, state: Dict[str, Any], requested_skills: List[s
     palette_key = _normalize_text(state.get("palette_key"), "platinum_white_gold")
     template_family = _normalize_text(state.get("template_family"), "dashboard_dark")
     skill_profile = _normalize_text(state.get("skill_profile"), "general-content")
+    quality_profile = _normalize_text(state.get("quality_profile"), "").lower()
+    scene_directives = scene_prompt_directives(quality_profile, slide_type=slide_type)
 
     if skill == "ppt-orchestra-skill":
         patch.update(
@@ -1037,7 +1052,7 @@ def _build_skill_row(skill: str, state: Dict[str, Any], requested_skills: List[s
             state=state,
         )
         outputs["planning_mode"] = "skill-first"
-        outputs["page_skill_directives"] = _page_skill_directives(slide_type, layout_grid, render_path)
+        outputs["page_skill_directives"] = _page_skill_directives(slide_type, layout_grid, render_path) + scene_directives
         outputs["page_design_intent"] = (
             f"{slide_type} slide using {layout_grid} layout with {render_path} render path; "
             "prioritize readability, single-title hierarchy, and visual consistency."
@@ -1143,6 +1158,7 @@ def execute_direct_skill_runtime(payload: Dict[str, Any]) -> Dict[str, Any]:
 
     if not requested_skills:
         requested_skills = ["ppt-orchestra-skill", "slide-making-skill", "design-style-skill"]
+    scene_rule_profile = _resolve_scene_rule_profile(slide, deck, state)
 
     mode = _normalize_text(os.getenv("PPT_DIRECT_SKILL_RUNTIME_MODE", "builtin"), "builtin").lower()
     if mode in {"codex", "codex-cli", "codex_cli"}:
@@ -1183,6 +1199,8 @@ def execute_direct_skill_runtime(payload: Dict[str, Any]) -> Dict[str, Any]:
         resolved_state["template_family"],
         state,
     )
+    if scene_rule_profile:
+        resolved_state["quality_profile"] = scene_rule_profile
     if execution_profile:
         resolved_state["execution_profile"] = execution_profile
     if force_ppt_master_raw is not None:
@@ -1257,6 +1275,14 @@ def execute_direct_skill_runtime(payload: Dict[str, Any]) -> Dict[str, Any]:
             _normalize_text(resolved_state.get("layout_grid"), "split_2"),
             _normalize_text(resolved_state.get("render_path"), "pptxgenjs"),
         )
+    scene_context_directives = scene_prompt_directives(
+        resolved_state.get("quality_profile"),
+        slide_type=_normalize_text(resolved_state.get("slide_type"), "content"),
+    )
+    if scene_context_directives:
+        context["page_skill_directives"] = list(
+            dict.fromkeys([*(context.get("page_skill_directives") or []), *scene_context_directives])
+        )
     if not context.get("text_constraints"):
         context["text_constraints"] = _text_constraints(
             _normalize_text(resolved_state.get("slide_type"), "content"),
@@ -1273,6 +1299,8 @@ def execute_direct_skill_runtime(payload: Dict[str, Any]) -> Dict[str, Any]:
     merged_patch.setdefault("palette_key", context["palette_key"])
     merged_patch.setdefault("template_family", context["template_family"])
     merged_patch.setdefault("skill_profile", context["skill_profile"])
+    if resolved_state.get("quality_profile"):
+        merged_patch.setdefault("quality_profile", resolved_state["quality_profile"])
     merged_patch.setdefault("load_skills", context["recommended_load_skills"])
 
     return {

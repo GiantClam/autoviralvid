@@ -45,7 +45,7 @@ export function toAST(html: string): AST[] {
   let i = 0;
 
   function parseText(): AST | null {
-    let start = i;
+    const start = i;
     while (i < html.length && html[i] !== '<') i++;
     if (i > start) {
       const text = html.substring(start, i).replace(/&nbsp;/g, ' ')

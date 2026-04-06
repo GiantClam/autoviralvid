@@ -64,6 +64,18 @@ type ApiEnvelope<T> = {
   error?: string | Record<string, unknown>;
 };
 
+function styleNumber(value: unknown, fallback: number): number {
+  return typeof value === "number" ? value : fallback;
+}
+
+function styleString(value: unknown, fallback: string): string {
+  return typeof value === "string" ? value : fallback;
+}
+
+function styleBoolean(value: unknown): boolean {
+  return value === true;
+}
+
 async function apiPost<T>(path: string, body: Record<string, unknown>): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     method: "POST",
@@ -601,46 +613,53 @@ export default function PPTTestPage() {
                       </div>
                     )}
 
-                    {slides[currentSlideIdx]?.elements?.map((el) => (
-                      <div
-                        key={el.id}
-                        data-testid={`preview-element-${el.type}`}
-                        className="absolute overflow-hidden"
-                        style={{
-                          left: `${(el.left / 1920) * 100}%`,
-                          top: `${(el.top / 1080) * 100}%`,
-                          width: `${(el.width / 1920) * 100}%`,
-                          height: `${(el.height / 1080) * 100}%`,
-                          fontSize: `${Math.max(6, ((el.style?.fontSize || 18) / 1920) * 100)}vw`,
-                          fontFamily: el.style?.fontFamily || "sans-serif",
-                          color: el.style?.color || "#333",
-                          fontWeight: el.style?.bold ? "bold" : "normal",
-                        }}
-                      >
-                        {el.type === "text" && (
-                          <div
-                            dangerouslySetInnerHTML={{
-                              __html: (el.content || "")
-                                .replace(/<script[\s\S]*?<\/script>/gi, "")
-                                .replace(/on\w+=/gi, ""),
-                            }}
-                          />
-                        )}
-                        {el.type === "image" && el.src && (
-                          <img src={el.src} className="h-full w-full object-cover" alt="" />
-                        )}
-                        {el.type === "chart" && (
-                          <div className="flex h-full items-center justify-center text-xs text-gray-500">
-                            Chart
-                          </div>
-                        )}
-                        {el.type === "table" && (
-                          <div className="flex h-full items-center justify-center text-xs text-gray-500">
-                            Table
-                          </div>
-                        )}
-                      </div>
-                    ))}
+                    {slides[currentSlideIdx]?.elements?.map((el) => {
+                      const fontSize = styleNumber(el.style?.fontSize, 18);
+                      const fontFamily = styleString(el.style?.fontFamily, "sans-serif");
+                      const color = styleString(el.style?.color, "#333");
+                      const isBold = styleBoolean(el.style?.bold);
+
+                      return (
+                        <div
+                          key={el.id}
+                          data-testid={`preview-element-${el.type}`}
+                          className="absolute overflow-hidden"
+                          style={{
+                            left: `${(el.left / 1920) * 100}%`,
+                            top: `${(el.top / 1080) * 100}%`,
+                            width: `${(el.width / 1920) * 100}%`,
+                            height: `${(el.height / 1080) * 100}%`,
+                            fontSize: `${Math.max(6, (fontSize / 1920) * 100)}vw`,
+                            fontFamily,
+                            color,
+                            fontWeight: isBold ? "bold" : "normal",
+                          }}
+                        >
+                          {el.type === "text" && (
+                            <div
+                              dangerouslySetInnerHTML={{
+                                __html: (el.content || "")
+                                  .replace(/<script[\s\S]*?<\/script>/gi, "")
+                                  .replace(/on\w+=/gi, ""),
+                              }}
+                            />
+                          )}
+                          {el.type === "image" && el.src && (
+                            <img src={el.src} className="h-full w-full object-cover" alt="" />
+                          )}
+                          {el.type === "chart" && (
+                            <div className="flex h-full items-center justify-center text-xs text-gray-500">
+                              Chart
+                            </div>
+                          )}
+                          {el.type === "table" && (
+                            <div className="flex h-full items-center justify-center text-xs text-gray-500">
+                              Table
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
 
                     <div className="absolute bottom-2 right-3 text-xs text-gray-500">
                       {currentSlideIdx + 1}/{slides.length}
@@ -722,5 +741,3 @@ export default function PPTTestPage() {
     </div>
   );
 }
-
-

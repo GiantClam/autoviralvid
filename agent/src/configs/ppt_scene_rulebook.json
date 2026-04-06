@@ -1,0 +1,151 @@
+{
+  "status_report": {
+    "label": "工作汇报",
+    "prompt_guidance": {
+      "shared": {
+        "must": [
+          "每页只传递一个核心观点，避免把两个结论塞进同一页。",
+          "标题写成结论句而非话题词，单页正文尽量控制在 40 字内。"
+        ],
+        "key": [
+          "关键数字给出对比口径（vs 去年 / vs 目标 / vs 行业），并说明原因或影响。",
+          "行动项避免空话，尽量写清谁负责、做什么、何时完成。"
+        ],
+        "bonus": [
+          "优先用真实案例或客户反馈支撑结论，而不是只列抽象分析。"
+        ]
+      },
+      "cover": {
+        "must": [
+          "封面应同时体现项目名、汇报人、日期，以及一句 10 字内核心结论。"
+        ]
+      },
+      "summary": {
+        "must": [
+          "执行摘要页应可独立阅读，覆盖现状快照、核心问题、建议方案、所需决策四项。"
+        ]
+      }
+    },
+    "hard_fail_rules": [
+      {
+        "id": "exec_summary_present",
+        "weight": "must",
+        "machine_checkable": true,
+        "description": "前 3 页内必须出现执行摘要页或等价摘要结构。"
+      },
+      {
+        "id": "exec_summary_complete",
+        "weight": "must",
+        "machine_checkable": true,
+        "description": "执行摘要页至少覆盖 4 个独立信息块。"
+      }
+    ],
+    "advisory_rules": [
+      {
+        "id": "conclusion_title",
+        "weight": "must",
+        "machine_checkable": false,
+        "default_mode": "score",
+        "description": "标题应是结论句而非泛化话题词。"
+      }
+    ]
+  },
+  "investor_pitch": {
+    "label": "融资路演",
+    "prompt_guidance": {
+      "shared": {
+        "must": [
+          "叙事遵循痛苦→希望→证明→邀请，主体模块覆盖 Problem / Solution / Market / Traction / Model / Competition / Team / Ask。",
+          "每页文字尽量控制在 15 字内，重点靠口头表达和大数字视觉完成。"
+        ],
+        "key": [
+          "市场页优先给出 TAM / SAM / SOM 与来源，商业模式页尽量说明单位经济模型。",
+          "Ask 页要明确融资金额、用途分配和 18 个月里程碑。"
+        ],
+        "bonus": [
+          "解决方案页优先用真实产品截图或 Demo 线索，而不是纯文字说明。"
+        ]
+      },
+      "cover": {
+        "must": [
+          "开场 60 秒内先建立痛点或反直觉问题，而不是先讲公司简介。"
+        ]
+      }
+    },
+    "hard_fail_rules": [
+      {
+        "id": "core_modules_present",
+        "weight": "must",
+        "machine_checkable": true,
+        "description": "至少覆盖 Problem、Solution、Market、Traction、Model、Competition、Team、Ask 八类核心模块。"
+      }
+    ],
+    "advisory_rules": [
+      {
+        "id": "hook_present",
+        "weight": "must",
+        "machine_checkable": false,
+        "default_mode": "score",
+        "description": "开场应在 60 秒内建立问题感或痛感。"
+      },
+      {
+        "id": "ask_clarity",
+        "weight": "key",
+        "machine_checkable": true,
+        "default_mode": "score",
+        "description": "Ask 页应同时出现融资金额、用途分配或里程碑中的至少两个要素。"
+      }
+    ]
+  },
+  "training_deck": {
+    "label": "课程讲义",
+    "prompt_guidance": {
+      "shared": {
+        "must": [
+          "每页只讲一个知识点，抽象概念必须配具体例子。",
+          "教学流尽量遵循概念→原理→示例→练习，并让正文大字号、可讲可学。"
+        ],
+        "key": [
+          "步骤型内容用编号，术语首次出现给出定义与记忆钩子。",
+          "每 15 分钟最好安排一次互动、测验或练习。"
+        ],
+        "bonus": [
+          "可补一页知识精华卡或课后速查页，帮助复习。"
+        ]
+      },
+      "cover": {
+        "must": [
+          "封面或开场页应列出 3 条以内可量化学习目标，并说明为什么要学这个主题。"
+        ]
+      },
+      "toc": {
+        "must": [
+          "前 3 页应出现知识地图 / 课程结构总览，帮助学员建立认知框架。"
+        ]
+      }
+    },
+    "hard_fail_rules": [
+      {
+        "id": "measurable_learning_goals_present",
+        "weight": "must",
+        "machine_checkable": true,
+        "description": "前 2 页内必须出现带可量化行为动词的学习目标。"
+      },
+      {
+        "id": "knowledge_map_present",
+        "weight": "must",
+        "machine_checkable": true,
+        "description": "前 4 页内必须出现知识地图 / 课程结构总览。"
+      }
+    ],
+    "advisory_rules": [
+      {
+        "id": "interaction_present",
+        "weight": "key",
+        "machine_checkable": true,
+        "default_mode": "score",
+        "description": "课程中最好包含互动、测验、讨论或练习页。"
+      }
+    ]
+  }
+}

@@ -213,7 +213,7 @@ def build_export_request(
         "visual_priority": True,
         "visual_preset": "tech_cinematic",
         "visual_density": "balanced",
-        "constraint_hardness": "balanced",
+        "constraint_hardness": "strict",
         "svg_mode": "on",
         "template_family": "auto",
     }

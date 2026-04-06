@@ -36,7 +36,7 @@ export interface TemplateStyle {
   overlayOpacity?: number;
 }
 
-export interface VideoTemplateProps {
+export type VideoTemplateProps = Record<string, unknown> & {
   clips: ClipData[];
   subtitles?: SubtitleData[];
   bgmUrl?: string;
@@ -45,7 +45,7 @@ export interface VideoTemplateProps {
   style?: TemplateStyle;
   introText?: string;
   outroText?: string;
-}
+};
 
 // ── Sub-components ──
 

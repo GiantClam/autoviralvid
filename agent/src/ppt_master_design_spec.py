@@ -3,8 +3,14 @@
 from __future__ import annotations
 
 import re
-from typing import Any, Dict, Iterable, List, Set
+from typing import Any, Dict, Iterable, List
 
+from src.ppt_render_path_policy import (
+    DEFAULT_PPTXGENJS_SLIDE_TYPES,
+    SVG_EXCEPTION_BLOCK_TYPES,
+    SVG_EXCEPTION_LAYOUTS,
+    choose_render_path_by_policy,
+)
 from src.ppt_visual_identity import canonicalize_theme_recipe, resolve_style_variant, resolve_tone
 
 
@@ -12,101 +18,6 @@ _LIGHT_TEMPLATE_FAMILIES = {
     "neural_blueprint_light",
     "ops_lifecycle_light",
     "consulting_warm_light",
-}
-
-_COMPLEX_LAYOUTS = {
-    "timeline",
-    "roadmap",
-    "workflow",
-    "swimlane",
-    "matrix_2x2",
-    "matrix_3x3",
-    "architecture",
-    "org_chart",
-    "process_map",
-    "journey_map",
-    "ecosystem_map",
-    "value_chain",
-    "capability_map",
-    "network_map",
-    "infographic_strip",
-    "storyline",
-    "bento_5",
-    "bento_6",
-}
-
-_COMPLEX_BLOCK_TYPES = {
-    "workflow",
-    "diagram",
-    "sankey",
-    "funnel",
-    "matrix",
-    "org_chart",
-    "architecture",
-    "mindmap",
-    "treemap",
-    "heatmap",
-    "gauge",
-    "pyramid",
-    "swot",
-    "process",
-    "relationship",
-    "timeline",
-    "roadmap",
-    "mind_map",
-    "journey",
-    "ecosystem",
-    "value_chain",
-    "capability",
-    "infographic",
-    "data_visualization",
-    "dashboard",
-    "radialbar",
-    "sunburst",
-    "rose",
-    "radar_area",
-    "bubble_map",
-    "choropleth",
-    "marimekko",
-    "mekko",
-    "boxplot",
-    "violin",
-    "candlestick",
-    "wordcloud",
-    "network",
-    "alluvial",
-    "streamgraph",
-    "bullet",
-    "variance",
-    "pareto",
-}
-
-_COMPLEX_CHART_TYPES = {
-    "sankey",
-    "funnel",
-    "waterfall",
-    "treemap",
-    "heatmap",
-    "gauge",
-    "pyramid",
-    "sunburst",
-    "radialbar",
-    "rose",
-    "radar_area",
-    "bubble_map",
-    "choropleth",
-    "marimekko",
-    "mekko",
-    "boxplot",
-    "violin",
-    "candlestick",
-    "wordcloud",
-    "network",
-    "alluvial",
-    "streamgraph",
-    "bullet",
-    "variance",
-    "pareto",
 }
 
 _TEXTUAL_BLOCK_TYPES = {
@@ -142,52 +53,6 @@ _STYLE_BODY_SIZE = {
 }
 
 _CJK_RE = re.compile(r"[\u4e00-\u9fff]")
-_SPLIT_TOKENS_RE = re.compile(r"[\s,;|/]+")
-
-_SEMANTIC_COMPLEX_SLIDE_TYPES = {
-    "timeline",
-    "workflow",
-    "diagram",
-    "architecture",
-    "org_chart",
-    "matrix",
-    "swot",
-    "roadmap",
-    "relationship",
-    "dashboard",
-    "data_visualization",
-    "infographic",
-    "process_map",
-    "journey_map",
-    "ecosystem_map",
-    "value_chain",
-    "capability_map",
-    "network_map",
-    "operating_model",
-    "strategy_map",
-}
-
-_SEMANTIC_COMPLEX_SUBTYPES = {
-    "timeline",
-    "roadmap",
-    "swimlane",
-    "workflow",
-    "process",
-    "diagram",
-    "architecture",
-    "org_chart",
-    "matrix",
-    "swot",
-    "relationship",
-    "journey",
-    "ecosystem",
-    "value_chain",
-    "capability",
-    "network",
-    "infographic",
-    "dashboard",
-    "data_visualization",
-}
 
 
 def _clean_hex(value: Any, fallback: str) -> str:
@@ -220,100 +85,9 @@ def _normalize_tone(value: str) -> str:
     return "auto"
 
 
-def _block_types(slide: Dict[str, Any]) -> Set[str]:
-    out: Set[str] = set()
-    for item in slide.get("blocks") or []:
-        if not isinstance(item, dict):
-            continue
-        t = str(item.get("block_type") or item.get("type") or "").strip().lower()
-        if t:
-            out.add(t)
-    for item in slide.get("elements") or []:
-        if not isinstance(item, dict):
-            continue
-        t = str(item.get("type") or "").strip().lower()
-        if t:
-            out.add(t)
-    return out
-
-
-def _has_complex_chart_subtype(slide: Dict[str, Any]) -> bool:
-    for container in (slide.get("blocks") or [], slide.get("elements") or []):
-        if not isinstance(container, list):
-            continue
-        for item in container:
-            if not isinstance(item, dict):
-                continue
-            btype = str(item.get("block_type") or item.get("type") or "").strip().lower()
-            if btype not in {"chart", "data_visualization"}:
-                continue
-            data = item.get("data")
-            content = item.get("content")
-            if not isinstance(data, dict) and isinstance(content, dict):
-                data = content
-            data = data if isinstance(data, dict) else {}
-            subtype = str(
-                data.get("chart_type")
-                or data.get("type")
-                or item.get("chart_type")
-                or ""
-            ).strip().lower()
-            if subtype in _COMPLEX_CHART_TYPES:
-                return True
-    return False
-
-
-def _semantic_tokens(value: Any) -> Set[str]:
-    text = str(value or "").strip().lower().replace("-", "_")
-    if not text:
-        return set()
-    return {item for item in _SPLIT_TOKENS_RE.split(text) if item}
-
-
-def _collect_semantic_markers(slide: Dict[str, Any]) -> Set[str]:
-    fields = (
-        slide.get("slide_type"),
-        slide.get("type"),
-        slide.get("content_subtype"),
-        slide.get("subtype"),
-        slide.get("semantic_type"),
-        slide.get("semantic_subtype"),
-        slide.get("layout_intent"),
-        slide.get("intent"),
-    )
-    out: Set[str] = set()
-    for item in fields:
-        out |= _semantic_tokens(item)
-    return out
-
-
 def choose_render_path(slide: Dict[str, Any], *, svg_mode: str = "on") -> str:
     """Return per-slide render path: pptxgenjs|svg."""
-    explicit = str(slide.get("render_path") or "").strip().lower()
-    if explicit in {"pptxgenjs", "svg"}:
-        if svg_mode == "off" and explicit == "svg":
-            return "pptxgenjs"
-        return explicit
-
-    slide_type = str(slide.get("slide_type") or "").strip().lower()
-    if slide_type in {"cover", "summary", "toc", "divider", "hero_1"}:
-        return "pptxgenjs"
-    layout = str(slide.get("layout_grid") or slide.get("layout") or "").strip().lower()
-    block_types = _block_types(slide)
-    semantic_markers = _collect_semantic_markers(slide)
-
-    if svg_mode != "off":
-        if layout in _COMPLEX_LAYOUTS:
-            return "svg"
-        if block_types & _COMPLEX_BLOCK_TYPES:
-            return "svg"
-        if _has_complex_chart_subtype(slide):
-            return "svg"
-        if slide_type in _SEMANTIC_COMPLEX_SLIDE_TYPES:
-            return "svg"
-        if semantic_markers & _SEMANTIC_COMPLEX_SUBTYPES:
-            return "svg"
-    return "pptxgenjs"
+    return choose_render_path_by_policy(slide, svg_mode=svg_mode)
 
 
 def apply_render_paths(
@@ -419,8 +193,15 @@ def build_design_spec(
             "light_template": normalized_tone == "light" or family in _LIGHT_TEMPLATE_FAMILIES,
         },
         "render_policy": {
-            "svg_complex_layouts": sorted(_COMPLEX_LAYOUTS),
-            "svg_complex_block_types": sorted(_COMPLEX_BLOCK_TYPES),
+            "default_pptxgenjs_slide_types": sorted(DEFAULT_PPTXGENJS_SLIDE_TYPES),
+            "svg_complex_layouts": sorted(SVG_EXCEPTION_LAYOUTS),
+            "svg_complex_block_types": sorted(SVG_EXCEPTION_BLOCK_TYPES),
             "textual_block_types": sorted(_TEXTUAL_BLOCK_TYPES),
+            "forbidden_svg_triggers": [
+                "density_only",
+                "template_fallback_available",
+                "split_or_merge_already_applied",
+                "split_merge_not_exhausted",
+            ],
         },
     }

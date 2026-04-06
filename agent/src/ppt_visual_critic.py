@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 
+from src.ppt_render_path_policy import allow_visual_critic_svg_fallback
 
 def _slide_id(slide: Dict[str, Any], index: int) -> str:
     value = slide.get("slide_id") or slide.get("id") or slide.get("page_number")
@@ -79,7 +80,7 @@ def _collect_issue_codes_by_slide(
     return codes_by_slide
 
 
-def _derive_actions(issue_codes: List[str]) -> Dict[str, Any]:
+def _derive_actions(issue_codes: List[str], slide: Dict[str, Any]) -> Dict[str, Any]:
     codes = {str(item or "").strip().lower() for item in issue_codes if str(item or "").strip()}
     actions: Dict[str, Any] = {
         "layout_grid": "",
@@ -130,7 +131,7 @@ def _derive_actions(issue_codes: List[str]) -> Dict[str, Any]:
         actions["ensure_chart_block"] = True
         actions["semantic_constraints_patch"]["chart_required"] = True
 
-    if {"card_overlap", "visual_card_overlap_ratio_high"} & codes and not actions["render_path"]:
+    if allow_visual_critic_svg_fallback(slide, list(codes)) and not actions["render_path"]:
         actions["render_path"] = "svg"
 
     return actions
@@ -155,10 +156,16 @@ def build_visual_critic_patch(
         gate_issues=gate_issues,
         slides=slides,
     )
+    slide_by_id: Dict[str, Dict[str, Any]] = {
+        _slide_id(slide, idx): slide
+        for idx, slide in enumerate(slides)
+        if isinstance(slide, dict)
+    }
     target_rows: List[Dict[str, Any]] = []
     for sid in target_ids[: max(1, int(max_target_slides))]:
         codes = issue_codes_by_slide.get(sid, [])
-        actions = _derive_actions(codes)
+        source_slide = slide_by_id.get(sid, {})
+        actions = _derive_actions(codes, source_slide if isinstance(source_slide, dict) else {})
         target_rows.append(
             {
                 "slide_id": sid,
@@ -320,6 +327,17 @@ def apply_visual_critic_patch(
             slide_changed = True
 
         if slide_changed:
+            visual = slide.get("visual")
+            if not isinstance(visual, dict):
+                visual = {}
+                slide["visual"] = visual
+            prior = visual.get("critic_repair")
+            critic_repair = dict(prior) if isinstance(prior, dict) else {}
+            critic_repair["enabled"] = True
+            critic_repair["issue_codes"] = list(row.get("issue_codes") or [])
+            visual["critic_repair"] = critic_repair
+
+        if slide_changed:
             updated_slide_ids.append(sid)
 
     return {
@@ -329,4 +347,3 @@ def apply_visual_critic_patch(
         "inserted_elements": inserted_elements,
         "target_count": len(target_map),
     }
-

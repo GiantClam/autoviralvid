@@ -12,11 +12,19 @@ import temml from 'temml';
 // mathml2omml 使用动态导入以支持可选依赖
 let _mml2omml: ((mathml: string) => string) | null = null;
 
+type MathMl2OmmlModule = {
+  mml2omml?: (mathml: string) => string;
+  default?: (mathml: string) => string;
+};
+
 async function getMml2omml(): Promise<(mathml: string) => string> {
   if (_mml2omml) return _mml2omml;
   try {
-    const mod = await import('mathml2omml');
-    _mml2omml = (mod as any).mml2omml || (mod as any).default || mod;
+    const mod = await import('mathml2omml') as MathMl2OmmlModule;
+    _mml2omml = mod.mml2omml || mod.default || null;
+    if (!_mml2omml) {
+      throw new Error('mathml2omml module has no callable export');
+    }
     return _mml2omml!;
   } catch {
     throw new Error('mathml2omml is not installed. Run: npm install mathml2omml');

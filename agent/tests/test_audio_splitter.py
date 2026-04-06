@@ -71,7 +71,7 @@ def _make_audio_with_speech_and_silence(
     return combined
 
 
-def _export_to_temp(audio, fmt="mp3") -> str:
+def _export_to_temp(audio, fmt="wav") -> str:
     """将 AudioSegment 导出到临时文件，返回路径"""
     tmp = tempfile.NamedTemporaryFile(suffix=f".{fmt}", delete=False)
     audio.export(tmp.name, format=fmt)

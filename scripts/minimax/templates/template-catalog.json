@@ -114,6 +114,7 @@
     "craft_artisan": ["7F5539", "A68A64", "EDE0D4", "656D4A", "414833"],
     "tech_night": ["000814", "001D3D", "003566", "FFC300", "FFD60A"],
     "education_charts": ["264653", "2A9D8F", "E9C46A", "F4A261", "E76F51"],
+    "education_office_classic": ["1F497D", "4F81BD", "C0504D", "9BBB59", "8064A2"],
     "forest_eco": ["DAD7CD", "A3B18A", "588157", "3A5A40", "344E41"],
     "elegant_fashion": ["EDAFB8", "F7E1D7", "DEDBD2", "B0C4B1", "4A5759"],
     "art_food": ["335C67", "FFF3B0", "E09F3E", "9E2A2B", "540B0E"],
@@ -126,7 +127,7 @@
   "palette_keywords": {
     "科技|AI|人工智能|cloud|tech": "pure_tech_blue",
     "金融|投资|财务|fintech|finance": "business_authority",
-    "教育|培训|学术|education": "education_charts",
+    "教育|培训|学术|education": "education_office_classic",
     "医疗|健康|医药|health": "modern_wellness",
     "环保|ESG|绿色|sustainability|eco": "forest_eco",
     "品牌|发布会|launch|premium|高端": "platinum_white_gold",
@@ -259,7 +260,7 @@
     },
     "chart_or_kpi_required": {
       "required_block_types": ["title"],
-      "required_one_of_groups": [["body", "list"], ["chart", "kpi"]],
+      "required_one_of_groups": [["body", "list"], ["chart", "kpi", "table"]],
       "min_text_blocks": 2,
       "min_visual_blocks": 1,
       "visual_anchor_types": ["chart", "kpi", "table"],
@@ -563,6 +564,29 @@
       "forbid_duplicate_text": true,
       "forbid_title_echo": true,
       "require_image_url": true,
+      "orchestration": {
+        "require_image_anchor": false,
+        "family_convergence": {
+          "enabled": true,
+          "only_when_deck_template_auto": false,
+          "default_family": "education_textbook_light",
+          "layout_to_family": {
+            "split_2": "education_textbook_light",
+            "asymmetric_2": "education_textbook_light",
+            "timeline": "education_textbook_light",
+            "grid_3": "education_textbook_light",
+            "grid_4": "education_textbook_light"
+          },
+          "lock_after_apply": true,
+          "skip_slide_types": ["cover", "summary", "toc", "divider", "hero_1"]
+        },
+        "theme_cohesion": {
+          "enabled": true,
+          "preferred_tone": "light",
+          "content_only": true,
+          "apply_to_terminal": false
+        }
+      },
       "layout_max_type_ratio": 0.38,
       "layout_max_top2_ratio": 0.63,
       "layout_max_adjacent_repeat": 1,
@@ -821,6 +845,22 @@
         "supported_slide_types": ["content", "comparison", "data"],
         "supported_layouts": ["split_2", "asymmetric_2", "grid_3"],
         "supported_block_types": ["title", "comparison", "body", "list", "quote", "kpi", "chart", "table", "icon_text"],
+        "density_range": { "min": "sparse", "max": "balanced", "recommended": "balanced" },
+        "visual_anchor_capacity": 1,
+        "data_block_capacity": 2
+      }
+    },
+    "education_textbook_light": {
+      "skill_profile": "education-textbook",
+      "hardness_profile": "balanced",
+      "schema_profile": "ppt-template/v2-education-textbook",
+      "contract_profile": "default",
+      "quality_profile": "training_deck",
+      "header_style": "underline-light",
+      "capabilities": {
+        "supported_slide_types": ["content", "data", "comparison", "summary", "timeline"],
+        "supported_layouts": ["split_2", "asymmetric_2", "grid_3", "grid_4", "timeline"],
+        "supported_block_types": ["title", "body", "list", "quote", "chart", "kpi", "table", "comparison", "workflow"],
         "density_range": { "min": "sparse", "max": "balanced", "recommended": "balanced" },
         "visual_anchor_capacity": 1,
         "data_block_capacity": 2

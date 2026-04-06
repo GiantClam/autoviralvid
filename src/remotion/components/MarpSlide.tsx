@@ -88,7 +88,7 @@ ${markdown}`;
 
     try {
       return marp.render(fullMd);
-    } catch (e) {
+    } catch {
       return {
         html: `<section class="marpit"><div style="padding:40px;color:#333"><h1>Error</h1><pre>${markdown.substring(0, 200)}</pre></div></section>`,
         css: '',

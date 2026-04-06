@@ -40,18 +40,6 @@ export function buildSlideSvg(sourceSlide, theme = {}, width = 1600, height = 90
   ].join("");
 }
 
-function splitTitleLines(title = "", maxChars = 16) {
-  const text = String(title || "").trim();
-  if (!text) return ["", ""];
-  const parts = text.split(/[：:]/).map((item) => item.trim()).filter(Boolean);
-  if (parts.length >= 2) {
-    return [parts[0], parts.slice(1).join("：")];
-  }
-  if (text.length <= maxChars) return [text, ""];
-  const midpoint = Math.ceil(text.length / 2);
-  return [text.slice(0, midpoint).trim(), text.slice(midpoint).trim()];
-}
-
 function cleanHex(value, fallback = "FFFFFF") {
   const raw = String(value || "").replace("#", "").trim();
   return /^[0-9a-fA-F]{6}$/.test(raw) ? raw.toUpperCase() : fallback;
@@ -62,18 +50,8 @@ export function buildTerminalPageSvg(kind, payload = {}, theme = {}, width = 128
   const secondary = cleanHex(theme.secondary || theme.accentStrong, "0076A8");
   const accent = cleanHex(theme.accentStrong || theme.accent, "F5A623");
   const bg = cleanHex(theme.white || theme.bg, kind === "toc" ? "F7F8FA" : "FFFFFF");
-  const panelBg = cleanHex(theme.cardBg || theme.white || "F8F9FA", "F8F9FA");
-  const text = cleanHex(theme.darkText, kind === "toc" ? "2C3E50" : "2C3E50");
   const muted = cleanHex(theme.mutedText, "7F8C8D");
-  const title = String(payload.title || "").trim();
-  const subtitle = String(payload.subtitle || "").trim();
-  const titleLines = splitTitleLines(title, 16);
   const sections = Array.isArray(payload.sections) ? payload.sections.slice(0, 6).map((item) => String(item || "").trim()).filter(Boolean) : [];
-  const bullets = Array.isArray(payload.bullets) ? payload.bullets.slice(0, 4).map((item) => String(item || "").trim()).filter(Boolean) : [];
-  const footerLabel = String(payload.footerLabel || "").trim();
-  const pageLabel = String(payload.pageLabel || "").trim();
-  const focus = String(payload.focus || "").trim();
-
   if (kind === "cover") {
     return [
       `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}">`,

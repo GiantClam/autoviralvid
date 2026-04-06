@@ -30,6 +30,24 @@ interface PPTPreviewProps {
   onIndexChange?: (index: number) => void;
 }
 
+function styleNumber(value: unknown, fallback: number): number {
+  return typeof value === "number" ? value : fallback;
+}
+
+function styleString(value: unknown, fallback: string): string {
+  return typeof value === "string" ? value : fallback;
+}
+
+function styleBoolean(value: unknown): boolean {
+  return value === true;
+}
+
+function styleObjectFit(value: unknown): React.CSSProperties["objectFit"] {
+  return value === "contain" || value === "cover" || value === "fill" || value === "none" || value === "scale-down"
+    ? value
+    : "cover";
+}
+
 export default function PPTPreview({
   slides,
   currentIndex: controlledIndex,
@@ -152,19 +170,25 @@ function PreviewElement({ element }: { element: SlideElement }) {
 
   switch (element.type) {
     case "text":
+      {
+        const fontSize = styleNumber(element.style?.fontSize, 18);
+        const fontFamily = styleString(element.style?.fontFamily, "sans-serif");
+        const color = styleString(element.style?.color, "#333");
+        const isBold = styleBoolean(element.style?.bold);
       return (
         <div
           style={{
             ...baseStyle,
-            fontSize: `clamp(8px, ${((element.style?.fontSize || 18) / 1920) * 100}vw, ${element.style?.fontSize || 18}px)`,
-            fontFamily: element.style?.fontFamily || "sans-serif",
-            color: element.style?.color || "#333",
-            fontWeight: element.style?.bold ? "bold" : "normal",
+            fontSize: `clamp(8px, ${(fontSize / 1920) * 100}vw, ${fontSize}px)`,
+            fontFamily,
+            color,
+            fontWeight: isBold ? "bold" : "normal",
             lineHeight: 1.5,
           }}
           dangerouslySetInnerHTML={{ __html: sanitizeHtml(element.content || "") }}
         />
       );
+      }
 
     case "image":
       if (!element.src) {
@@ -178,7 +202,7 @@ function PreviewElement({ element }: { element: SlideElement }) {
       return (
         <img
           src={element.src}
-          style={{ ...baseStyle, objectFit: element.style?.objectFit || "cover" }}
+          style={{ ...baseStyle, objectFit: styleObjectFit(element.style?.objectFit) }}
           alt=""
         />
       );
@@ -207,5 +231,4 @@ function PreviewElement({ element }: { element: SlideElement }) {
       return null;
   }
 }
-
 

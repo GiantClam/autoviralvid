@@ -5,6 +5,44 @@ from types import SimpleNamespace
 from src import ppt_service
 
 
+def test_relaxed_quality_issue_codes_keep_accuracy_hard_fails_strict():
+    relaxed = ppt_service._relaxed_quality_issue_codes(
+        route_mode="fast",
+        quality_profile="lenient_draft",
+        use_reference_reconstruct=True,
+        requested_execution_profile="prod_safe",
+        include_template_switch_relaxation=True,
+    )
+    assert "placeholder_kpi_data" not in relaxed
+    assert "placeholder_chart_data" not in relaxed
+    assert "placeholder_pollution" not in relaxed
+    assert "layout_homogeneous" in relaxed
+
+
+def test_relaxed_quality_issue_codes_disabled_in_dev_strict():
+    relaxed = ppt_service._relaxed_quality_issue_codes(
+        route_mode="fast",
+        quality_profile="lenient_draft",
+        use_reference_reconstruct=True,
+        requested_execution_profile="dev_strict",
+        include_template_switch_relaxation=True,
+    )
+    assert relaxed == set()
+
+
+def test_relaxed_quality_issue_codes_export_mode_keeps_previous_scope():
+    relaxed = ppt_service._relaxed_quality_issue_codes(
+        route_mode="fast",
+        quality_profile="lenient_draft",
+        use_reference_reconstruct=False,
+        requested_execution_profile="prod_safe",
+        include_template_switch_relaxation=False,
+    )
+    assert "template_family_switch_frequent" not in relaxed
+    assert "template_family_abab_repeat" not in relaxed
+    assert "template_family_homogeneous" in relaxed
+
+
 def test_requested_skills_for_slide_uses_deck_template_family_when_slide_missing():
     skills = ppt_service._requested_skills_for_slide(
         {"slide_type": "content", "layout_grid": "split_2", "render_path": "pptxgenjs"},
@@ -818,6 +856,51 @@ def test_resolve_execution_profile_for_runtime_defaults_to_dev_strict(monkeypatc
     assert ppt_service._resolve_execution_profile_for_runtime("auto") == "dev_strict"
     monkeypatch.setenv("PPT_DEFAULT_EXECUTION_PROFILE", "prod_safe")
     assert ppt_service._resolve_execution_profile_for_runtime("auto") == "prod_safe"
+
+
+def test_visual_contract_block_uses_table_for_education_without_numeric_values():
+    block = ppt_service._make_visual_contract_block(
+        preferred_types=["chart", "image", "table"],
+        keypoints=["国际关系的交汇点", "制度接口的主要类型", "课堂案例与证据"],
+        numeric_values=[],
+        prefer_zh=True,
+        semantic_text="高中课堂 教学 课程 国际关系 制度 案例",
+        card_id="visual_anchor",
+        position="right",
+    )
+    assert block.get("block_type") == "table"
+    rows = (block.get("data") or {}).get("table_rows")
+    assert isinstance(rows, list) and len(rows) >= 2
+
+
+def test_layout_solver_underflow_adds_table_not_image_when_no_visual_anchor():
+    slides = [
+        {
+            "slide_id": "s1",
+            "slide_type": "content",
+            "layout_grid": "split_2",
+            "title": "课堂重点",
+            "blocks": [
+                {"block_type": "title", "content": "课堂重点"},
+                {"block_type": "body", "content": "关键概念与案例"},
+            ],
+        }
+    ]
+    contract_rows = [
+        {
+            "slide_id": "s1",
+            "layout_solution": {
+                "status": "underflow",
+                "underflow_actions": ["add_visual_anchor"],
+                "overflow_actions": [],
+            },
+        }
+    ]
+    summary = ppt_service._apply_layout_solution_actions(slides, contract_rows)
+    assert summary.get("updated_slides") == 1
+    block_types = [str((block or {}).get("block_type") or "") for block in slides[0].get("blocks") or []]
+    assert "table" in block_types
+    assert "image" not in block_types
 
 
 def test_collect_image_asset_issues_detects_placeholder_and_missing():

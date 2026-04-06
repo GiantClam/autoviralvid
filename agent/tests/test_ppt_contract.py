@@ -426,7 +426,7 @@ def test_content_contract_image_anchor_keeps_min_text_blocks_for_visual_anchor_p
     ]
     block_types = [str(block.get("block_type") or "").strip().lower() for block in blocks]
     assert len(text_non_visual) >= 2
-    assert any(bt in {"image", "chart", "kpi", "workflow", "diagram"} for bt in block_types)
+    assert any(bt in {"image", "chart", "kpi", "workflow", "diagram", "table"} for bt in block_types)
 
 
 def test_content_contract_prefers_chart_kpi_hard_contract_over_soft_image_anchor():

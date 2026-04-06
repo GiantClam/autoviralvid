@@ -34,6 +34,7 @@ html {
 body {
   background: var(--color-background);
   color: var(--color-text);
+  font-family: "Plus Jakarta Sans", Inter, "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
 }
 
 body,

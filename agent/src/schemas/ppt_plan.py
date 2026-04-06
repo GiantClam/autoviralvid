@@ -35,6 +35,8 @@ BlockType = Literal[
     "list",
     "quote",
     "table",
+    "workflow",
+    "diagram",
 ]
 
 PositionType = Literal[

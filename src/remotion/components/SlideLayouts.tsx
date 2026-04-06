@@ -57,7 +57,7 @@ function getTextColor(bg?: string): string {
 
 // ── 交错入场动画 ───────────────────────────────────────────────────
 
-function useStagger(index: number, totalItems: number) {
+function useStagger(index: number) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const delay = Math.round(index * 0.15 * fps);
@@ -66,6 +66,50 @@ function useStagger(index: number, totalItems: number) {
     opacity: interpolate(progress, [0, 1], [0, 1], { extrapolateRight: 'clamp' }),
     translateY: interpolate(progress, [0, 1], [20, 0], { extrapolateRight: 'clamp' }),
   };
+}
+
+function StaggeredTextRow({ text, emphasisWords, style, prefix = '', index }: {
+  text: string;
+  emphasisWords: string[];
+  style: React.CSSProperties;
+  prefix?: string;
+  index: number;
+}) {
+  const anim = useStagger(index);
+  return (
+    <div style={{
+      ...style,
+      opacity: anim.opacity,
+      transform: `translateY(${anim.translateY}px)`,
+    }}>
+      <HighlightText text={`${prefix}${text}`} emphasisWords={emphasisWords} style={{ color: style.color || COLORS.text }} />
+    </div>
+  );
+}
+
+function ComparisonColumn({ title, items, color, emphasisWords }: {
+  title: string;
+  items: string[];
+  color: string;
+  emphasisWords: string[];
+}) {
+  return (
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+      <div style={{ backgroundColor: color, borderRadius: 8, padding: '10px 16px', marginBottom: 16 }}>
+        <div style={{ fontSize: 20, fontWeight: 700, color: COLORS.white }}>{title}</div>
+      </div>
+      {items.map((item, index) => (
+        <StaggeredTextRow
+          key={`${title}-${index}`}
+          text={item}
+          emphasisWords={emphasisWords}
+          prefix="✓ "
+          index={index}
+          style={{ fontSize: 18, color: COLORS.text, padding: '6px 0', lineHeight: 1.5 }}
+        />
+      ))}
+    </div>
+  );
 }
 
 // ── 文本高亮组件 ───────────────────────────────────────────────────
@@ -100,7 +144,7 @@ function HighlightText({ text, emphasisWords, style }: {
 // ── 封面布局 ───────────────────────────────────────────────────────
 
 export function CoverLayout({ content }: { content: VisualContent }) {
-  const anim = useStagger(0, 3);
+  const anim = useStagger(0);
   const isDark = content.bgStyle === 'dark' || content.bgStyle === 'gradient';
 
   return (
@@ -171,19 +215,16 @@ export function BulletPointsLayout({ content, emphasisWords }: {
         }} />
         {/* 要点列表 */}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {items.map((item, i) => {
-            const anim = useStagger(i, items.length);
-            return (
-              <div key={i} style={{
-                fontSize: 20, lineHeight: 1.5,
-                opacity: anim.opacity, transform: `translateY(${anim.translateY}px)`,
-                paddingLeft: 8,
-              }}>
-                <HighlightText text={`• ${item}`} emphasisWords={emphasisWords}
-                  style={{ color: getTextColor(content.bgStyle) }} />
-              </div>
-            );
-          })}
+          {items.map((item, index) => (
+            <StaggeredTextRow
+              key={index}
+              text={item}
+              emphasisWords={emphasisWords}
+              prefix="• "
+              index={index}
+              style={{ fontSize: 20, lineHeight: 1.5, paddingLeft: 8, color: getTextColor(content.bgStyle) }}
+            />
+          ))}
         </div>
         {/* 右侧高亮数据 */}
         {emphasisWords.length > 0 && (
@@ -230,40 +271,19 @@ export function ComparisonLayout({ content, emphasisWords }: {
           }}>
             <div style={{ fontSize: 20, fontWeight: 700, color: COLORS.white }}>{comp.leftTitle}</div>
           </div>
-          {comp.leftItems.map((item, i) => {
-            const anim = useStagger(i, comp.leftItems.length);
-            return (
-              <div key={i} style={{
-                fontSize: 18, color: COLORS.text, padding: '6px 0', lineHeight: 1.5,
-                opacity: anim.opacity, transform: `translateY(${anim.translateY}px)`,
-              }}>
-                <HighlightText text={`✓ ${item}`} emphasisWords={emphasisWords}
-                  style={{ color: COLORS.text }} />
-              </div>
-            );
-          })}
+          {comp.leftItems.map((item, index) => (
+            <StaggeredTextRow
+              key={`left-${index}`}
+              text={item}
+              emphasisWords={emphasisWords}
+              prefix="✓ "
+              index={index}
+              style={{ fontSize: 18, color: COLORS.text, padding: '6px 0', lineHeight: 1.5 }}
+            />
+          ))}
         </div>
         {/* 右栏 */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-          <div style={{
-            backgroundColor: COLORS.accent, borderRadius: 8,
-            padding: '10px 16px', marginBottom: 16,
-          }}>
-            <div style={{ fontSize: 20, fontWeight: 700, color: COLORS.white }}>{comp.rightTitle}</div>
-          </div>
-          {comp.rightItems.map((item, i) => {
-            const anim = useStagger(i, comp.rightItems.length);
-            return (
-              <div key={i} style={{
-                fontSize: 18, color: COLORS.text, padding: '6px 0', lineHeight: 1.5,
-                opacity: anim.opacity, transform: `translateY(${anim.translateY}px)`,
-              }}>
-                <HighlightText text={`✓ ${item}`} emphasisWords={emphasisWords}
-                  style={{ color: COLORS.text }} />
-              </div>
-            );
-          })}
-        </div>
+        <ComparisonColumn title={comp.rightTitle} items={comp.rightItems} color={COLORS.accent} emphasisWords={emphasisWords} />
       </div>
     </AbsoluteFill>
   );
@@ -281,7 +301,7 @@ export function QuoteLayout({ content, emphasisWords }: {
       ...getBgStyle('dark'), display: 'flex', flexDirection: 'column',
       justifyContent: 'center', alignItems: 'center', padding: '0 120px',
     }}>
-      <div style={{ fontSize: 64, color: COLORS.accent, marginBottom: -20, opacity: 0.6 }}>"</div>
+      <div style={{ fontSize: 64, color: COLORS.accent, marginBottom: -20, opacity: 0.6 }}>“</div>
       <div style={{ fontSize: 32, color: COLORS.white, textAlign: 'center', lineHeight: 1.6 }}>
         <HighlightText text={text} emphasisWords={emphasisWords}
           style={{ color: COLORS.white }} />
@@ -300,7 +320,7 @@ export function QuoteLayout({ content, emphasisWords }: {
 // ── 大数字布局 ─────────────────────────────────────────────────────
 
 export function BigNumberLayout({ content }: { content: VisualContent }) {
-  const anim = useStagger(0, 3);
+  const anim = useStagger(0);
   const bn = content.bigNumber;
 
   return (
@@ -342,18 +362,16 @@ export function SplitImageLayout({ content, emphasisWords, imagePos = 'left' }: 
   const items = content.bodyText || [];
   const textBlock = (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '0 40px', gap: 10 }}>
-      {items.map((item, i) => {
-        const anim = useStagger(i, items.length);
-        return (
-          <div key={i} style={{
-            fontSize: 18, lineHeight: 1.5,
-            opacity: anim.opacity, transform: `translateY(${anim.translateY}px)`,
-          }}>
-            <HighlightText text={`• ${item}`} emphasisWords={emphasisWords}
-              style={{ color: getTextColor(content.bgStyle) }} />
-          </div>
-        );
-      })}
+      {items.map((item, index) => (
+        <StaggeredTextRow
+          key={index}
+          text={item}
+          emphasisWords={emphasisWords}
+          prefix="• "
+          index={index}
+          style={{ fontSize: 18, lineHeight: 1.5, color: getTextColor(content.bgStyle) }}
+        />
+      ))}
     </div>
   );
 

@@ -124,23 +124,12 @@ function stripBoilerplatePrefix(text) {
     .trim();
 }
 
-function semanticFallbackBullets({ base = "", preferZh = true, max = 8 }) {
+function semanticFallbackBullets({ base = "", max = 8 }) {
   const topic = stripBoilerplatePrefix(base) || String(base || "").trim();
-  const zhSeeds = ["背景", "机制", "关键环节", "影响", "案例", "启示", "结论", "行动建议"];
-  const enSeeds = ["Background", "Mechanism", "Key Steps", "Impact", "Case", "Insight", "Conclusion", "Action"];
-  const seeds = preferZh ? zhSeeds : enSeeds;
-  const out = [];
-  const used = new Set();
-  for (let i = 0; i < max; i += 1) {
-    const seed = seeds[i % seeds.length];
-    const item = topic ? (preferZh ? `${topic}${seed}` : `${seed}: ${topic}`) : seed;
-    const key = normalizeTextKey(item);
-    if (!key || used.has(key)) continue;
-    used.add(key);
-    out.push(item);
-    if (out.length >= max) break;
-  }
-  return out;
+  if (!topic) return [];
+  const pieces = splitText(topic, max).map((item) => stripBoilerplatePrefix(item)).filter(Boolean);
+  if (pieces.length) return pieces.slice(0, max);
+  return [truncate(topic, Math.max(12, max * 4))];
 }
 
 function semanticSequenceLabel({
@@ -158,16 +147,8 @@ function semanticSequenceLabel({
     return truncate(stripBoilerplatePrefix(text) || text, maxChars);
   }
   const cleanedBase = stripBoilerplatePrefix(fallbackBase);
-  const seeds = preferZh
-    ? ["背景", "机制", "关键点", "影响", "结论"]
-    : ["Background", "Mechanism", "Key Point", "Impact", "Conclusion"];
-  const seed = seeds[Math.max(0, Number(index) || 0) % seeds.length];
-  if (cleanedBase) {
-    return preferZh
-      ? truncate(`${cleanedBase}${seed}`, maxChars)
-      : truncate(`${seed}: ${cleanedBase}`, maxChars);
-  }
-  return truncate(seed, maxChars);
+  if (cleanedBase) return truncate(cleanedBase, maxChars);
+  return truncate(preferZh ? `要点${Number(index) + 1}` : `Point ${Number(index) + 1}`, maxChars);
 }
 
 function pickSecondaryHeading(primary, points = [], fallback = "Focus") {
@@ -211,7 +192,6 @@ function safeBulletsFromArgs(args, max = 12) {
   const explicit = Array.isArray(args?.bullets) ? args.bullets : [];
   const sourceSlide = args?.sourceSlide && typeof args.sourceSlide === "object" ? args.sourceSlide : {};
   const blocks = Array.isArray(sourceSlide.blocks) ? sourceSlide.blocks : [];
-  const preferZh = inferPreferZh(sourceSlide, explicit);
   const fromBlocks = blocks
     .filter((block) => ["body", "list", "quote", "icon_text", "subtitle"].includes(blockType(block)))
     .flatMap((block) => splitText(blockText(block), 4));
@@ -231,7 +211,6 @@ function safeBulletsFromArgs(args, max = 12) {
     const fallbackBase = stripBoilerplatePrefix(String(sourceSlide?.title || sourceSlide?.slide_id || "").trim());
     const generated = semanticFallbackBullets({
       base: fallbackBase,
-      preferZh,
       max: Math.max(3, max),
     });
     for (const item of generated) {
@@ -467,6 +446,33 @@ function addSlideText(slide, text, rect, options = {}) {
     margin: 0,
     fit: options.fit || "shrink",
     breakLine: options.breakLine === true,
+  });
+}
+
+function addCanonicalLightHeader(slide, title, theme, helpers, options = {}) {
+  const { FONT_ZH } = helpers;
+  const headerY = Number(options.y) || 0.56;
+  const accent = String(options.accent || theme.primary || "2F67E8");
+  const titleText = truncate(String(title || "").trim(), 44);
+  if (!titleText) return;
+  slide.addShape("line", {
+    x: 0.62,
+    y: headerY - 0.12,
+    w: 0.86,
+    h: 0,
+    line: { color: accent, pt: 2.2 },
+  });
+  addSlideText(slide, titleText, {
+    x: 0.78,
+    y: headerY,
+    w: 8.0,
+    h: 0.3,
+  }, {
+    fontFace: FONT_ZH,
+    fontSize: 20,
+    bold: true,
+    color: theme.darkText || accent,
+    maxChars: 44,
   });
 }
 
@@ -799,6 +805,8 @@ function renderNeuralBlueprintLightTemplate(slide, bullets, pageNumber, theme, s
   const accent = "2F67E8";
   const points = safeBulletsFromArgs({ bullets, sourceSlide }, 8);
 
+  addCanonicalLightHeader(slide, sourceSlide?.title || points[0] || sourceSlide?.slide_id, { ...theme, darkText: text }, helpers, { accent });
+
   addPanel(slide, spec.left, theme, { radius: spec.left.radius, fill: bgCard, transparency: 0, border, pt: 0.6 });
   for (let i = 0; i < 6; i += 1) {
     const col = i % 2;
@@ -886,10 +894,17 @@ function renderOpsLifecycleLightTemplate(slide, bullets, pageNumber, theme, styl
   const accent = "2F67E8";
   const points = safeBulletsFromArgs({ bullets, sourceSlide }, 10);
 
+  addCanonicalLightHeader(slide, sourceSlide?.title || points[0] || sourceSlide?.slide_id, { ...theme, darkText: text }, helpers, { accent });
+
   const preferZh = inferPreferZh(sourceSlide, points);
   const titleBase = truncate(sourceSlide?.title || sourceSlide?.slide_id || (preferZh ? "主题" : "Topic"), 24);
-  const titleSeeds = preferZh ? ["背景", "机制", "要点", "影响"] : ["Background", "Mechanism", "Key Point", "Impact"];
-  const cardTitles = [points[0], points[1], points[2], points[3]].map((v, idx) => v || `${titleBase}${titleSeeds[idx] || ""}`);
+  const cardTitles = [0, 1, 2, 3].map((idx) => semanticSequenceLabel({
+    points,
+    index: idx,
+    preferZh,
+    fallbackBase: titleBase,
+    maxChars: 24,
+  }));
   const cardBodies = [
     points.slice(4, 7),
     points.slice(5, 8),
@@ -995,6 +1010,8 @@ function renderConsultingWarmLightTemplate(slide, bullets, pageNumber, theme, st
   const listPoints = blockTextList(sourceSlide, ["list", "quote", "icon_text"], 6);
   const topPoints = [...bodyPoints, ...listPoints, ...points].slice(0, 10);
   const imageData = pickImageSource(sourceSlide);
+
+  addCanonicalLightHeader(slide, sourceSlide?.title || topPoints[0] || sourceSlide?.slide_id, { ...theme, darkText: text }, helpers, { accent, y: 0.72 });
 
   addPanel(slide, spec.heroRule, theme, { radius: spec.heroRule.radius, fill: bgCard, transparency: 0, border, pt: 0.6 });
   const ruleHeading = pickSecondaryHeading(sourceSlide?.title, topPoints, "Recommendation rule");
@@ -1109,13 +1126,14 @@ function extractChartSeries(sourceSlide, fallback = []) {
     if (fallbackValues.length >= 5) break;
   }
   if (fallbackValues.length) return fallbackValues;
-  const seed = truncate(String(sourceSlide?.title || sourceSlide?.slide_id || (inferPreferZh(sourceSlide, fallback) ? "主题" : "Topic")).trim() || "topic", 14);
-  return [
-    { label: inferPreferZh(sourceSlide, fallback) ? `${seed}背景` : `Background: ${seed}`, value: 1 },
-    { label: inferPreferZh(sourceSlide, fallback) ? `${seed}机制` : `Mechanism: ${seed}`, value: 2 },
-    { label: inferPreferZh(sourceSlide, fallback) ? `${seed}影响` : `Impact: ${seed}`, value: 3 },
-    { label: inferPreferZh(sourceSlide, fallback) ? `${seed}结论` : `Conclusion: ${seed}`, value: 4 },
-  ];
+  const fallbackLabels = fallback
+    .map((item) => truncate(stripBoilerplatePrefix(String(item || "").trim()) || String(item || "").trim(), 14))
+    .filter(Boolean)
+    .slice(0, 4);
+  const safeLabels = fallbackLabels.length
+    ? fallbackLabels
+    : [1, 2, 3, 4].map((idx) => (inferPreferZh(sourceSlide, fallback) ? `要点${idx}` : `Point ${idx}`));
+  return safeLabels.map((label, idx) => ({ label, value: idx + 1 }));
 }
 
 function renderSplitMediaDarkTemplate(slide, bullets, pageNumber, theme, style, helpers, sourceSlide) {
@@ -1554,6 +1572,7 @@ function renderComparisonCardsLightTemplate(slide, bullets, pageNumber, theme, s
   const points = safeBulletsFromArgs({ bullets, sourceSlide }, 9);
   const preferZh = inferPreferZh(sourceSlide, points);
   const comparison = extractComparisonModel(sourceSlide, points);
+  addCanonicalLightHeader(slide, sourceSlide?.title || comparison.leftTitle || sourceSlide?.slide_id, nextTheme, helpers, { accent: nextTheme.primary || "2F67E8", y: 0.72 });
   const cards = [
     {
       title: comparison.leftTitle,
@@ -1608,6 +1627,196 @@ function renderComparisonCardsLightTemplate(slide, bullets, pageNumber, theme, s
   });
 
   addPageBadge(slide, pageNumber, nextTheme, style);
+  return true;
+}
+
+function renderEducationTextbookLightTemplate(slide, bullets, pageNumber, theme, style, helpers, sourceSlide) {
+  const { FONT_ZH, addBulletList, addPageBadge } = helpers;
+  const spec = getTemplateSpec("education_textbook_light");
+  const nextTheme = {
+    ...theme,
+    template_family: "education_textbook_light",
+    bg: "FFFFFF",
+    cardBg: "FFFFFF",
+    cardAltBg: "F3F6FB",
+    borderColor: "D9E2F3",
+    darkText: "1F1F1F",
+    mutedText: "5F6B7A",
+    primary: "1F497D",
+    secondary: "4F81BD",
+  };
+  const points = safeBulletsFromArgs({ bullets, sourceSlide }, 8);
+  const bodyPoints = blockTextList(sourceSlide, ["body"], 6);
+  const listPoints = blockTextList(sourceSlide, ["list", "quote", "icon_text"], 6);
+  const contentPoints = (bodyPoints.length ? bodyPoints : points).slice(0, 4);
+  const supportPoints = (listPoints.length ? listPoints : points.slice(2, 6)).slice(0, 4);
+  const chartSeries = extractChartSeries(sourceSlide, points);
+  const hasChartBlock = Boolean(findFirstBlock(sourceSlide, ["chart", "kpi"]));
+  const tableBlock = findFirstBlock(sourceSlide, ["table"]);
+  const tableRows = tableBlock?.data?.table_rows || tableBlock?.content?.table_rows || [];
+  const tableSourceType = tableBlock?.data?.source_type || tableBlock?.content?.source_type || "";
+  const syntheticOrdinalSeries = (
+    chartSeries.length >= 3
+    && chartSeries.every((item, idx) => Number(item?.value) === idx + 1)
+  );
+  const hasMeaningfulChartSeries = (
+    chartSeries.length >= 3
+    && !syntheticOrdinalSeries
+    && chartSeries.some((item) => Math.abs(Number(item?.value) || 0) > 4)
+  );
+
+  addPanel(slide, spec.left, nextTheme, { radius: spec.left.radius, fill: nextTheme.cardBg, transparency: 0, border: nextTheme.borderColor, pt: 0.6 });
+  addPanel(slide, spec.right, nextTheme, { radius: spec.right.radius, fill: nextTheme.cardBg, transparency: 0, border: nextTheme.borderColor, pt: 0.6 });
+  addCanonicalLightHeader(slide, sourceSlide?.title || points[0] || sourceSlide?.slide_id, nextTheme, helpers, { accent: nextTheme.primary, y: 0.72 });
+
+  const titleText = String(sourceSlide?.title || "").trim();
+  const archetypeKey = String(sourceSlide?.archetype || sourceSlide?.archetype_plan?.selected || "").trim().toLowerCase();
+  const isConcept = /^(什么是|what is)/i.test(titleText);
+  const isRoles = /(角色|主体|actors?)/i.test(titleText) || archetypeKey === 'chart_dual_compare';
+  const isImpact = /(交汇|影响|impact)/i.test(titleText);
+  const isInterface = /(接口|流程|步骤|制度|process|interface)/i.test(titleText);
+  const isCase = /(案例|case)/i.test(titleText);
+  const isTrend = /(趋势|思考|挑战|trend|reflection)/i.test(titleText) || archetypeKey === 'chart_single_focus';
+  if (process.env.DEBUG_EDU_TEMPLATE === '1') {
+    console.error('[edu-template]', JSON.stringify({ titleText, archetypeKey, isConcept, isRoles, isImpact, isInterface, isCase, isTrend }));
+  }
+
+  if (isConcept) {
+    addPanel(slide, { x: 0.68, y: 1.14, w: 8.64, h: 0.78 }, nextTheme, { radius: 0.05, fill: nextTheme.cardBg, transparency: 0, border: nextTheme.borderColor, pt: 0.6 });
+    addSlideText(slide, '定义', { x: 0.92, y: 1.28, w: 0.6, h: 0.18 }, { fontFace: FONT_ZH, fontSize: 13, bold: true, color: nextTheme.primary, maxChars: 8 });
+    addSlideText(slide, contentPoints[0] || supportPoints[0] || titleText, { x: 1.48, y: 1.27, w: 7.2, h: 0.24 }, { fontFace: FONT_ZH, fontSize: 12, color: nextTheme.darkText, maxChars: 90 });
+    addSlideText(slide, '关键要点', { x: 4.1, y: 2.08, w: 1.2, h: 0.18 }, { fontFace: FONT_ZH, fontSize: 14, bold: true, color: nextTheme.primary, maxChars: 12 });
+    const cards = [contentPoints[0], contentPoints[1], supportPoints[0], supportPoints[1]].filter(Boolean);
+    ['概念', '阶段', '角色', '意义'].forEach((heading, i) => {
+      const x = 0.74 + i * 2.1;
+      addPanel(slide, { x, y: 2.36, w: 1.86, h: 1.2 }, nextTheme, { radius: 0.05, fill: nextTheme.cardAltBg, transparency: 0, border: nextTheme.borderColor, pt: 0.5 });
+      addSlideText(slide, heading, { x: x + 0.08, y: 2.46, w: 1.7, h: 0.16 }, { fontFace: FONT_ZH, fontSize: 12, bold: true, color: nextTheme.primary, maxChars: 10 });
+      addSlideText(slide, cards[i] || titleText, { x: x + 0.08, y: 2.74, w: 1.7, h: 0.34 }, { fontFace: FONT_ZH, fontSize: 10, color: nextTheme.darkText, maxChars: 24 });
+    });
+    return true;
+  }
+
+  if (isRoles) {
+    addPanel(slide, { x: 0.68, y: 1.18, w: 4.18, h: 3.76 }, nextTheme, { radius: 0.05, fill: nextTheme.cardBg, transparency: 0, border: nextTheme.borderColor, pt: 0.6 });
+    addPanel(slide, { x: 5.02, y: 1.18, w: 4.28, h: 3.76 }, nextTheme, { radius: 0.05, fill: nextTheme.cardBg, transparency: 0, border: nextTheme.borderColor, pt: 0.6 });
+    addSlideText(slide, '关键角色', { x: 0.9, y: 1.34, w: 1.2, h: 0.18 }, { fontFace: FONT_ZH, fontSize: 14, bold: true, color: nextTheme.primary, maxChars: 12 });
+    addBulletList(slide, contentPoints.length ? contentPoints : points.slice(0, 4), 0.9, 1.68, 3.5, 2.8, { ...nextTheme, light: nextTheme.cardAltBg }, style, 4, { textConstraints: { bullet_max_chars_cjk: 24, bullet_max_items: 4 } });
+    addSlideText(slide, '核心职能', { x: 5.24, y: 1.34, w: 1.2, h: 0.18 }, { fontFace: FONT_ZH, fontSize: 14, bold: true, color: nextTheme.secondary, maxChars: 12 });
+    addBulletList(slide, supportPoints.length ? supportPoints : points.slice(2, 6), 5.24, 1.68, 3.58, 2.8, { ...nextTheme, light: nextTheme.cardAltBg }, style, 4, { textConstraints: { bullet_max_chars_cjk: 24, bullet_max_items: 4 } });
+    return true;
+  }
+
+  if (isImpact) {
+    addSlideText(slide, '国内立法 → 外部影响', { x: 0.9, y: 1.34, w: 2.8, h: 0.18 }, { fontFace: FONT_ZH, fontSize: 14, bold: true, color: nextTheme.primary, maxChars: 24 });
+    addBulletList(slide, contentPoints.length ? contentPoints : points.slice(0, 4), 0.9, 1.68, 3.48, 2.8, { ...nextTheme, light: nextTheme.cardAltBg }, style, 4, { textConstraints: { bullet_max_chars_cjk: 24, bullet_max_items: 4 } });
+    addSlideText(slide, '国际协议 → 国内调整', { x: 5.24, y: 1.34, w: 2.8, h: 0.18 }, { fontFace: FONT_ZH, fontSize: 14, bold: true, color: nextTheme.secondary, maxChars: 24 });
+    addBulletList(slide, supportPoints.length ? supportPoints : points.slice(2, 6), 5.24, 1.68, 3.58, 2.8, { ...nextTheme, light: nextTheme.cardAltBg }, style, 4, { textConstraints: { bullet_max_chars_cjk: 24, bullet_max_items: 4 } });
+    return true;
+  }
+
+  if (isInterface) {
+    addSlideText(slide, '关键流程', { x: 0.9, y: 1.32, w: 1.2, h: 0.18 }, { fontFace: FONT_ZH, fontSize: 14, bold: true, color: nextTheme.primary, maxChars: 12 });
+    const flowPoints = (contentPoints.length ? contentPoints : points.slice(0, 4)).slice(0, 4);
+    flowPoints.forEach((point, i) => {
+      const x = 0.86 + i * 2.04;
+      addPanel(slide, { x, y: 1.74, w: 1.72, h: 1.02 }, nextTheme, { radius: 0.05, fill: nextTheme.cardAltBg, transparency: 0, border: nextTheme.borderColor, pt: 0.5 });
+      addSlideText(slide, String(i + 1), { x: x + 0.72, y: 1.84, w: 0.2, h: 0.16 }, { fontFace: FONT_ZH, fontSize: 12, bold: true, color: nextTheme.primary, align: 'center' });
+      addSlideText(slide, point, { x: x + 0.08, y: 2.08, w: 1.56, h: 0.26 }, { fontFace: FONT_ZH, fontSize: 10, color: nextTheme.darkText, maxChars: 18, align: 'center' });
+    });
+    addBulletList(slide, supportPoints.length ? supportPoints : points.slice(2, 6), 0.92, 3.18, 8.0, 1.22, { ...nextTheme, light: nextTheme.cardAltBg }, style, 4, { textConstraints: { bullet_max_chars_cjk: 26, bullet_max_items: 4 } });
+    return true;
+  }
+
+  if (isCase || isTrend) {
+    addPanel(slide, { x: 0.68, y: 1.18, w: 4.18, h: 3.76 }, nextTheme, { radius: 0.05, fill: nextTheme.cardBg, transparency: 0, border: nextTheme.borderColor, pt: 0.6 });
+    addPanel(slide, { x: 5.02, y: 1.18, w: 4.28, h: 3.76 }, nextTheme, { radius: 0.05, fill: nextTheme.cardBg, transparency: 0, border: nextTheme.borderColor, pt: 0.6 });
+    addSlideText(slide, isCase ? '案例要点' : '核心判断', { x: 0.9, y: 1.34, w: 1.4, h: 0.18 }, { fontFace: FONT_ZH, fontSize: 14, bold: true, color: nextTheme.primary, maxChars: 16 });
+    addBulletList(slide, contentPoints.length ? contentPoints : points.slice(0, 4), 0.9, 1.68, 3.48, 2.8, { ...nextTheme, light: nextTheme.cardAltBg }, style, 4, { textConstraints: { bullet_max_chars_cjk: 24, bullet_max_items: 4 } });
+    addSlideText(slide, isCase ? '启示' : '延伸思考', { x: 5.24, y: 1.34, w: 1.2, h: 0.18 }, { fontFace: FONT_ZH, fontSize: 14, bold: true, color: nextTheme.secondary, maxChars: 16 });
+    addBulletList(slide, supportPoints.length ? supportPoints : points.slice(2, 6), 5.24, 1.68, 3.58, 2.8, { ...nextTheme, light: nextTheme.cardAltBg }, style, 4, { textConstraints: { bullet_max_chars_cjk: 24, bullet_max_items: 4 } });
+    return true;
+  }
+
+  addBulletList(
+    slide,
+    contentPoints.length ? contentPoints : [sourceSlide?.title || "课堂重点"],
+    spec.left.x + 0.18,
+    spec.left.y + 0.28,
+    spec.left.w - 0.36,
+    spec.left.h - 0.42,
+    { ...nextTheme, light: nextTheme.cardAltBg },
+    style,
+    4,
+    { textConstraints: { bullet_max_chars_cjk: 24, bullet_max_items: 4 } },
+  );
+
+  if (Array.isArray(tableRows) && tableRows.length > 1 && typeof slide.addTable === "function" && !["synthetic_table", "layout_solver"].includes(String(tableSourceType || ""))) {
+    const normalizedRows = tableRows.map((row) => Array.isArray(row) ? row.map((cell) => String(cell ?? "").trim()) : []);
+    const headers = normalizedRows[0] || [];
+    const body = normalizedRows.slice(1, 6);
+    slide.addTable([headers, ...body], {
+      x: spec.right.x + 0.14,
+      y: spec.right.y + 0.18,
+      w: spec.right.w - 0.28,
+      h: spec.right.h - 0.36,
+      border: { type: "solid", pt: 0.4, color: nextTheme.borderColor },
+      colW: headers.map(() => (spec.right.w - 0.28) / Math.max(1, headers.length)),
+      autoPage: false,
+    });
+  } else if (Array.isArray(tableRows) && tableRows.length > 1) {
+    const textRows = tableRows.slice(1).map((row) => Array.isArray(row) ? String(row[1] ?? row[0] ?? "").trim() : "").filter(Boolean).slice(0, 4);
+    addBulletList(
+      slide,
+      textRows.length ? textRows : supportPoints,
+      spec.right.x + 0.18,
+      spec.right.y + 0.28,
+      spec.right.w - 0.36,
+      spec.right.h - 0.42,
+      { ...nextTheme, light: nextTheme.cardAltBg },
+      style,
+      4,
+      { textConstraints: { bullet_max_chars_cjk: 24, bullet_max_items: 4 } },
+    );
+  } else if ((hasChartBlock || chartSeries.length >= 3) && hasMeaningfulChartSeries) {
+    const labels = chartSeries.map((item) => item.label);
+    const values = chartSeries.map((item) => item.value);
+    createChart(slide, {
+      type: "bar",
+      x: spec.right.x + 0.16,
+      y: spec.right.y + 0.26,
+      w: spec.right.w - 0.32,
+      h: spec.right.h - 0.52,
+      data: labels.map((label, idx) => ({ label, value: values[idx] })),
+      theme: nextTheme,
+    });
+  } else {
+    addBulletList(
+      slide,
+      supportPoints.length ? supportPoints : contentPoints,
+      spec.right.x + 0.18,
+      spec.right.y + 0.28,
+      spec.right.w - 0.36,
+      spec.right.h - 0.42,
+      { ...nextTheme, light: nextTheme.cardAltBg },
+      style,
+      4,
+      { textConstraints: { bullet_max_chars_cjk: 24, bullet_max_items: 4 } },
+    );
+  }
+
+  addSlideText(slide, truncate(String(sourceSlide?.title || points[0] || sourceSlide?.slide_id || "").trim(), 44), {
+    x: 0.78,
+    y: 0.72,
+    w: 8.0,
+    h: 0.3,
+  }, {
+    fontFace: FONT_ZH,
+    fontSize: 20,
+    bold: true,
+    color: nextTheme.darkText,
+    maxChars: 44,
+  });
+
   return true;
 }
 
@@ -1780,6 +1989,7 @@ const CONTENT_RENDERERS = new Set([
   "image_showcase_light",
   "process_flow_dark",
   "comparison_cards_light",
+  "education_textbook_light",
   "quote_hero_dark",
 ]);
 
@@ -1912,6 +2122,26 @@ export function renderTemplateContent(args) {
       );
     case "comparison_cards_light":
       return renderComparisonCardsLightTemplate(
+        args.slide,
+        args.bullets,
+        args.pageNumber,
+        args.theme,
+        args.style,
+        args.helpers,
+        args.sourceSlide,
+      );
+    case "education_textbook_light":
+      return renderEducationTextbookLightTemplate(
+        args.slide,
+        args.bullets,
+        args.pageNumber,
+        args.theme,
+        args.style,
+        args.helpers,
+        args.sourceSlide,
+      );
+    case "education_textbook_light":
+      return renderEducationTextbookLightTemplate(
         args.slide,
         args.bullets,
         args.pageNumber,
