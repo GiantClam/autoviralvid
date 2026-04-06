@@ -14848,7 +14848,7 @@ class PPTService:
             except Exception as exc:
                 final_visual_audit = {"error": str(exc)[:300]}
 
-        if final_quality_score is not None and final_visual_audit:
+        if final_quality_score is not None:
             final_quality_score = score_deck_quality(
                 slides=(export_result.get("input_payload") or {}).get("slides")
                 or slides_data,
@@ -14856,7 +14856,8 @@ class PPTService:
                 profile=quality_profile,
                 content_issues=[*final_content_issues],
                 layout_issues=[*final_layout_issues],
-                visual_audit=final_visual_audit,
+                visual_audit=final_visual_audit if isinstance(final_visual_audit, dict) else None,
+                enforce_visual_audit_presence=True,
             )
 
         if final_quality_score is not None:

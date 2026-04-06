@@ -464,6 +464,7 @@ def quality_profile(profile_id: str = "default") -> Dict[str, Any]:
         "visual_whitespace_max_ratio": max(0.0, min(1.0, float(profile.get("visual_whitespace_max_ratio") or 0.45))),
         "visual_layout_monotony_max_ratio": max(0.0, min(1.0, float(profile.get("visual_layout_monotony_max_ratio") or 0.45))),
         "visual_style_inconsistent_max_ratio": max(0.0, min(1.0, float(profile.get("visual_style_inconsistent_max_ratio") or 0.45))),
+        "require_visual_audit": bool(profile.get("require_visual_audit", True)),
         "quality_score_threshold": max(1.0, min(100.0, float(profile.get("quality_score_threshold") or 72))),
         "quality_score_warn_threshold": max(1.0, min(100.0, float(profile.get("quality_score_warn_threshold") or 80))),
         "quality_score_weights": normalized_weights,
@@ -689,4 +690,3 @@ def resolve_template_for_slide(
             best_template = template_id
 
     return best_template if best_template in templates else default_template_id()
-

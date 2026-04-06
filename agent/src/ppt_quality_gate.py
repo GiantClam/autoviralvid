@@ -1292,9 +1292,37 @@ def validate_visual_audit(
     profile: Optional[str | Dict[str, Any]] = None,
     layout_diversity_ok: Optional[bool] = None,
 ) -> QualityResult:
-    if not isinstance(visual_audit, dict):
-        return QualityResult(ok=True, issues=[])
     active_profile = _resolve_quality_profile(profile)
+    require_visual_audit = bool(active_profile.get("require_visual_audit", True))
+    if not isinstance(visual_audit, dict):
+        if not require_visual_audit:
+            return QualityResult(ok=True, issues=[])
+        return QualityResult(
+            ok=False,
+            issues=[
+                QualityIssue(
+                    slide_id="deck",
+                    code="visual_audit_missing",
+                    message="visual_audit payload is required for quality pass.",
+                    retry_scope="deck",
+                    retry_target_ids=[],
+                )
+            ],
+        )
+    audit_error = str(visual_audit.get("error") or "").strip()
+    if audit_error:
+        return QualityResult(
+            ok=False,
+            issues=[
+                QualityIssue(
+                    slide_id="deck",
+                    code="visual_audit_unavailable",
+                    message=f"visual_audit unavailable: {audit_error[:200]}",
+                    retry_scope="deck",
+                    retry_target_ids=[],
+                )
+            ],
+        )
     issue_ratios = (
         visual_audit.get("issue_ratios")
         if isinstance(visual_audit.get("issue_ratios"), dict)
@@ -1526,6 +1554,7 @@ def score_deck_quality(
     content_issues: Optional[List[QualityIssue]] = None,
     layout_issues: Optional[List[QualityIssue]] = None,
     visual_audit: Optional[Dict[str, Any]] = None,
+    enforce_visual_audit_presence: bool = False,
 ) -> QualityScoreResult:
     active_profile = _resolve_quality_profile(profile)
     content_result = (
@@ -1641,6 +1670,17 @@ def score_deck_quality(
         family_switch_ratio = 0.0
 
     visual_payload = visual_audit if isinstance(visual_audit, dict) else {}
+    require_visual_audit = bool(active_profile.get("require_visual_audit", True))
+    visual_audit_error = str(visual_payload.get("error") or "").strip() if isinstance(visual_payload, dict) else ""
+    visual_audit_present = isinstance(visual_audit, dict) and bool(visual_payload) and not visual_audit_error
+    visual_audit_missing_blocker = bool(
+        enforce_visual_audit_presence
+        and require_visual_audit
+        and (not visual_audit_present)
+    )
+    if visual_audit_missing_blocker:
+        issue_key = "visual_audit_unavailable" if visual_audit_error else "visual_audit_missing"
+        issue_counts[issue_key] = int(issue_counts.get(issue_key, 0)) + 1
     blank_slide_ratio = max(0.0, min(1.0, float(visual_payload.get("blank_slide_ratio") or 0.0)))
     low_contrast_ratio = max(0.0, min(1.0, float(visual_payload.get("low_contrast_ratio") or 0.0)))
     blank_area_ratio = max(0.0, min(1.0, float(visual_payload.get("blank_area_ratio") or 0.0)))
@@ -1687,7 +1727,7 @@ def score_deck_quality(
     warn_threshold = float(active_profile.get("quality_score_warn_threshold") or 80.0)
     fatal_codes = {"blank_slide", "encoding_invalid"}
     has_fatal = any(code in fatal_codes for code in issue_counts.keys())
-    passed = (weighted_score >= threshold) and (not has_fatal)
+    passed = (weighted_score >= threshold) and (not has_fatal) and (not visual_audit_missing_blocker)
 
     return QualityScoreResult(
         score=weighted_score,
@@ -1719,6 +1759,10 @@ def score_deck_quality(
             "visual_issue_pressure": visual_issue_pressure,
             "visual_mean_luminance": mean_luminance,
             "visual_multimodal_score": multimodal_numeric,
+            "visual_audit_required": require_visual_audit,
+            "visual_audit_present": visual_audit_present,
+            "visual_audit_error": visual_audit_error,
+            "visual_audit_missing_blocker": visual_audit_missing_blocker,
         },
     )
 
