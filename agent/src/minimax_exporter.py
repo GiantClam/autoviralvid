@@ -2,13 +2,11 @@
 
 from __future__ import annotations
 
-import json
 import logging
 import os
 import re
-import shutil
-import subprocess
 import tempfile
+from xml.etree import ElementTree as ET
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -26,193 +24,15 @@ from src.ppt_template_catalog import (
 )
 from src.ppt_master_design_spec import apply_render_paths, build_design_spec
 from src.ppt_visual_identity import canonicalize_theme_recipe, resolve_style_variant, resolve_tone
+from src.ppt_svg_renderer import render_slide_svg_markup, resolve_slide_svg_markup
 from src.pptx_theme_patch import patch_pptx_theme_colors
+from src.svg_to_pptx import create_pptx_with_native_svg
 
 logger = logging.getLogger("minimax_exporter")
 
 _TEMPLATE_ID_SET = set(list_template_ids())
 _CJK_RE = re.compile(r"[\u4e00-\u9fff]")
 _SUPPORTING_PREFIX_RE = re.compile(r"^(?:补充要点|supporting point)\s*[:：-]\s*", re.IGNORECASE)
-
-
-def _runtime_role() -> str:
-    explicit = str(os.getenv("PPT_EXECUTION_ROLE", "auto")).strip().lower()
-    if explicit in {"worker", "web"}:
-        return explicit
-    if str(os.getenv("VERCEL", "")).strip() or str(os.getenv("VERCEL_ENV", "")).strip():
-        return "web"
-    return "worker"
-
-
-def _parse_bool(raw: str, default: bool) -> bool:
-    text = str(raw or "").strip().lower()
-    if not text:
-        return bool(default)
-    return text in {"1", "true", "yes", "on"}
-
-
-def _module_retry_enabled() -> bool:
-    # Strict alignment with PPT architecture doc:
-    # module retry/orchestration is part of the primary path across roles.
-    default_enabled = True
-    return _parse_bool(os.getenv("PPT_MODULE_RETRY_ENABLED", ""), default_enabled)
-
-
-def _module_mainflow_enabled() -> bool:
-    # Strict alignment with architecture doc:
-    # mainflow should be enabled by default regardless of runtime role.
-    default_enabled = True
-    return _parse_bool(os.getenv("PPT_MODULE_MAINFLOW_ENABLED", ""), default_enabled)
-
-
-def _module_mainflow_render_each_enabled() -> bool:
-    # Strict alignment with architecture doc:
-    # mainflow should run per-slide orchestration + typed subagent by default.
-    return _parse_bool(os.getenv("PPT_MODULE_MAINFLOW_RENDER_EACH_ENABLED", ""), True)
-
-
-def _module_retry_max_parallel() -> int:
-    raw = str(os.getenv("PPT_MODULE_RETRY_MAX_PARALLEL", "5")).strip()
-    try:
-        value = int(raw)
-    except Exception:
-        value = 5
-    return max(1, min(10, value))
-
-
-def _module_subagent_exec_enabled() -> bool:
-    # Keep an explicit escape hatch, but default to enabled for all roles.
-    return _parse_bool(os.getenv("PPT_MODULE_SUBAGENT_EXEC_ENABLED", ""), True)
-
-
-def _resolve_scripts_root() -> Path:
-    explicit = str(os.getenv("PPT_SCRIPTS_ROOT", "")).strip()
-    candidates: List[Path] = []
-    if explicit:
-        candidates.append(Path(explicit))
-    here = Path(__file__).resolve()
-    candidates.extend(
-        [
-            here.parents[2] / "scripts",
-            here.parents[1] / "scripts",
-            Path.cwd() / "scripts",
-            Path.cwd().parent / "scripts",
-        ]
-    )
-    for candidate in candidates:
-        if candidate.exists() and candidate.is_dir():
-            return candidate
-    return here.parents[2] / "scripts"
-
-
-def _build_generator_cmd(
-    *,
-    script_path: Path,
-    input_path: Path,
-    output_path: Path,
-    render_spec_path: Path,
-    payload: Dict[str, Any],
-    retry_scope: str,
-    target_slide_ids: List[str] | None,
-    target_block_ids: List[str] | None,
-    retry_hint: str,
-    idempotency_key: str,
-    verbatim_content: bool,
-    original_style: bool,
-    disable_local_style_rewrite: bool,
-    visual_priority: bool,
-    visual_preset: str,
-    visual_density: str,
-    constraint_hardness: str,
-    deck_id: str,
-) -> List[str]:
-    cmd = [
-        "node",
-        str(script_path),
-        "--input",
-        str(input_path),
-        "--output",
-        str(output_path),
-        "--render-output",
-        str(render_spec_path),
-        "--retry-scope",
-        str(retry_scope or "deck"),
-        "--generator-mode",
-        str(payload.get("generator_mode") or "official"),
-    ]
-    if deck_id:
-        cmd.extend(["--deck-id", deck_id])
-    if target_slide_ids:
-        cmd.extend(["--target-slide-ids", ",".join(target_slide_ids)])
-    if target_block_ids:
-        cmd.extend(["--target-block-ids", ",".join(target_block_ids)])
-    if retry_hint:
-        cmd.extend(["--retry-hint", retry_hint[:1500]])
-    if idempotency_key:
-        cmd.extend(["--idempotency-key", idempotency_key])
-    if verbatim_content:
-        cmd.append("--verbatim-content")
-    if original_style:
-        cmd.append("--original-style")
-    if disable_local_style_rewrite:
-        cmd.append("--disable-local-style-rewrite")
-    if visual_priority:
-        cmd.append("--visual-priority")
-    if str(visual_preset or "").strip():
-        cmd.extend(["--visual-preset", str(visual_preset).strip()])
-    if str(visual_density or "").strip():
-        cmd.extend(["--visual-density", str(visual_density).strip()])
-    if str(constraint_hardness or "").strip():
-        cmd.extend(["--constraint-hardness", str(constraint_hardness).strip()])
-    if str(payload.get("theme_recipe") or "").strip():
-        cmd.extend(["--theme-recipe", str(payload.get("theme_recipe")).strip()])
-    if str(payload.get("tone") or "").strip():
-        cmd.extend(["--tone", str(payload.get("tone")).strip()])
-    return cmd
-
-
-def _build_module_retry_cmd(
-    *,
-    orchestrator_script_path: Path,
-    generator_script_path: Path,
-    input_path: Path,
-    output_path: Path,
-    render_spec_path: Path,
-    modules_dir: Path,
-    manifest_path: Path,
-    target_slide_ids: List[str],
-    render_each: bool,
-) -> List[str]:
-    cmd = [
-        "node",
-        str(orchestrator_script_path),
-        "--input",
-        str(input_path),
-        "--modules-dir",
-        str(modules_dir),
-        "--manifest",
-        str(manifest_path),
-        "--compile",
-        "--output",
-        str(output_path),
-        "--render-output",
-        str(render_spec_path),
-        "--generator-script",
-        str(generator_script_path),
-    ]
-    if render_each:
-        cmd.extend(
-            [
-                "--render-each",
-                "--max-parallel",
-                str(_module_retry_max_parallel()),
-            ]
-        )
-    if target_slide_ids:
-        cmd.extend(["--target-slide-ids", ",".join(target_slide_ids)])
-    if render_each and _module_subagent_exec_enabled():
-        cmd.append("--subagent-exec")
-    return cmd
 
 
 def _normalize_text_key(text: str) -> str:
@@ -370,20 +190,6 @@ def _allow_legacy_mode() -> bool:
     }
 
 
-def _extract_json_from_stdout(stdout: str) -> Dict[str, Any]:
-    for line in reversed((stdout or "").splitlines()):
-        candidate = line.strip()
-        if not candidate.startswith("{"):
-            continue
-        try:
-            parsed = json.loads(candidate)
-        except Exception:
-            continue
-        if isinstance(parsed, dict):
-            return parsed
-    return {}
-
-
 class MiniMaxExportError(RuntimeError):
     """Structured export error with retry classification metadata."""
 
@@ -454,6 +260,181 @@ def _normalize_render_channel(value: str | None) -> str:
     if normalized in {"local", "remote"}:
         return normalized
     return "local"
+
+
+def _is_valid_svg_markup(markup: str) -> bool:
+    text = str(markup or "").strip()
+    if not text:
+        return False
+    try:
+        root = ET.fromstring(text)
+    except ET.ParseError:
+        return False
+    tag = str(root.tag or "").strip().lower()
+    return tag.endswith("svg")
+
+
+def _emergency_svg_markup() -> str:
+    return (
+        '<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">'
+        '<rect width="1280" height="720" fill="#0B1220"/>'
+        '<text x="80" y="140" fill="#F4F8FF" font-size="48" '
+        'font-family="Microsoft YaHei, Segoe UI, Arial">Fallback Slide</text>'
+        "</svg>"
+    )
+
+
+def _prepare_svg_slides(
+    *,
+    slides: List[Dict[str, Any]],
+    deck_title: str,
+    design_spec: Dict[str, Any] | None = None,
+) -> tuple[List[Dict[str, Any]], Dict[str, int]]:
+    prepared: List[Dict[str, Any]] = []
+    provided_count = 0
+    templated_count = 0
+    repaired_count = 0
+    invalid_count = 0
+    emergency_count = 0
+    total = len(slides)
+    for idx, raw in enumerate(slides):
+        slide = dict(raw if isinstance(raw, dict) else {})
+        markup = resolve_slide_svg_markup(slide)
+        if markup:
+            provided_count += 1
+            if not _is_valid_svg_markup(markup):
+                invalid_count += 1
+                repaired_count += 1
+                markup = ""
+        if not markup:
+            markup = render_slide_svg_markup(
+                slide=slide,
+                slide_index=idx,
+                slide_count=total,
+                deck_title=deck_title,
+                design_spec=design_spec,
+            )
+            templated_count += 1
+        if not _is_valid_svg_markup(markup):
+            invalid_count += 1
+            markup = _emergency_svg_markup()
+            emergency_count += 1
+        slide["render_path"] = "svg"
+        slide["svg_markup"] = markup
+        prepared.append(slide)
+    return prepared, {
+        "provided_svg_count": int(provided_count),
+        "templated_svg_count": int(templated_count),
+        "repaired_svg_count": int(repaired_count),
+        "invalid_svg_count": int(invalid_count),
+        "emergency_svg_count": int(emergency_count),
+    }
+
+
+def _extract_slide_notes(slide: Dict[str, Any]) -> str:
+    for key in ("speaker_notes", "narration", "notes_for_designer", "notes", "script"):
+        value = str(slide.get(key) or "").strip()
+        if value:
+            return value
+    return ""
+
+
+def _write_svg_files(
+    *,
+    slides: List[Dict[str, Any]],
+    temp_root: Path,
+) -> tuple[List[Path], Dict[str, str]]:
+    svg_files: List[Path] = []
+    notes: Dict[str, str] = {}
+    for idx, slide in enumerate(slides):
+        stem = f"slide_{idx + 1:03d}"
+        svg_path = temp_root / f"{stem}.svg"
+        markup = str(slide.get("svg_markup") or "")
+        if not _is_valid_svg_markup(markup):
+            raise ValueError(f"invalid_svg_markup_at_slide_{idx + 1}")
+        svg_path.write_text(markup, encoding="utf-8")
+        svg_files.append(svg_path)
+        note_text = _extract_slide_notes(slide)
+        if note_text:
+            notes[stem] = note_text
+    return svg_files, notes
+
+
+def _assemble_pptx_with_drawingml(
+    *,
+    slides: List[Dict[str, Any]],
+    temp_root: Path,
+) -> tuple[bytes, Dict[str, int]]:
+    svg_files, notes = _write_svg_files(slides=slides, temp_root=temp_root)
+    output_path = temp_root / "presentation.pptx"
+    ok = create_pptx_with_native_svg(
+        svg_files=svg_files,
+        output_path=output_path,
+        verbose=False,
+        transition=None,
+        auto_advance=None,
+        use_compat_mode=False,
+        notes=notes or None,
+        enable_notes=bool(notes),
+        use_native_shapes=True,
+    )
+    if (not ok) or (not output_path.exists()):
+        raise RuntimeError("drawingml_export_failed")
+    return output_path.read_bytes(), {
+        "notes_slide_count": int(len(notes)),
+    }
+
+
+def _render_all_slides_with_template(
+    *,
+    slides: List[Dict[str, Any]],
+    deck_title: str,
+    design_spec: Dict[str, Any] | None = None,
+) -> List[Dict[str, Any]]:
+    rendered: List[Dict[str, Any]] = []
+    total = len(slides)
+    for idx, raw in enumerate(slides):
+        slide = dict(raw if isinstance(raw, dict) else {})
+        markup = render_slide_svg_markup(
+            slide=slide,
+            slide_index=idx,
+            slide_count=total,
+            deck_title=deck_title,
+            design_spec=design_spec,
+        )
+        if not _is_valid_svg_markup(markup):
+            markup = _emergency_svg_markup()
+        slide["render_path"] = "svg"
+        slide["svg_markup"] = markup
+        rendered.append(slide)
+    return rendered
+
+
+def _build_render_spec(slides: List[Dict[str, Any]]) -> Dict[str, Any]:
+    summary_rows: List[Dict[str, Any]] = []
+    for idx, slide in enumerate(slides):
+        summary_rows.append(
+            {
+                "slide_id": str(slide.get("slide_id") or f"slide-{idx + 1}"),
+                "page_number": idx + 1,
+                "slide_type": str(slide.get("slide_type") or "content"),
+                "layout_grid": str(slide.get("layout_grid") or "split_2"),
+                "render_path": "svg",
+            }
+        )
+    return {
+        "mode": "minimax_presentation",
+        "engine": "drawingml_native",
+        "slides": summary_rows,
+        "template_renderer_summary": {
+            "evaluated_slides": len(summary_rows),
+            "skipped_slides": 0,
+            "skipped_ratio": 0.0,
+            "mode_counts": {"drawingml_native": len(summary_rows)},
+            "reason_counts": {},
+            "reason_ratios": {},
+        },
+    }
 
 
 def _infer_slide_type(slide: Dict[str, Any], index: int, total: int) -> str:
@@ -704,12 +685,10 @@ def build_payload(
         decision_filled_slides,
         svg_mode=str(svg_mode or "on"),
     )
-    if str(deck_archetype_profile or "").strip().lower() == "education_textbook":
-        for slide in normalized_slides:
-            if not isinstance(slide, dict):
-                continue
-            if str(slide.get("slide_type") or "").strip().lower() == "content":
-                slide["render_path"] = "pptxgenjs"
+    # DrawingML-first architecture: all slides are normalized to SVG route.
+    for slide in normalized_slides:
+        if isinstance(slide, dict):
+            slide["render_path"] = "svg"
     primary_template = (
         str(normalized_slides[0].get("template_family") or "dashboard_dark")
         if normalized_slides
@@ -819,12 +798,6 @@ def export_minimax_pptx(
     design_decision: Dict[str, Any] | None = None,
     timeout: int = 180,
 ) -> Dict[str, Any]:
-    scripts_root = _resolve_scripts_root()
-    generator_script_path = scripts_root / "generate-pptx-minimax.mjs"
-    orchestrator_script_path = scripts_root / "orchestrate-pptx-modules.mjs"
-    if not generator_script_path.exists():
-        raise FileNotFoundError(f"MiniMax PPTX script not found: {generator_script_path}")
-
     payload = build_payload(
         slides=slides,
         title=title,
@@ -869,214 +842,74 @@ def export_minimax_pptx(
     channel_fallback_reason = ""
     if requested_channel == "remote":
         channel_fallback_reason = (
-            "remote_channel_not_configured: current deployment uses local pptx-plugin rendering"
+            "remote_channel_not_configured: drawingml export currently runs in local mode"
         )
         logger.warning("[minimax_exporter] %s", channel_fallback_reason)
 
-    input_path: Path | None = None
-    output_path: Path | None = None
-    render_spec_path: Path | None = None
-    modules_dir: Path | None = None
-    manifest_path: Path | None = None
-
     try:
-        with tempfile.NamedTemporaryFile(
-            mode="w",
-            suffix=".json",
-            delete=False,
-            encoding="utf-8",
-        ) as f:
-            json.dump(payload, f, ensure_ascii=False)
-            input_path = Path(f.name)
-
-        output_path = input_path.with_suffix(".pptx")
-        render_spec_path = input_path.with_suffix(".render.json")
-        normalized_retry_scope = str(retry_scope or "").strip().lower()
-        normalized_target_slide_ids = [str(item).strip() for item in (target_slide_ids or []) if str(item).strip()]
-        should_use_module_retry = (
-            normalized_retry_scope == "slide"
-            and bool(normalized_target_slide_ids)
-            and _module_retry_enabled()
-            and orchestrator_script_path.exists()
+        prepared_slides, svg_stats = _prepare_svg_slides(
+            slides=[slide for slide in payload.get("slides", []) if isinstance(slide, dict)],
+            deck_title=title,
+            design_spec=payload.get("design_spec") if isinstance(payload.get("design_spec"), dict) else None,
         )
-        should_use_module_mainflow = (
-            normalized_retry_scope != "slide"
-            and _module_mainflow_enabled()
-            and _module_retry_enabled()
-            and orchestrator_script_path.exists()
-        )
-        should_use_module_orchestrator = should_use_module_retry or should_use_module_mainflow
+        payload["slides"] = prepared_slides
 
-        render_each = False
-        if should_use_module_orchestrator:
-            modules_dir = input_path.with_name(f"{input_path.stem}_modules")
-            manifest_path = modules_dir / "manifest.json"
-            render_each = bool(should_use_module_retry) or _module_mainflow_render_each_enabled()
-            cmd = _build_module_retry_cmd(
-                orchestrator_script_path=orchestrator_script_path,
-                generator_script_path=generator_script_path,
-                input_path=input_path,
-                output_path=output_path,
-                render_spec_path=render_spec_path,
-                modules_dir=modules_dir,
-                manifest_path=manifest_path,
-                target_slide_ids=normalized_target_slide_ids if should_use_module_retry else [],
-                render_each=render_each,
-            )
-        else:
-            cmd = _build_generator_cmd(
-                script_path=generator_script_path,
-                input_path=input_path,
-                output_path=output_path,
-                render_spec_path=render_spec_path,
-                payload=payload,
-                retry_scope=retry_scope,
-                target_slide_ids=target_slide_ids,
-                target_block_ids=target_block_ids,
-                retry_hint=retry_hint,
-                idempotency_key=idempotency_key,
-                verbatim_content=verbatim_content,
-                original_style=original_style,
-                disable_local_style_rewrite=disable_local_style_rewrite,
-                visual_priority=visual_priority,
-                visual_preset=visual_preset,
-                visual_density=visual_density,
-                constraint_hardness=constraint_hardness,
-                deck_id=deck_id,
-            )
-
-        def _run(export_cmd: List[str], *, cmd_timeout: int) -> subprocess.CompletedProcess[str]:
-            return subprocess.run(
-                export_cmd,
-                capture_output=True,
-                text=True,
-                timeout=max(30, int(cmd_timeout)),
-            )
-
-        module_timeout = int(timeout)
-        if should_use_module_orchestrator:
-            env_timeout = str(os.getenv("PPT_MODULE_ORCHESTRATOR_TIMEOUT_SEC", "")).strip()
-            if env_timeout:
-                try:
-                    module_timeout = max(module_timeout, int(float(env_timeout)))
-                except Exception:
-                    module_timeout = max(module_timeout, 420)
-            else:
-                module_timeout = max(module_timeout, 420)
-
-        module_timeout_fallback_used = False
-        try:
-            result = _run(
-                cmd,
-                cmd_timeout=(module_timeout if should_use_module_orchestrator else int(timeout)),
-            )
-        except subprocess.TimeoutExpired:
-            if should_use_module_orchestrator:
-                logger.warning(
-                    "[minimax_exporter] module orchestrator timed out after %ss; fallback to direct generator",
-                    module_timeout,
-                )
-                cmd = _build_generator_cmd(
-                    script_path=generator_script_path,
-                    input_path=input_path,
-                    output_path=output_path,
-                    render_spec_path=render_spec_path,
-                    payload=payload,
-                    retry_scope=retry_scope,
-                    target_slide_ids=target_slide_ids,
-                    target_block_ids=target_block_ids,
-                    retry_hint=retry_hint,
-                    idempotency_key=idempotency_key,
-                    verbatim_content=verbatim_content,
-                    original_style=original_style,
-                    disable_local_style_rewrite=disable_local_style_rewrite,
-                    visual_priority=visual_priority,
-                    visual_preset=visual_preset,
-                    visual_density=visual_density,
-                    constraint_hardness=constraint_hardness,
-                    deck_id=deck_id,
-                )
-                result = _run(cmd, cmd_timeout=int(timeout))
-                should_use_module_orchestrator = False
-                should_use_module_mainflow = False
-                should_use_module_retry = False
-                module_timeout_fallback_used = True
-            else:
-                raise
-        effective_mode = payload["generator_mode"]
-        fallback_used = False
-        legacy_fallback_enabled = bool(enable_legacy_fallback) and _allow_legacy_mode()
-        if (
-            result.returncode != 0
-            and payload["generator_mode"] == "official"
-            and legacy_fallback_enabled
-            and not should_use_module_orchestrator
-        ):
-            fallback_cmd: List[str] = []
-            skip_next = False
-            for part in cmd:
-                if skip_next:
-                    skip_next = False
-                    continue
-                if part == "--generator-mode":
-                    skip_next = True
-                    continue
-                fallback_cmd.append(part)
-            fallback_cmd.extend(["--generator-mode", "legacy"])
-            result = _run(fallback_cmd, cmd_timeout=int(timeout))
-            effective_mode = "legacy"
-            fallback_used = True
-
-        if result.returncode != 0:
-            detail = (result.stderr or result.stdout or "").strip()
-            classification = classify_failure(detail)
-            raise MiniMaxExportError(
-                message=f"MiniMax PPTX export failed: {detail[:800]}",
-                classification=classification,
-                detail=detail,
-            )
-        if not output_path.exists():
-            detail = "MiniMax PPTX export reported success but file was not created"
-            classification = classify_failure(detail)
-            raise MiniMaxExportError(
-                message=detail,
-                classification=classification,
-                detail=detail,
-            )
-
-        render_spec: Dict[str, Any] = {}
-        if render_spec_path.exists():
+        with tempfile.TemporaryDirectory(prefix="drawingml_export_") as tmp_dir:
+            temp_root = Path(tmp_dir)
             try:
-                parsed = json.loads(render_spec_path.read_text(encoding="utf-8"))
-                if isinstance(parsed, dict):
-                    render_spec = parsed
-            except Exception as exc:
-                logger.warning("failed to parse minimax render spec: %s", exc)
+                output_bytes, assembly_stats = _assemble_pptx_with_drawingml(
+                    slides=prepared_slides,
+                    temp_root=temp_root,
+                )
+            except Exception as first_exc:
+                logger.warning(
+                    "[minimax_exporter] drawingml primary assembly failed, retrying with fully templated SVG: %s",
+                    first_exc,
+                )
+                retry_slides = _render_all_slides_with_template(
+                    slides=prepared_slides,
+                    deck_title=title,
+                    design_spec=payload.get("design_spec")
+                    if isinstance(payload.get("design_spec"), dict)
+                    else None,
+                )
+                try:
+                    output_bytes, assembly_stats = _assemble_pptx_with_drawingml(
+                        slides=retry_slides,
+                        temp_root=temp_root,
+                    )
+                    prepared_slides = retry_slides
+                    payload["slides"] = prepared_slides
+                    svg_stats["full_template_retry_used"] = 1
+                    svg_stats["full_template_retry_slides"] = len(retry_slides)
+                except Exception as retry_exc:
+                    detail = f"drawingml_export_failed: {first_exc}; retry_failed: {retry_exc}"
+                    classification = classify_failure(detail)
+                    raise MiniMaxExportError(
+                        message="MiniMax PPTX export failed: DrawingML assembly failed",
+                        classification=classification,
+                        detail=detail,
+                    ) from retry_exc
 
-        generator_meta = _extract_json_from_stdout(result.stdout)
-        if should_use_module_orchestrator:
-            generator_meta["module_retry_enabled"] = True
-            generator_meta["module_orchestrator_enabled"] = True
-            generator_meta["module_orchestrator_mode"] = "slide_retry" if should_use_module_retry else "mainflow"
-            generator_meta["module_retry_target_slide_ids"] = normalized_target_slide_ids if should_use_module_retry else []
-            generator_meta["module_mainflow_enabled"] = bool(should_use_module_mainflow)
-            generator_meta["module_mainflow_render_each_enabled"] = bool(render_each)
-            if isinstance(generator_meta.get("compile"), dict):
-                compile_meta = dict(generator_meta.get("compile") or {})
-                compile_meta.setdefault("is_full_deck", True)
-                generator_meta["compile"] = compile_meta
-        if fallback_used:
-            generator_meta["fallback_used"] = True
-            generator_meta["generator_mode"] = effective_mode
-        if module_timeout_fallback_used:
-            generator_meta["module_timeout_fallback_used"] = True
+        render_spec = _build_render_spec(prepared_slides)
+        effective_mode = "drawingml"
+        generator_meta: Dict[str, Any] = {
+            "success": True,
+            "engine": "drawingml_native",
+            "generator_mode": effective_mode,
+            "requested_generator_mode": str(payload.get("generator_mode") or "official"),
+            "render_channel": effective_channel,
+            "render_slides": len(prepared_slides),
+            "timeout_sec": int(timeout),
+            **svg_stats,
+            **assembly_stats,
+        }
         if channel_fallback_reason:
             generator_meta["channel_fallback_used"] = True
             generator_meta["channel_fallback_reason"] = channel_fallback_reason
-        generator_meta["render_channel"] = effective_channel
 
         themed_bytes = patch_pptx_theme_colors(
-            output_path.read_bytes(),
+            output_bytes,
             payload.get("minimax_palette_key") or payload.get("theme", {}).get("palette") or "",
         )
         return {
@@ -1091,16 +924,8 @@ def export_minimax_pptx(
             },
             "generator_mode": effective_mode,
             "render_channel": effective_channel,
-            "is_full_deck": bool(should_use_module_orchestrator or normalized_retry_scope == "deck"),
+            "is_full_deck": True,
         }
-    except subprocess.TimeoutExpired as exc:
-        detail = f"subprocess.TimeoutExpired: {exc}"
-        classification = classify_failure(detail)
-        raise MiniMaxExportError(
-            message=f"MiniMax PPTX export timeout after {timeout}s",
-            classification=classification,
-            detail=detail,
-        ) from exc
     except MiniMaxExportError:
         raise
     except Exception as exc:
@@ -1111,16 +936,3 @@ def export_minimax_pptx(
             classification=classification,
             detail=detail,
         ) from exc
-    finally:
-        for path in (input_path, output_path, render_spec_path):
-            if path and path.exists():
-                try:
-                    path.unlink()
-                except Exception:
-                    logger.debug("failed to cleanup temp file: %s", path, exc_info=True)
-        for dir_path in (modules_dir,):
-            if dir_path and dir_path.exists():
-                try:
-                    shutil.rmtree(dir_path, ignore_errors=True)
-                except Exception:
-                    logger.debug("failed to cleanup temp dir: %s", dir_path, exc_info=True)

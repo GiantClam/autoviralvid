@@ -100,3 +100,9 @@ nul
 output/
 test_outputs/
 test_inputs/
+test_output/
+template/
+
+# local generated deck artifacts (repo root)
+/*.pptx
+/*_content.txt
