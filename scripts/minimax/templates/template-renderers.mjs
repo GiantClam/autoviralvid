@@ -127,9 +127,7 @@ function stripBoilerplatePrefix(text) {
 function semanticFallbackBullets({ base = "", max = 8 }) {
   const topic = stripBoilerplatePrefix(base) || String(base || "").trim();
   if (!topic) return [];
-  const pieces = splitText(topic, max).map((item) => stripBoilerplatePrefix(item)).filter(Boolean);
-  if (pieces.length) return pieces.slice(0, max);
-  return [truncate(topic, Math.max(12, max * 4))];
+  return splitText(topic, max).map((item) => stripBoilerplatePrefix(item)).filter(Boolean).slice(0, max);
 }
 
 function semanticSequenceLabel({
@@ -148,7 +146,7 @@ function semanticSequenceLabel({
   }
   const cleanedBase = stripBoilerplatePrefix(fallbackBase);
   if (cleanedBase) return truncate(cleanedBase, maxChars);
-  return truncate(preferZh ? `要点${Number(index) + 1}` : `Point ${Number(index) + 1}`, maxChars);
+  return truncate(String(Number(index) + 1), maxChars);
 }
 
 function pickSecondaryHeading(primary, points = [], fallback = "Focus") {
@@ -208,16 +206,37 @@ function safeBulletsFromArgs(args, max = 12) {
     if (out.length >= max) break;
   }
   if (out.length < max) {
-    const fallbackBase = stripBoilerplatePrefix(String(sourceSlide?.title || sourceSlide?.slide_id || "").trim());
-    const generated = semanticFallbackBullets({
-      base: fallbackBase,
-      max: Math.max(3, max),
-    });
-    for (const item of generated) {
-      const key = normalizeTextKey(item);
-      if (!key || seen.has(key)) continue;
-      seen.add(key);
-      out.push(item);
+    const fallbackSources = [
+      sourceSlide?.title,
+      sourceSlide?.narration,
+      sourceSlide?.speaker_notes,
+    ];
+    for (const source of fallbackSources) {
+      const generated = semanticFallbackBullets({
+        base: source,
+        max: Math.max(3, max),
+      });
+      for (const item of generated) {
+        const key = normalizeTextKey(item);
+        if (!key || seen.has(key)) continue;
+        seen.add(key);
+        out.push(item);
+        if (out.length >= max) break;
+      }
+      if (out.length >= max) break;
+    }
+  }
+  if (out.length < max) {
+    for (const block of blocks) {
+      const text = blockText(block);
+      if (!text || isPlaceholderLike(text)) continue;
+      for (const item of splitText(text, 4)) {
+        const key = normalizeTextKey(item);
+        if (!key || seen.has(key)) continue;
+        seen.add(key);
+        out.push(item);
+        if (out.length >= max) break;
+      }
       if (out.length >= max) break;
     }
   }
@@ -360,14 +379,16 @@ function extractKpiCards(sourceSlide, bullets = [], count = 3) {
   const fallbackPrimary = extractKpi(sourceSlide, bullets);
   pushItem(fallbackPrimary);
   while (out.length < count) {
-    const seed = bullets[out.length] || bullets[0] || `Metric ${out.length + 1}`;
+    const seed = bullets[out.length] || bullets[0] || fallbackPrimary.label || "";
+    if (!seed) break;
     pushItem({
-      number: Number.isFinite(Number(fallbackPrimary.number)) ? Number(fallbackPrimary.number) + out.length * 7 : out.length + 1,
-      unit: String(fallbackPrimary.unit || "%"),
+      number: fallbackPrimary.number,
+      unit: String(fallbackPrimary.unit || ""),
       label: seed,
-      trend: Number(fallbackPrimary.trend || 0) + out.length * 2,
+      trend: Number(fallbackPrimary.trend || 0),
     });
     if (out.length >= count) break;
+    if (out.length === 1 && !Number.isFinite(Number(fallbackPrimary.number))) break;
   }
   return out.slice(0, count);
 }

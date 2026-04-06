@@ -189,6 +189,62 @@ def _enforce_profile_field_ownership(
     return out
 
 
+_VISUAL_DECISION_OWNED_FIELDS = (
+    "style_variant",
+    "palette_key",
+    "theme_recipe",
+    "tone",
+    "template_family",
+    "layout_grid",
+    "render_path",
+    "skill_profile",
+)
+
+
+def _resolve_slide_identity(slide: Dict[str, Any], index: int) -> str:
+    for key in ("slide_id", "id", "page_number"):
+        raw = str(slide.get(key) or "").strip()
+        if raw:
+            return raw
+    return f"slide-{index + 1}"
+
+
+def _collect_visual_owner_conflicts(
+    slides: List[Dict[str, Any]],
+    decision: Dict[str, Any],
+) -> List[str]:
+    if not isinstance(decision, dict):
+        return []
+    normalized = normalize_design_decision_v1(decision)
+    deck = normalized.get("deck") if isinstance(normalized.get("deck"), dict) else {}
+    rows = normalized.get("slides") if isinstance(normalized.get("slides"), list) else []
+    by_slide: Dict[str, Dict[str, Any]] = {}
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        sid = str(row.get("slide_id") or "").strip()
+        if sid and sid not in by_slide:
+            by_slide[sid] = row
+    conflicts: List[str] = []
+    for idx, slide in enumerate(slides or []):
+        if not isinstance(slide, dict):
+            continue
+        sid = _resolve_slide_identity(slide, idx)
+        row = by_slide.get(sid, {})
+        for field in _VISUAL_DECISION_OWNED_FIELDS:
+            target = str(row.get(field) or "").strip() or str(deck.get(field) or "").strip()
+            if not target or target.lower() in {"auto", "none", "null", "undefined"}:
+                continue
+            current = str(slide.get(field) or "").strip()
+            if not current or current.lower() in {"auto", "none", "null", "undefined"}:
+                continue
+            if current != target:
+                conflicts.append(f"{sid}:{field}:{current}->{target}")
+                if len(conflicts) >= 20:
+                    return conflicts
+    return conflicts
+
+
 def _canonicalize_pipeline_palette(
     palette_key: str,
     *,
@@ -10797,6 +10853,21 @@ class PPTService:
                 execution_profile=requested_execution_profile,
                 force_ppt_master=requested_force_ppt_master,
             )
+            requested_quality_profile = _resolve_quality_profile_id(
+                req.quality_profile,
+                topic=req.title,
+                purpose=req.retry_hint,
+                audience=req.author,
+                total_pages=len(slides_data),
+            )
+            effective_theme_recipe = str(layer1_design.get("theme_recipe") or req.theme_recipe or "auto")
+            requested_deck_archetype_profile = _derive_deck_archetype_profile(
+                topic=req.title,
+                audience=req.author,
+                purpose=req.retry_hint,
+                quality_profile=requested_quality_profile,
+                theme_recipe=effective_theme_recipe,
+            )
             effective_style_variant = str(layer1_design.get("style_variant") or req.minimax_style_variant)
             effective_palette_key = _canonicalize_pipeline_palette(
                 str(layer1_design.get("palette_key") or _default_palette_for_archetype(requested_deck_archetype_profile, str(req.minimax_palette_key or "auto"))),
@@ -10812,24 +10883,9 @@ class PPTService:
                 effective_palette_key = "education_office_classic"
             effective_template_family = str(layer1_design.get("template_family") or req.template_family)
             effective_skill_profile = str(layer1_design.get("skill_profile") or req.skill_profile)
-            effective_theme_recipe = str(layer1_design.get("theme_recipe") or req.theme_recipe or "auto")
             effective_tone = str(layer1_design.get("tone") or req.tone or "auto").strip().lower()
             if effective_tone not in {"auto", "light", "dark"}:
                 effective_tone = "auto"
-            requested_quality_profile = _resolve_quality_profile_id(
-                req.quality_profile,
-                topic=req.title,
-                purpose=req.retry_hint,
-                audience=req.author,
-                total_pages=len(slides_data),
-            )
-            requested_deck_archetype_profile = _derive_deck_archetype_profile(
-                topic=req.title,
-                audience=req.author,
-                purpose=req.retry_hint,
-                quality_profile=requested_quality_profile,
-                theme_recipe=effective_theme_recipe,
-            )
             visual_seed = await _hydrate_image_assets(
                 _apply_visual_orchestration(
                     _apply_skill_planning_to_render_payload(
@@ -10890,6 +10946,17 @@ class PPTService:
                 skill_profile=effective_skill_profile,
                 slides=slides_data,
                 decision_source="export_entry",
+            )
+        owner_conflicts = _collect_visual_owner_conflicts(slides_data, effective_design_decision)
+        if owner_conflicts:
+            if dev_fast_fail:
+                raise RuntimeError(
+                    "visual_decision_owner_conflict:" + ";".join(owner_conflicts[:8])
+                )
+            logger.warning(
+                "[ppt_service] visual decision owner conflict auto-corrected count=%s sample=%s",
+                len(owner_conflicts),
+                owner_conflicts[:5],
             )
         slides_data = freeze_retry_visual_identity(slides_data, effective_design_decision)
         skill = "minimax_pptx_generator"

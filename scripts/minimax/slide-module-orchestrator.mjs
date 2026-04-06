@@ -779,11 +779,22 @@ function repairCompilePayloadContract(payload) {
       const slideType = normalizeText(slide.slide_type, "content").toLowerCase();
       if (["cover", "summary", "toc", "divider", "hero_1"].includes(slideType)) continue;
 
-      if (reason.includes("one of [chart|kpi] is required")) {
-        if (!hasBlockType(slide, ["chart", "kpi"])) {
-          pushChartBlock(slide, repairs.length + 1);
-          repairs.push({ pass, slide_index: slideIndex, action: "add_chart_for_required_group" });
-          changed = true;
+      const requiredGroupMatch = /one of \[([^\]]+)\] is required/i.exec(reason);
+      if (requiredGroupMatch) {
+        const requiredGroup = String(requiredGroupMatch[1] || "")
+          .split("|")
+          .map((item) => normalizeText(item, "").toLowerCase())
+          .filter(Boolean);
+        if (requiredGroup.length > 0 && !hasBlockType(slide, requiredGroup)) {
+          if (requiredGroup.some((type) => ["chart", "kpi", "table"].includes(type))) {
+            pushChartBlock(slide, repairs.length + 1);
+            repairs.push({ pass, slide_index: slideIndex, action: "add_chart_for_required_group" });
+            changed = true;
+          } else if (requiredGroup.some((type) => ["body", "list", "quote", "icon_text", "workflow"].includes(type))) {
+            pushBodyBlock(slide, repairs.length + 1);
+            repairs.push({ pass, slide_index: slideIndex, action: "add_text_for_required_group" });
+            changed = true;
+          }
         }
         continue;
       }

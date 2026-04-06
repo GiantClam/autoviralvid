@@ -9,6 +9,9 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any, Dict, List, Mapping
 
+CANONICAL_DECISION_TRACE_OWNER = "agent/src/ppt_design_decision.py"
+FINAL_OWNER_ASSERTION_OWNER = "agent/src/ppt_service.py"
+
 _DECK_FIELDS = (
     "style_variant",
     "palette_key",
@@ -89,11 +92,21 @@ def normalize_design_decision_v1(raw: Any) -> Dict[str, Any]:
         source = _normalize_text(row.get("source") or row.get("stage"))
         if not source:
             continue
+        owned_fields = row.get("owned_fields")
+        normalized_owned_fields: List[str] = []
+        if isinstance(owned_fields, list):
+            for item in owned_fields:
+                text = _normalize_text(item)
+                if text:
+                    normalized_owned_fields.append(text)
+        owner_path = _normalize_text(row.get("owner"))
         trace.append(
             {
                 "source": source,
                 "detail": _normalize_text(row.get("detail") or row.get("message")),
                 "confidence": float(row.get("confidence") or 0.0),
+                "owner": owner_path or CANONICAL_DECISION_TRACE_OWNER,
+                "owned_fields": normalized_owned_fields,
             }
         )
 
@@ -153,7 +166,15 @@ def build_design_decision_v1(
 
     trace = [dict(item) for item in (decision_trace or []) if isinstance(item, Mapping)]
     if decision_source:
-        trace.append({"source": decision_source, "detail": "decision_built", "confidence": 1.0})
+        trace.append(
+            {
+                "source": decision_source,
+                "detail": "decision_built",
+                "confidence": 1.0,
+                "owner": CANONICAL_DECISION_TRACE_OWNER,
+                "owned_fields": list(_DECK_FIELDS),
+            }
+        )
 
     return normalize_design_decision_v1(
         {
@@ -253,6 +274,10 @@ def freeze_retry_visual_identity(
     decision: Mapping[str, Any] | None,
 ) -> List[Dict[str, Any]]:
     normalized = normalize_design_decision_v1(decision)
+    prefilled = apply_design_decision_to_slides(
+        [dict(raw) for raw in (slides or []) if isinstance(raw, Mapping)],
+        normalized,
+    )
     deck = normalized.get("deck") if isinstance(normalized.get("deck"), Mapping) else {}
     style_variant = _normalize_text(deck.get("style_variant"))
     palette_key = _normalize_text(deck.get("palette_key"))
@@ -261,9 +286,7 @@ def freeze_retry_visual_identity(
     template_family = _normalize_text(deck.get("template_family"))
     skill_profile = _normalize_text(deck.get("skill_profile"))
     out: List[Dict[str, Any]] = []
-    for raw in slides or []:
-        if not isinstance(raw, Mapping):
-            continue
+    for raw in prefilled:
         slide = deepcopy(dict(raw))
         if style_variant:
             slide["style_variant"] = style_variant
