@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import statistics
 import subprocess
 import sys
@@ -31,6 +32,26 @@ THEME_OUTPUT_DIR = {
 REQUIRED_RUNS_PER_THEME = 3
 EVAL_QUALITY_PROFILE = "high_density_consulting"
 
+THEME_STRUCTURE_TERMS: Dict[str, List[str]] = {
+    "courseware": ["课程", "课堂", "学习", "案例", "总结"],
+    "work_report": ["汇报", "成果", "问题", "计划", "季度"],
+    "investor_pitch": ["融资", "路演", "市场", "商业模式", "财务"],
+}
+
+THEME_FACT_TERMS: Dict[str, List[str]] = {
+    "courseware": ["核心概念", "关键角色", "阶段", "影响", "总结"],
+    "work_report": ["关键成果", "问题", "下阶段计划", "指标", "风险"],
+    "investor_pitch": ["市场机会", "产品方案", "商业模式", "财务预测", "融资需求"],
+}
+
+THEME_CONTAMINATION_TERMS: Dict[str, List[str]] = {
+    "courseware": ["融资路演", "季度汇报", "工作汇报", "财务预测", "融资需求"],
+    "work_report": ["融资路演", "估值", "投后", "课堂展示", "学习目标", "课程总结"],
+    "investor_pitch": ["季度汇报", "工作汇报", "课堂总结", "课程总结", "学习目标", "教学案例"],
+}
+
+_CONFLICT_CODE_TOKENS = ("fact_conflict", "factual_conflict", "hallucination", "contradiction")
+
 
 def _repo_root() -> Path:
     return Path(__file__).resolve().parents[2]
@@ -55,6 +76,202 @@ def _to_float(value: Any, default: float = 0.0) -> float:
 def _normalize_quality_profile(value: Any) -> str:
     text = str(value or "").strip().lower()
     return text or EVAL_QUALITY_PROFILE
+
+
+def _clamp01(value: float) -> float:
+    return max(0.0, min(1.0, float(value)))
+
+
+def _normalize_text_key(value: Any) -> str:
+    return re.sub(r"\s+", " ", str(value or "").strip().lower())
+
+
+def _extract_topic_focus_terms(prompt: str) -> List[str]:
+    text = str(prompt or "")
+    parts: List[str] = []
+    quoted = re.findall(r"[“\"]([^”\"]+)[”\"]", text)
+    if quoted:
+        parts.extend(quoted)
+    else:
+        parts.append(text)
+    out: List[str] = []
+    seen = set()
+    for part in parts:
+        for item in re.split(r"[：:，,、；;。.!?\n]+", str(part or "")):
+            token = str(item or "").strip()
+            if len(token) < 2:
+                continue
+            key = _normalize_text_key(token)
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append(token)
+            if len(out) >= 8:
+                return out
+    return out
+
+
+def _iter_text_segments(node: Any) -> Iterable[str]:
+    if isinstance(node, str):
+        text = node.strip()
+        if text:
+            yield text
+        return
+    if isinstance(node, dict):
+        for value in node.values():
+            yield from _iter_text_segments(value)
+        return
+    if isinstance(node, list):
+        for row in node:
+            yield from _iter_text_segments(row)
+
+
+def _collect_text_corpus(payload: Dict[str, Any]) -> str:
+    text_parts: List[str] = []
+    for key in ("slides", "video_slides"):
+        value = payload.get(key)
+        if isinstance(value, list):
+            text_parts.extend(_iter_text_segments(value))
+    for key in ("title", "topic", "narration", "speaker_notes"):
+        value = payload.get(key)
+        if isinstance(value, str) and value.strip():
+            text_parts.append(value.strip())
+    return "\n".join(text_parts)
+
+
+def _keyword_hit_stats(text: str, keywords: List[str]) -> Dict[str, Any]:
+    lowered = _normalize_text_key(text)
+    unique_hits = 0
+    hit_terms: List[str] = []
+    for token in keywords:
+        term = str(token or "").strip()
+        if not term:
+            continue
+        if _normalize_text_key(term) in lowered:
+            unique_hits += 1
+            hit_terms.append(term)
+    total = len([k for k in keywords if str(k or "").strip()])
+    return {
+        "unique_hits": unique_hits,
+        "total_terms": total,
+        "coverage": (float(unique_hits) / float(total)) if total else 1.0,
+        "hit_terms": hit_terms,
+    }
+
+
+def _extract_issue_codes(payload: Dict[str, Any]) -> List[str]:
+    issue_codes: List[str] = []
+    if isinstance(payload.get("observability_report"), dict):
+        issue_codes.extend(
+            str(item)
+            for item in (payload.get("observability_report", {}).get("issue_codes") or [])
+            if str(item or "").strip()
+        )
+    if isinstance(payload.get("text_qa"), dict):
+        issue_codes.extend(
+            str(item)
+            for item in (payload.get("text_qa", {}).get("issue_codes") or [])
+            if str(item or "").strip()
+        )
+    if isinstance(payload.get("quality_score"), dict):
+        counts = payload.get("quality_score", {}).get("issue_counts")
+        if isinstance(counts, dict):
+            issue_codes.extend(str(key) for key, value in counts.items() if int(value or 0) > 0)
+    dedup: List[str] = []
+    seen = set()
+    for code in issue_codes:
+        key = _normalize_text_key(code)
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        dedup.append(code)
+    return dedup
+
+
+def extract_topic_fact_metrics(
+    payload: Dict[str, Any],
+    *,
+    theme: str,
+    prompt: str,
+) -> Dict[str, Any]:
+    theme_key = str(theme or "").strip().lower()
+    corpus = _collect_text_corpus(payload)
+    if len(corpus.strip()) < 8:
+        return {
+            "topic_consistency_score": 1.0,
+            "fact_coverage_rate": 1.0,
+            "fact_conflict_count": 0,
+            "cross_topic_contamination_count": 0,
+            "topic_hit_terms": [],
+            "fact_hit_terms": [],
+            "contamination_hit_terms": [],
+            "issue_codes": _extract_issue_codes(payload),
+            "insufficient_text_evidence": True,
+        }
+    prompt_terms = _extract_topic_focus_terms(prompt)
+    topic_terms = list(THEME_STRUCTURE_TERMS.get(theme_key, [])) + prompt_terms
+    fact_terms = list(THEME_FACT_TERMS.get(theme_key, [])) + prompt_terms[:5]
+    contamination_terms = list(THEME_CONTAMINATION_TERMS.get(theme_key, []))
+    topic_stats = _keyword_hit_stats(corpus, topic_terms)
+    fact_stats = _keyword_hit_stats(corpus, fact_terms)
+    contamination_stats = _keyword_hit_stats(corpus, contamination_terms)
+    issue_codes = _extract_issue_codes(payload)
+    fact_conflict_count = sum(
+        1 for code in issue_codes if any(token in _normalize_text_key(code) for token in _CONFLICT_CODE_TOKENS)
+    )
+    contamination_count = int(contamination_stats.get("unique_hits", 0))
+    topic_score = _clamp01(float(topic_stats.get("coverage", 0.0)) - min(0.5, 0.1 * contamination_count))
+    return {
+        "topic_consistency_score": float(topic_score),
+        "fact_coverage_rate": float(_clamp01(float(fact_stats.get("coverage", 0.0)))),
+        "fact_conflict_count": int(fact_conflict_count),
+        "cross_topic_contamination_count": int(contamination_count),
+        "topic_hit_terms": list(topic_stats.get("hit_terms") or []),
+        "fact_hit_terms": list(fact_stats.get("hit_terms") or []),
+        "contamination_hit_terms": list(contamination_stats.get("hit_terms") or []),
+        "issue_codes": issue_codes,
+    }
+
+
+def extract_decision_execution_metrics(payload: Dict[str, Any]) -> Dict[str, Any]:
+    decision = payload.get("design_decision_v1") if isinstance(payload.get("design_decision_v1"), dict) else {}
+    trace = decision.get("decision_trace") if isinstance(decision.get("decision_trace"), list) else []
+    owner_by_field: Dict[str, str] = {}
+    owner_conflicts = 0
+    for row in trace:
+        if not isinstance(row, dict):
+            continue
+        owner = str(row.get("owner") or "").strip()
+        owned_fields = row.get("owned_fields") if isinstance(row.get("owned_fields"), list) else []
+        for field in owned_fields:
+            key = str(field or "").strip()
+            if not key:
+                continue
+            prev_owner = owner_by_field.get(key)
+            if prev_owner and owner and prev_owner != owner:
+                owner_conflicts += 1
+            if owner and key not in owner_by_field:
+                owner_by_field[key] = owner
+    obs = payload.get("observability_report") if isinstance(payload.get("observability_report"), dict) else {}
+    node_additions_raw = obs.get("node_semantic_additions_count", 0)
+    try:
+        node_additions = int(node_additions_raw)
+    except Exception:
+        node_additions = 0
+    issue_codes = _extract_issue_codes(payload)
+    render_path_policy_passed = not any(
+        token in _normalize_text_key(code)
+        for code in issue_codes
+        for token in ("render_path_policy_violation", "density_only_svg")
+    )
+    if owner_conflicts > 0:
+        render_path_policy_passed = bool(render_path_policy_passed)
+    return {
+        "decision_uniqueness_passed": owner_conflicts == 0,
+        "decision_owner_conflict_count": int(owner_conflicts),
+        "node_semantic_additions_count": int(max(0, node_additions)),
+        "render_path_policy_passed": bool(render_path_policy_passed),
+    }
 
 
 def _coerce_quality_score(payload: Dict[str, Any]) -> Optional[QualityScoreResult]:
@@ -262,6 +479,12 @@ def _list_run_files(run_dir: Path) -> List[Path]:
 def _theme_stats(records: List[Dict[str, Any]], *, baseline_score: Optional[float] = None) -> Dict[str, Any]:
     total = len(records)
     visual_scores = [_to_float(row.get("visual_avg_score"), 0.0) for row in records]
+    topic_scores = [_to_float(row.get("topic_consistency_score"), 1.0) for row in records]
+    fact_scores = [_to_float(row.get("fact_coverage_rate"), 1.0) for row in records]
+    max_fact_conflict = max((int(row.get("fact_conflict_count", 0) or 0) for row in records), default=0)
+    max_contamination = max((int(row.get("cross_topic_contamination_count", 0) or 0) for row in records), default=0)
+    decision_uniqueness_all_pass = all(bool(row.get("decision_uniqueness_passed", True)) for row in records) if records else False
+    node_semantic_additions_max = max((int(row.get("node_semantic_additions_count", 0) or 0) for row in records), default=0)
     passing_runs = sum(
         1
         for row in records
@@ -278,6 +501,14 @@ def _theme_stats(records: List[Dict[str, Any]], *, baseline_score: Optional[floa
         "pass_rate": pass_rate,
         "mean_visual_avg_score": mean_visual,
         "stddev_visual_avg_score": stddev_visual,
+        "mean_topic_consistency_score": float(statistics.mean(topic_scores)) if topic_scores else 0.0,
+        "stddev_topic_consistency_score": float(statistics.pstdev(topic_scores)) if len(topic_scores) > 1 else 0.0,
+        "mean_fact_coverage_rate": float(statistics.mean(fact_scores)) if fact_scores else 0.0,
+        "stddev_fact_coverage_rate": float(statistics.pstdev(fact_scores)) if len(fact_scores) > 1 else 0.0,
+        "max_fact_conflict_count": int(max_fact_conflict),
+        "max_cross_topic_contamination_count": int(max_contamination),
+        "decision_uniqueness_all_pass": bool(decision_uniqueness_all_pass),
+        "node_semantic_additions_max": int(node_semantic_additions_max),
         "accuracy_all_pass": bool(accuracy_all_pass),
         "candidate_modes": sorted(
             {
@@ -376,6 +607,12 @@ def command_run(args: argparse.Namespace) -> int:
                 f" expected={expected_quality_profile} got={run_quality_profile} run={pipeline_run_id or idx + 1}"
             )
         visual = extract_visual_professional_score(export_payload)
+        topic_fact = extract_topic_fact_metrics(
+            export_payload,
+            theme=theme,
+            prompt=THEME_PROMPTS.get(theme, ""),
+        )
+        decision_exec = extract_decision_execution_metrics(export_payload)
         run_id = pipeline_run_id or str(uuid.uuid4())
         record = {
             "run_id": run_id,
@@ -389,6 +626,15 @@ def command_run(args: argparse.Namespace) -> int:
             "scorer_version": str(visual.get("scorer_version") or "v1"),
             "candidate_mode": run_candidate_mode,
             "quality_profile": run_quality_profile,
+            "topic_consistency_score": float(topic_fact.get("topic_consistency_score", 0.0)),
+            "fact_coverage_rate": float(topic_fact.get("fact_coverage_rate", 0.0)),
+            "fact_conflict_count": int(topic_fact.get("fact_conflict_count", 0)),
+            "cross_topic_contamination_count": int(topic_fact.get("cross_topic_contamination_count", 0)),
+            "decision_uniqueness_passed": bool(decision_exec.get("decision_uniqueness_passed", True)),
+            "decision_owner_conflict_count": int(decision_exec.get("decision_owner_conflict_count", 0)),
+            "node_semantic_additions_count": int(decision_exec.get("node_semantic_additions_count", 0)),
+            "render_path_policy_passed": bool(decision_exec.get("render_path_policy_passed", True)),
+            "issue_codes": list(topic_fact.get("issue_codes") or []),
             "source": {
                 "pipeline_run_id": pipeline_run_id,
                 "has_export_payload": bool(export_payload),
@@ -474,10 +720,12 @@ def command_aggregate(args: argparse.Namespace) -> int:
         > 0.0,
         "work_report_total_runs_ge_3": themes_report["work_report"]["total_runs"] >= REQUIRED_RUNS_PER_THEME,
         "work_report_mean_visual_gt_8": _to_float(themes_report["work_report"].get("mean_visual_avg_score"), 0.0) > 8.0,
+        "work_report_pass_rate_eq_1_0": _to_float(themes_report["work_report"].get("pass_rate"), 0.0) >= 1.0,
         "work_report_pass_rate_ge_2_3": _to_float(themes_report["work_report"].get("pass_rate"), 0.0) >= (2.0 / 3.0),
         "work_report_accuracy_all_pass": bool(themes_report["work_report"].get("accuracy_all_pass", False)),
         "investor_pitch_total_runs_ge_3": themes_report["investor_pitch"]["total_runs"] >= REQUIRED_RUNS_PER_THEME,
         "investor_pitch_mean_visual_gt_8": _to_float(themes_report["investor_pitch"].get("mean_visual_avg_score"), 0.0) > 8.0,
+        "investor_pitch_pass_rate_eq_1_0": _to_float(themes_report["investor_pitch"].get("pass_rate"), 0.0) >= 1.0,
         "investor_pitch_pass_rate_ge_2_3": _to_float(themes_report["investor_pitch"].get("pass_rate"), 0.0) >= (2.0 / 3.0),
         "investor_pitch_accuracy_all_pass": bool(themes_report["investor_pitch"].get("accuracy_all_pass", False)),
         "courseware_stability_stddev_le_0_50": _to_float(themes_report["courseware"].get("stddev_visual_avg_score"), 999.0)
@@ -491,6 +739,66 @@ def command_aggregate(args: argparse.Namespace) -> int:
         "courseware_quality_profile_match": profile_mismatch_counts["courseware"] == 0,
         "work_report_quality_profile_match": profile_mismatch_counts["work_report"] == 0,
         "investor_pitch_quality_profile_match": profile_mismatch_counts["investor_pitch"] == 0,
+        "courseware_topic_consistency_ge_0_95": _to_float(
+            themes_report["courseware"].get("mean_topic_consistency_score"), 0.0
+        )
+        >= 0.95,
+        "work_report_topic_consistency_ge_0_95": _to_float(
+            themes_report["work_report"].get("mean_topic_consistency_score"), 0.0
+        )
+        >= 0.95,
+        "investor_pitch_topic_consistency_ge_0_95": _to_float(
+            themes_report["investor_pitch"].get("mean_topic_consistency_score"), 0.0
+        )
+        >= 0.95,
+        "courseware_fact_coverage_ge_0_90": _to_float(
+            themes_report["courseware"].get("mean_fact_coverage_rate"), 0.0
+        )
+        >= 0.90,
+        "work_report_fact_coverage_ge_0_90": _to_float(
+            themes_report["work_report"].get("mean_fact_coverage_rate"), 0.0
+        )
+        >= 0.90,
+        "investor_pitch_fact_coverage_ge_0_90": _to_float(
+            themes_report["investor_pitch"].get("mean_fact_coverage_rate"), 0.0
+        )
+        >= 0.90,
+        "courseware_fact_conflict_eq_0": int(themes_report["courseware"].get("max_fact_conflict_count", 1)) == 0,
+        "work_report_fact_conflict_eq_0": int(themes_report["work_report"].get("max_fact_conflict_count", 1)) == 0,
+        "investor_pitch_fact_conflict_eq_0": int(themes_report["investor_pitch"].get("max_fact_conflict_count", 1)) == 0,
+        "courseware_cross_topic_contamination_eq_0": int(
+            themes_report["courseware"].get("max_cross_topic_contamination_count", 1)
+        )
+        == 0,
+        "work_report_cross_topic_contamination_eq_0": int(
+            themes_report["work_report"].get("max_cross_topic_contamination_count", 1)
+        )
+        == 0,
+        "investor_pitch_cross_topic_contamination_eq_0": int(
+            themes_report["investor_pitch"].get("max_cross_topic_contamination_count", 1)
+        )
+        == 0,
+        "courseware_decision_uniqueness_all_pass": bool(
+            themes_report["courseware"].get("decision_uniqueness_all_pass", False)
+        ),
+        "work_report_decision_uniqueness_all_pass": bool(
+            themes_report["work_report"].get("decision_uniqueness_all_pass", False)
+        ),
+        "investor_pitch_decision_uniqueness_all_pass": bool(
+            themes_report["investor_pitch"].get("decision_uniqueness_all_pass", False)
+        ),
+        "courseware_node_semantic_additions_eq_0": int(
+            themes_report["courseware"].get("node_semantic_additions_max", 1)
+        )
+        == 0,
+        "work_report_node_semantic_additions_eq_0": int(
+            themes_report["work_report"].get("node_semantic_additions_max", 1)
+        )
+        == 0,
+        "investor_pitch_node_semantic_additions_eq_0": int(
+            themes_report["investor_pitch"].get("node_semantic_additions_max", 1)
+        )
+        == 0,
     }
     failed_rules = [name for name, ok in rule_results.items() if not bool(ok)]
     overall_pass = len(failed_rules) == 0

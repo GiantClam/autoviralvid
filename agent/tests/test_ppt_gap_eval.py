@@ -7,6 +7,8 @@ from src.ppt_gap_eval import (
     _extract_baseline_slides_from_pptx,
     _pipeline_request_payload,
     build_baseline_score_record,
+    extract_decision_execution_metrics,
+    extract_topic_fact_metrics,
     extract_visual_professional_score,
     main,
 )
@@ -391,3 +393,45 @@ def test_gap_eval_offline_matrix_generates_required_artifacts_without_live_rende
 
     verdict = json.loads((out_root / "verdict.json").read_text(encoding="utf-8"))
     assert verdict["overall_pass"] is True
+
+
+def test_extract_topic_fact_metrics_detects_cross_topic_contamination():
+    payload = {
+        "slides": [
+            {
+                "title": "融资路演总览",
+                "blocks": [
+                    {"block_type": "body", "content": "市场机会与商业模式"},
+                    {"block_type": "body", "content": "本季度工作汇报与课程总结"},
+                ],
+            }
+        ],
+        "text_qa": {"issue_codes": []},
+    }
+    metrics = extract_topic_fact_metrics(payload, theme="investor_pitch", prompt="请制作一份融资路演PPT")
+    assert metrics["topic_consistency_score"] < 1.0
+    assert metrics["cross_topic_contamination_count"] >= 1
+
+
+def test_extract_decision_execution_metrics_detects_owner_conflict():
+    payload = {
+        "design_decision_v1": {
+            "decision_trace": [
+                {
+                    "source": "layer1",
+                    "owner": "a.py",
+                    "owned_fields": ["template_family"],
+                },
+                {
+                    "source": "render",
+                    "owner": "b.mjs",
+                    "owned_fields": ["template_family"],
+                },
+            ]
+        },
+        "observability_report": {"node_semantic_additions_count": 2},
+    }
+    metrics = extract_decision_execution_metrics(payload)
+    assert metrics["decision_uniqueness_passed"] is False
+    assert metrics["decision_owner_conflict_count"] == 1
+    assert metrics["node_semantic_additions_count"] == 2
