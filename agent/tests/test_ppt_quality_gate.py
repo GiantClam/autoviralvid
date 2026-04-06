@@ -518,6 +518,13 @@ def test_visual_audit_gate_detects_overlap_and_image_irrelevance():
     assert "visual_irrelevant_image_ratio_high" in codes
 
 
+def test_visual_audit_gate_requires_payload_by_default():
+    slides = [{"slide_id": "s1", "slide_type": "content", "title": "A"}]
+    result = validate_visual_audit(visual_audit=None, slides=slides, profile="default")
+    assert result.ok is False
+    assert any(issue.code == "visual_audit_missing" for issue in result.issues)
+
+
 def test_visual_audit_gate_returns_slide_level_retry_targets():
     slides = [
         {"slide_id": "s1", "slide_type": "content", "title": "A"},
@@ -668,6 +675,34 @@ def test_weighted_quality_score_penalizes_visual_issue_pressure():
         },
     )
     assert degraded.score < baseline.score
+
+
+def test_weighted_quality_score_can_enforce_visual_audit_presence():
+    slides = [
+        {
+            "slide_id": "s1",
+            "slide_type": "content",
+            "layout_grid": "split_2",
+            "template_family": "architecture_dark_panel",
+            "title": "A",
+            "blocks": [
+                {"block_type": "title", "content": "A"},
+                {"block_type": "body", "content": "A1", "emphasis": ["1"]},
+                {"block_type": "list", "content": "A2"},
+                {"block_type": "image", "content": {"url": "https://example.com/a.png"}},
+            ],
+        }
+    ]
+    result = score_deck_quality(
+        slides=slides,
+        render_spec={"slides": slides},
+        profile="default",
+        enforce_visual_audit_presence=True,
+        visual_audit=None,
+    )
+    assert result.passed is False
+    assert result.issue_counts.get("visual_audit_missing") == 1
+    assert result.diagnostics.get("visual_audit_missing_blocker") is True
 
 
 def test_status_report_requires_executive_summary_with_four_items():
