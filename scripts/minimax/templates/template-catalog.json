@@ -336,8 +336,8 @@
       "visual_whitespace_max_ratio": 0.6,
       "visual_layout_monotony_max_ratio": 0.65,
       "visual_style_inconsistent_max_ratio": 0.55,
-      "quality_score_threshold": 72,
-      "quality_score_warn_threshold": 80,
+      "quality_score_threshold": 75,
+      "quality_score_warn_threshold": 82,
       "quality_score_weights": {
         "structure": 0.26,
         "layout": 0.2,
@@ -409,8 +409,8 @@
       "visual_whitespace_max_ratio": 0.35,
       "visual_layout_monotony_max_ratio": 0.42,
       "visual_style_inconsistent_max_ratio": 0.35,
-      "quality_score_threshold": 78,
-      "quality_score_warn_threshold": 84,
+      "quality_score_threshold": 80,
+      "quality_score_warn_threshold": 86,
       "quality_score_weights": {
         "structure": 0.24,
         "layout": 0.22,

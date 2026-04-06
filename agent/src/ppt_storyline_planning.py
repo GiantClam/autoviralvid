@@ -23,7 +23,19 @@ _NAVIGATION_TOKENS = {
     "高中",
     "学生",
     "教师",
+    "培训",
+    "学习",
 }
+
+_EDUCATION_REQUIRED_SECTIONS = [
+    "cover",
+    "learning_objectives",
+    "core_concepts",
+    "case_analysis",
+    "discussion",
+    "summary",
+    "references",
+]
 
 _BOILERPLATE_PREFIXES = {
     "先说明",
@@ -94,24 +106,84 @@ def _semantic_profile(point: str) -> dict:
     text = str(point or "")
     lower = text.lower()
     if text.startswith("什么是") or lower.startswith("what is"):
-        return {"layout": "split_2", "density": "medium", "elements": ["definition", "list"], "anchor": "concept"}
+        return {
+            "layout": "split_2",
+            "density": "medium",
+            "elements": ["definition", "list"],
+            "anchor": "concept",
+        }
     if any(token in text for token in ("定义", "背景", "概念", "是什么")):
-        return {"layout": "split_2", "density": "medium", "elements": ["definition", "list"], "anchor": "concept"}
+        return {
+            "layout": "split_2",
+            "density": "medium",
+            "elements": ["definition", "list"],
+            "anchor": "concept",
+        }
     if any(token in text for token in ("参与方", "角色", "职责", "主体", "要素")):
-        return {"layout": "asymmetric_2", "density": "medium", "elements": ["roles", "comparison", "list"], "anchor": "roles"}
+        return {
+            "layout": "asymmetric_2",
+            "density": "medium",
+            "elements": ["roles", "comparison", "list"],
+            "anchor": "roles",
+        }
     if any(token in text for token in ("交汇", "影响路径", "双向影响", "联动")):
-        return {"layout": "split_2", "density": "medium", "elements": ["insight", "comparison", "list"], "anchor": "impact"}
-    if any(token in text for token in ("接口", "条约", "批准", "转化", "一元论", "二元论", "制度接口")):
-        return {"layout": "timeline", "density": "medium", "elements": ["process", "timeline", "list"], "anchor": "process"}
+        return {
+            "layout": "split_2",
+            "density": "medium",
+            "elements": ["insight", "comparison", "list"],
+            "anchor": "impact",
+        }
+    if any(
+        token in text
+        for token in ("接口", "条约", "批准", "转化", "一元论", "二元论", "制度接口")
+    ):
+        return {
+            "layout": "timeline",
+            "density": "medium",
+            "elements": ["process", "timeline", "list"],
+            "anchor": "process",
+        }
     if any(token in text for token in ("流程", "步骤", "阶段", "路径", "机制", "结构")):
-        return {"layout": "split_2", "density": "medium", "elements": ["process", "timeline", "list"], "anchor": "process"}
-    if any(token in text for token in ("案例", "证据", "数据", "实证", "example", "case")):
-        return {"layout": "bento_5", "density": "medium", "elements": ["case", "evidence", "image"], "anchor": "case"}
-    if any(token in text for token in ("影响", "联系", "启示", "意义", "作用", "impact")):
-        return {"layout": "split_2", "density": "medium", "elements": ["insight", "list"], "anchor": "impact"}
-    if any(token in text for token in ("争议", "风险", "约束", "挑战", "趋势", "未来", "risk", "trend")):
-        return {"layout": "asymmetric_2", "density": "medium", "elements": ["trend", "insight", "list"], "anchor": "trend"}
-    return {"layout": "split_2", "density": "medium", "elements": ["list", "insight"], "anchor": "text"}
+        return {
+            "layout": "split_2",
+            "density": "medium",
+            "elements": ["process", "timeline", "list"],
+            "anchor": "process",
+        }
+    if any(
+        token in text for token in ("案例", "证据", "数据", "实证", "example", "case")
+    ):
+        return {
+            "layout": "bento_5",
+            "density": "medium",
+            "elements": ["case", "evidence", "image"],
+            "anchor": "case",
+        }
+    if any(
+        token in text for token in ("影响", "联系", "启示", "意义", "作用", "impact")
+    ):
+        return {
+            "layout": "split_2",
+            "density": "medium",
+            "elements": ["insight", "list"],
+            "anchor": "impact",
+        }
+    if any(
+        token in text
+        for token in ("争议", "风险", "约束", "挑战", "趋势", "未来", "risk", "trend")
+    ):
+        return {
+            "layout": "asymmetric_2",
+            "density": "medium",
+            "elements": ["trend", "insight", "list"],
+            "anchor": "trend",
+        }
+    return {
+        "layout": "split_2",
+        "density": "medium",
+        "elements": ["list", "insight"],
+        "anchor": "text",
+    }
 
 
 def _split_subject_focus(text: str) -> tuple[str, str]:
@@ -124,7 +196,11 @@ def _split_subject_focus(text: str) -> tuple[str, str]:
     m = re.search(r"(.+?)在(.+?)中的(.+)$", value)
     if m:
         subject = str(m.group(1) or "").strip()
-        focus = " ".join(str(item or "").strip() for item in m.groups()[1:] if str(item or "").strip())
+        focus = " ".join(
+            str(item or "").strip()
+            for item in m.groups()[1:]
+            if str(item or "").strip()
+        )
         return subject, focus
     m = re.search(r"(.+?)的(.+)$", value)
     if m:
@@ -137,7 +213,11 @@ def _compact_focus_seed(text: str) -> str:
     if not value:
         return ""
     while True:
-        next_value = re.sub(r"^(理解|认识|解码|解析|探究|把握|观察|说明|分析|其对|它对|关于|对)\s*", "", value)
+        next_value = re.sub(
+            r"^(理解|认识|解码|解析|探究|把握|观察|说明|分析|其对|它对|关于|对)\s*",
+            "",
+            value,
+        )
         if next_value == value:
             break
         value = next_value
@@ -224,9 +304,17 @@ def build_research_storyline_notes(
     topic_seed = _extract_topic_seed(topic)
     points = _dedupe_points(data_points, topic_seed)
     prefer_zh = bool(re.search(r"[\u4e00-\u9fff]", topic_seed))
-    navigation_title = "课程导航" if prefer_zh and instructional_context else ("内容导航" if prefer_zh else "Table of Contents")
+    navigation_title = (
+        "课程导航"
+        if prefer_zh and instructional_context
+        else ("内容导航" if prefer_zh else "Table of Contents")
+    )
     classroom_summary_title = "课堂总结" if prefer_zh else "Lesson Summary"
-    ending_title = "谢谢" if prefer_zh and instructional_context else ("总结与启示" if prefer_zh else "Summary & Takeaways")
+    ending_title = (
+        "谢谢"
+        if prefer_zh and instructional_context
+        else ("总结与启示" if prefer_zh else "Summary & Takeaways")
+    )
     reserve_terminal_summary = instructional_context and total_pages >= 9
 
     slots = total_pages - 2
@@ -258,12 +346,16 @@ def build_research_storyline_notes(
     notes: List[StickyNote] = [
         StickyNote(
             page_number=1,
-            core_message=_normalize_point(str(page_anchors.get(1) or topic_seed), topic_seed),
+            core_message=_normalize_point(
+                str(page_anchors.get(1) or topic_seed), topic_seed
+            ),
             layout_hint="cover",
             content_density="low",
             data_elements=[],
             visual_anchor="title",
-            key_points=points[:3] if len(points) >= 3 else [topic_seed, topic_seed, topic_seed],
+            key_points=points[:3]
+            if len(points) >= 3
+            else [topic_seed, topic_seed, topic_seed],
             speaker_notes=str(topic_seed)[:200],
         )
     ]
@@ -273,13 +365,20 @@ def build_research_storyline_notes(
         notes.append(
             StickyNote(
                 page_number=page_number,
-                core_message=_normalize_point(str(page_anchors.get(page_number) or navigation_title), navigation_title),
+                core_message=_normalize_point(
+                    str(page_anchors.get(page_number) or navigation_title),
+                    navigation_title,
+                ),
                 layout_hint="asymmetric_2",
                 content_density="low",
                 data_elements=["toc", "agenda"],
                 visual_anchor="toc",
                 key_points=middle_points[:6] if len(middle_points) >= 3 else points[:6],
-                speaker_notes=("先看课程地图，再进入概念、机制、案例与思考。" if prefer_zh else "Start with the lesson map, then move through concepts, mechanisms, cases, and reflection.")[:200],
+                speaker_notes=(
+                    "先看课程地图，再进入概念、机制、案例与思考。"
+                    if prefer_zh
+                    else "Start with the lesson map, then move through concepts, mechanisms, cases, and reflection."
+                )[:200],
             )
         )
         page_number += 1
@@ -300,7 +399,9 @@ def build_research_storyline_notes(
         notes.append(
             StickyNote(
                 page_number=page_number,
-                core_message=_normalize_point(str(page_anchors.get(page_number) or point), point),
+                core_message=_normalize_point(
+                    str(page_anchors.get(page_number) or point), point
+                ),
                 layout_hint=profile["layout"],
                 content_density=profile["density"],
                 data_elements=list(profile["elements"]),
@@ -316,12 +417,22 @@ def build_research_storyline_notes(
         notes.append(
             StickyNote(
                 page_number=page_number,
-                core_message=_normalize_point(str(page_anchors.get(page_number) or (points[-1] if points else topic_seed)), topic_seed),
+                core_message=_normalize_point(
+                    str(
+                        page_anchors.get(page_number)
+                        or (points[-1] if points else topic_seed)
+                    ),
+                    topic_seed,
+                ),
                 layout_hint="split_2",
                 content_density="medium",
                 data_elements=["list", "insight"],
                 visual_anchor="text",
-                key_points=(points[-3:] if len(points) >= 3 else [topic_seed, topic_seed, topic_seed]),
+                key_points=(
+                    points[-3:]
+                    if len(points) >= 3
+                    else [topic_seed, topic_seed, topic_seed]
+                ),
                 speaker_notes=(points[-1] if points else topic_seed)[:200],
             )
         )
@@ -331,12 +442,19 @@ def build_research_storyline_notes(
         notes.append(
             StickyNote(
                 page_number=max(1, total_pages - 1),
-                core_message=_normalize_point(str(page_anchors.get(total_pages - 1) or classroom_summary_title), classroom_summary_title),
+                core_message=_normalize_point(
+                    str(page_anchors.get(total_pages - 1) or classroom_summary_title),
+                    classroom_summary_title,
+                ),
                 layout_hint="asymmetric_2",
                 content_density="low",
                 data_elements=["summary", "question"],
                 visual_anchor="summary",
-                key_points=(points[-3:] if len(points) >= 3 else [topic_seed, topic_seed, topic_seed]),
+                key_points=(
+                    points[-3:]
+                    if len(points) >= 3
+                    else [topic_seed, topic_seed, topic_seed]
+                ),
                 speaker_notes=classroom_summary_title[:200],
             )
         )
@@ -344,12 +462,21 @@ def build_research_storyline_notes(
     notes.append(
         StickyNote(
             page_number=total_pages,
-            core_message=_normalize_point(str(page_anchors.get(total_pages) or ending_title), ending_title),
+            core_message=_normalize_point(
+                str(page_anchors.get(total_pages) or ending_title), ending_title
+            ),
             layout_hint="summary",
             content_density="low",
-            data_elements=["summary", "action" if not instructional_context else "question"],
+            data_elements=[
+                "summary",
+                "action" if not instructional_context else "question",
+            ],
             visual_anchor="summary",
-            key_points=(points[-3:] if len(points) >= 3 else [topic_seed, topic_seed, topic_seed]),
+            key_points=(
+                points[-3:]
+                if len(points) >= 3
+                else [topic_seed, topic_seed, topic_seed]
+            ),
             speaker_notes=ending_title[:200],
         )
     )
@@ -361,7 +488,9 @@ def build_research_storyline_notes(
         if idx > 0 and note.layout_hint == normalized_notes[-1].layout_hint:
             for candidate in layout_rotation:
                 prev_layout = normalized_notes[-1].layout_hint
-                next_layout = notes[idx + 1].layout_hint if idx + 1 < len(notes) else "summary"
+                next_layout = (
+                    notes[idx + 1].layout_hint if idx + 1 < len(notes) else "summary"
+                )
                 if candidate in {prev_layout, next_layout}:
                     continue
                 updated = note.model_copy(update={"layout_hint": candidate})
@@ -377,7 +506,11 @@ def expand_semantic_support_points(
     instructional_context: bool = False,
 ) -> List[str]:
     title = str(core_message or "").strip()
-    related = [str(item or "").strip() for item in (related_points or []) if str(item or "").strip()]
+    related = [
+        str(item or "").strip()
+        for item in (related_points or [])
+        if str(item or "").strip()
+    ]
     profile = _semantic_profile(title)
     anchor = str(profile.get("anchor") or "text")
     subject, focus = _split_subject_focus(title)
@@ -475,7 +608,70 @@ def expand_semantic_support_points(
 
     merged = _dedupe_point_rows([*related, *base], title=title)
     filtered = [
-        item for item in merged
+        item
+        for item in merged
         if not any(item.startswith(prefix) for prefix in _BOILERPLATE_PREFIXES)
     ]
     return (filtered or merged or [title])[:4]
+
+
+def ensure_education_storyline_completeness(
+    slides: List[Dict],
+    *,
+    purpose: str = "",
+    topic: str = "",
+) -> List[str]:
+    """Validate education PPT has required sections, return missing sections."""
+    purpose_lower = str(purpose or "").lower()
+    topic_lower = str(topic or "").lower()
+
+    # Check if this is education content
+    is_education = (
+        any(
+            token in purpose_lower for token in ["教学", "课程", "课堂", "培训", "教育"]
+        )
+        or any(token in topic_lower for token in ["课堂", "教学", "课程", "学习"])
+        or is_instructional_context(f"{purpose} {topic}")
+    )
+
+    if not is_education:
+        return []
+
+    # Check for required sections
+    slide_types = {
+        str(s.get("slide_type", "")).lower() for s in slides if isinstance(s, dict)
+    }
+    slide_titles = {
+        str(s.get("title", "")).lower() for s in slides if isinstance(s, dict)
+    }
+
+    missing_sections = []
+
+    # Check cover
+    if "cover" not in slide_types and not any(
+        s.get("slide_type") == "cover" for s in slides
+    ):
+        missing_sections.append("cover")
+
+    # Check learning objectives
+    if not any(
+        keyword in " ".join(slide_titles)
+        for keyword in ["学习目标", "课程目标", "learning objective"]
+    ):
+        missing_sections.append("learning_objectives")
+
+    # Check core concepts
+    if not any(
+        keyword in " ".join(slide_titles)
+        for keyword in ["核心概念", "关键概念", "基本概念", "core concept"]
+    ):
+        missing_sections.append("core_concepts")
+
+    # Check summary
+    if "summary" not in slide_types and not any(
+        keyword in " ".join(slide_titles)
+        for keyword in ["总结", "小结", "summary", "conclusion"]
+    ):
+        missing_sections.append("summary")
+
+    return missing_sections

@@ -98,7 +98,9 @@ def execution_profile(requested: Any = None) -> str:
     requested_norm = _normalize_execution_profile(requested)
     if requested_norm:
         return requested_norm
-    env_norm = _normalize_execution_profile(os.getenv("PPT_EXECUTION_PROFILE", "prod_safe"))
+    env_norm = _normalize_execution_profile(
+        os.getenv("PPT_EXECUTION_PROFILE", "prod_safe")
+    )
     return env_norm or "prod_safe"
 
 
@@ -110,6 +112,9 @@ def should_force_ppt_master_hit(
     *,
     requested_execution_profile: Any = None,
     requested_force_flag: Any = None,
+    quality_profile: Any = None,
+    purpose: Any = None,
+    topic: Any = None,
 ) -> bool:
     request_force = _optional_flag(requested_force_flag)
     if request_force is not None:
@@ -117,6 +122,38 @@ def should_force_ppt_master_hit(
     explicit_env = _normalize_text(os.getenv("PPT_FORCE_PPT_MASTER", ""), "")
     if explicit_env:
         return _env_flag("PPT_FORCE_PPT_MASTER", "false")
+
+    # Force ppt-master for education/training content
+    quality_key = _normalize_key(quality_profile, "")
+    purpose_key = _normalize_key(purpose, "")
+    topic_text = _normalize_text(topic, "").lower()
+
+    education_keywords = [
+        "教学",
+        "课程",
+        "课堂",
+        "培训",
+        "教育",
+        "学习",
+        "高中",
+        "学生",
+        "classroom",
+        "teaching",
+        "lesson",
+        "education",
+        "training",
+        "courseware",
+    ]
+
+    if quality_key in {"training_deck", "high_density_consulting"}:
+        return True
+
+    if any(keyword in purpose_key for keyword in ["课程", "教学", "培训", "教育"]):
+        return True
+
+    if any(keyword in topic_text for keyword in education_keywords):
+        return True
+
     return is_dev_strict_profile(requested_execution_profile)
 
 
@@ -128,7 +165,12 @@ def _skill_search_roots() -> List[Path]:
     roots.extend(_parse_env_paths(os.getenv("PPT_MASTER_SKILL_ROOTS", "")))
     roots.extend(
         [
-            agent_root / "tests" / "fixtures" / "skills_reference" / "ppt-master" / "skills",
+            agent_root
+            / "tests"
+            / "fixtures"
+            / "skills_reference"
+            / "ppt-master"
+            / "skills",
             repo_root / "vendor" / "minimax-skills" / "skills",
             repo_root / "skills",
         ]
@@ -179,7 +221,9 @@ def _block_types(slide: Dict[str, Any]) -> Set[str]:
     return out
 
 
-def is_ppt_master_candidate(slide: Dict[str, Any], state: Dict[str, Any] | None = None) -> bool:
+def is_ppt_master_candidate(
+    slide: Dict[str, Any], state: Dict[str, Any] | None = None
+) -> bool:
     runtime = state if isinstance(state, dict) else {}
     render_path = _resolve_render_path(slide, runtime)
     if render_path in {"svg", "png_fallback"}:
@@ -190,7 +234,9 @@ def is_ppt_master_candidate(slide: Dict[str, Any], state: Dict[str, Any] | None 
     types = _block_types(slide)
     if types & _COMPLEX_BLOCK_TYPES:
         return True
-    slide_type = _normalize_key(runtime.get("slide_type") or slide.get("slide_type"), "")
+    slide_type = _normalize_key(
+        runtime.get("slide_type") or slide.get("slide_type"), ""
+    )
     return slide_type in {"timeline", "workflow", "diagram", "architecture"}
 
 
@@ -270,9 +316,10 @@ def execute_ppt_master_skill(
         "sequential_page_generation_only": True,
     }
     if not patch:
-        patch["skill_profile"] = (
-            current_profile
-            or ("architecture" if complex_candidate else _normalize_key(deck.get("skill_profile"), "general-content"))
+        patch["skill_profile"] = current_profile or (
+            "architecture"
+            if complex_candidate
+            else _normalize_key(deck.get("skill_profile"), "general-content")
         )
     return {
         "status": "applied" if patch or outputs else "noop",
