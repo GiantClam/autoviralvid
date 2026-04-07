@@ -1,4 +1,4 @@
-﻿"""PPT service: generation, export, enhancement and render lifecycle."""
+"""PPT service: generation, export, enhancement and render lifecycle."""
 
 from __future__ import annotations
 
@@ -731,21 +731,10 @@ def _requested_skills_for_slide(
         if isinstance(block, dict)
     }
 
+    # Only use ppt-master skill, remove other skills that change style/geometry
     skills: List[str] = [
-        "ppt-orchestra-skill",
         "slide-making-skill",
-        "design-style-skill",
     ]
-    if (
-        idx == 0
-        or idx == max(0, total - 1)
-        or slide_type in {"cover", "toc", "divider", "summary"}
-    ):
-        skills.append("color-font-skill")
-    if render_path == "svg" or layout_grid == "timeline" or (
-        block_types & {"workflow", "diagram"}
-    ):
-        skills.append("pptx")
     if should_force_ppt_master_hit(
         requested_execution_profile=execution_profile,
         requested_force_flag=force_ppt_master,
@@ -754,8 +743,6 @@ def _requested_skills_for_slide(
         topic=slide.get("title"),
     ) or is_ppt_master_candidate(slide, {"execution_profile": execution_profile}):
         skills.append("ppt-master")
-    if has_template_hint:
-        skills.append("ppt-editing-skill")
     existing = (
         slide.get("load_skills") if isinstance(slide.get("load_skills"), list) else []
     )
@@ -1171,12 +1158,8 @@ def _run_layer1_design_skill_chain(
     resolved_execution_profile = _normalize_execution_profile(execution_profile)
     resolved_force_ppt_master = force_ppt_master
 
-    requested_skills = [
-        "ppt-orchestra-skill",
-        "color-font-skill",
-        "design-style-skill",
-        "pptx",
-    ]
+    # Only use ppt-master skill, remove other skills that change style/geometry
+    requested_skills = []
     first_slide = dict(slides[0]) if slides and isinstance(slides[0], dict) else {}
     if should_force_ppt_master_hit(
         requested_execution_profile=resolved_execution_profile,
@@ -1186,8 +1169,6 @@ def _run_layer1_design_skill_chain(
         topic=deck_title,
     ):
         requested_skills.append("ppt-master")
-    if effective_template and effective_template not in {"auto"}:
-        requested_skills.append("ppt-editing-skill")
     deck_context_blob = " ".join(
         part
         for part in [
@@ -2351,9 +2332,11 @@ def _build_render_payload_from_reference_desc(
                 },
             ]
         normalized_blocks = _assign_layout_card_ids(layout_grid, normalized_blocks)
-        slide_template_family = str(
-            raw.get("template_family") or raw.get("template_id") or ""
-        ).strip().lower()
+        slide_template_family = (
+            str(raw.get("template_family") or raw.get("template_id") or "")
+            .strip()
+            .lower()
+        )
         if slide_template_family in {"", "auto"}:
             slide_template_family = ""
         slide_skill_profile = str(raw.get("skill_profile") or "").strip()
@@ -2383,7 +2366,9 @@ def _build_render_payload_from_reference_desc(
             "layout_grid": layout_grid,
             "bg_style": str(raw.get("bg_style") or "light"),
             "title": title,
-            "narration": str(raw.get("notes_for_designer") or raw.get("narration") or ""),
+            "narration": str(
+                raw.get("notes_for_designer") or raw.get("narration") or ""
+            ),
             "image_keywords": [title] if title else [],
             "blocks": normalized_blocks,
             "elements": normalized_elements,
@@ -2414,9 +2399,15 @@ def _build_render_payload_from_reference_desc(
         if isinstance(reference_desc.get("theme"), dict)
         else {}
     )
-    deck_template_family = str(
-        reference_desc.get("template_family") or reference_desc.get("template_id") or ""
-    ).strip().lower()
+    deck_template_family = (
+        str(
+            reference_desc.get("template_family")
+            or reference_desc.get("template_id")
+            or ""
+        )
+        .strip()
+        .lower()
+    )
     if deck_template_family in {"", "auto"}:
         deck_template_family = ""
     deck_skill_profile = str(reference_desc.get("skill_profile") or "").strip()
@@ -3222,9 +3213,7 @@ def _build_presentation_contract_v2(deck: Dict[str, Any]) -> Dict[str, Any]:
             },
             "visual_channel": {
                 "layout": str(slide.get("layout_grid") or "split_2").strip().lower(),
-                "render_path": str(slide.get("render_path") or "svg")
-                .strip()
-                .lower(),
+                "render_path": str(slide.get("render_path") or "svg").strip().lower(),
                 "component_slots": [
                     str((block or {}).get("card_id") or "").strip()
                     for block in (
@@ -3532,7 +3521,8 @@ def _split_topic_focus(topic: str, *, prefer_zh: bool) -> tuple[str, str]:
         subject = str(parts[0] if parts else text).strip()
         focus = str(parts[1] if len(parts) > 1 else "").strip()
         subject = (
-            re.sub(r"^(瑙ｇ爜|鐞嗚В|璁よ瘑|瑙ｆ瀽|鎺㈢┒)\s*", "", subject).strip() or subject
+            re.sub(r"^(瑙ｇ爜|鐞嗚В|璁よ瘑|瑙ｆ瀽|鎺㈢┒)\s*", "", subject).strip()
+            or subject
         )
         subject = subject[:28] if subject else "涓婚"
         focus = focus[:40]
@@ -3803,7 +3793,9 @@ def _clip_text_for_visual_budget(
         limit = 34 if prefer_zh else 72
         if normalized_slide_type in {"cover", "summary", "toc", "divider", "hero_1"}:
             limit += 4
-        title_parts = [part.strip() for part in re.split(r"[：:|-]", cleaned) if part.strip()]
+        title_parts = [
+            part.strip() for part in re.split(r"[：:|-]", cleaned) if part.strip()
+        ]
         if len(title_parts) >= 2:
             deduped_parts: List[str] = []
             seen_keys: set[str] = set()
@@ -4257,7 +4249,9 @@ def _make_visual_contract_block(
         if str(item or "").strip()
     ]
     requested_set = set(requested)
-    label = keypoints[0] if keypoints else ("鏍稿績鎸囨爣" if prefer_zh else "Key metric")
+    label = (
+        keypoints[0] if keypoints else ("鏍稿績鎸囨爣" if prefer_zh else "Key metric")
+    )
     education_like = any(
         token in str(semantic_text or "").lower()
         for token in (
@@ -4621,9 +4615,11 @@ def _collect_strict_contract_issues(
         if isinstance(slide.get("template_family_whitelist"), list)
         else []
     )
-    resolved_template = str(
-        slide.get("template_family") or slide.get("template_id") or ""
-    ).strip().lower()
+    resolved_template = (
+        str(slide.get("template_family") or slide.get("template_id") or "")
+        .strip()
+        .lower()
+    )
     if resolved_template in {"", "auto"}:
         resolved_template = ""
     slide_type_hint = (
@@ -5756,12 +5752,11 @@ def _ensure_content_contract(
 
     if (not strict_contract) and (not terminal_slide):
         required_chart_like = (
-            ("chart" in set(contract_visual_types) or "kpi" in set(contract_visual_types))
-            or any(
-                ("chart" in set(group) or "kpi" in set(group))
-                for group in (required_groups or [])
-                if isinstance(group, list)
-            )
+            "chart" in set(contract_visual_types) or "kpi" in set(contract_visual_types)
+        ) or any(
+            ("chart" in set(group) or "kpi" in set(group))
+            for group in (required_groups or [])
+            if isinstance(group, list)
         )
         if required_chart_like:
             has_chart_or_kpi = any(
@@ -6079,10 +6074,13 @@ def _apply_visual_orchestration(render_payload: Dict[str, Any]) -> Dict[str, Any
                     )
                 except ValueError as strict_exc:
                     strict_detail = str(strict_exc or "").strip().lower()
-                    still_recoverable = "strict_content_contract_unmet" in strict_detail and (
-                        "missing_required_group" in strict_detail
-                        or "insufficient_visual_blocks" in strict_detail
-                        or "missing_visual_anchor_block" in strict_detail
+                    still_recoverable = (
+                        "strict_content_contract_unmet" in strict_detail
+                        and (
+                            "missing_required_group" in strict_detail
+                            or "insufficient_visual_blocks" in strict_detail
+                            or "missing_visual_anchor_block" in strict_detail
+                        )
                     )
                     if not still_recoverable:
                         raise
@@ -8696,7 +8694,15 @@ async def _search_serper_web(
     )
 
 
-_GENERIC_AUDIENCE = {"general", "all", "public", "everyone", "澶т紬", "閫氱敤", "鍏ㄩ儴浜虹兢"}
+_GENERIC_AUDIENCE = {
+    "general",
+    "all",
+    "public",
+    "everyone",
+    "澶т紬",
+    "閫氱敤",
+    "鍏ㄩ儴浜虹兢",
+}
 _GENERIC_PURPOSE = {"presentation", "general", "姹囨姤", "婕旂ず", "灞曠ず"}
 _GENERIC_STYLE = {"professional", "default", "normal", "鍟嗗姟", "涓撲笟", "甯歌"}
 
@@ -8775,7 +8781,9 @@ def _build_research_gaps(req: ResearchRequest, *, is_zh: bool) -> List[ResearchG
                 message="鍙椾紬鎻忚堪杩囦簬娉涘寲锛岀己灏戞槑纭鑹蹭笌鍐崇瓥灞傜骇?"
                 if is_zh
                 else "Audience definition is too generic; role and decision level are missing.",
-                query_hint="鐩爣鍙椾紬 鍒嗗眰" if is_zh else "target audience segmentation",
+                query_hint="鐩爣鍙椾紬 鍒嗗眰"
+                if is_zh
+                else "target audience segmentation",
             )
         )
     if _is_generic_slot(req.purpose, _GENERIC_PURPOSE):
@@ -8841,8 +8849,8 @@ def _normalize_research_topic(topic: str, *, is_zh: bool) -> str:
     if not raw:
         return ""
     text = (
-        raw.replace("“", "\"")
-        .replace("”", "\"")
+        raw.replace("“", '"')
+        .replace("”", '"')
         .replace("‘", "'")
         .replace("’", "'")
         .strip()
@@ -9093,7 +9101,9 @@ _MOJIBAKE_CJK_TOKENS = (
     "缁斿?",
     "閻梻?",
 )
-_MOJIBAKE_CJK_CHARS = set("鑱圭鑱綖鑾借伔鑱炶祩濞勮仜楹撹仸搴愯仚鑱熼崣閻ㄩ妴閿涢梽閺佺拠閹规径娑撻弰?")
+_MOJIBAKE_CJK_CHARS = set(
+    "鑱圭鑱綖鑾借伔鑱炶祩濞勮仜楹撹仸搴愯仚鑱熼崣閻ㄩ妴閿涢梽閺佺拠閹规径娑撻弰?"
+)
 _COMMON_ZH_FUNCTION_CHARS = "鐨勪竴鏄湪涓嶄簡鍜屽涓庡叾灏嗙敱鍙婁腑鑰屽彲?"
 _TOPIC_ZH_HINT_CHARS = "鑳屾櫙鐩爣绛栫暐鏈哄埗娴佺▼妗堜緥鏁版嵁瓒嬪娍鏂规硶瀹炶返搴旂敤鏁欒偛鍟嗕笟鎶㈡湳?"
 _SOFTWARE_TOPIC_HINTS = {
@@ -11292,9 +11302,7 @@ class PPTService:
             )
             if topic_seed:
                 default_fallback = (
-                    f"{topic_seed} 核心观点"
-                    if is_zh
-                    else f"Key point: {topic_seed}"
+                    f"{topic_seed} 核心观点" if is_zh else f"Key point: {topic_seed}"
                 )
             else:
                 default_fallback = "核心观点" if is_zh else "Key insight"
@@ -11324,7 +11332,9 @@ class PPTService:
                 normalized = re.sub(
                     r"\bitem\s*\d+\b", " ", normalized, flags=re.IGNORECASE
                 )
-                normalized = re.sub(r"\s{2,}", " ", normalized).strip(" -:;,.，。；：！？")
+                normalized = re.sub(r"\s{2,}", " ", normalized).strip(
+                    " -:;,.，。；：！？"
+                )
                 return normalized
 
             safe_fallback = _normalize_candidate(fallback)
@@ -11450,9 +11460,8 @@ class PPTService:
                 or "table of contents" in core_message
             ):
                 return "toc"
-            if (
-                total_outline_pages >= 12
-                and ("section" in elements or "transition" in elements)
+            if total_outline_pages >= 12 and (
+                "section" in elements or "transition" in elements
             ):
                 return "divider"
             return _layout_to_slide_type(note.layout_hint)
@@ -11686,7 +11695,9 @@ class PPTService:
                                 "labels": _labels(),
                                 "datasets": [
                                     {
-                                        "label": "鍏抽敭鎸囨爣" if is_zh else "Key metric",
+                                        "label": "鍏抽敭鎸囨爣"
+                                        if is_zh
+                                        else "Key metric",
                                         "data": _chart_series(base),
                                     }
                                 ],
@@ -13597,7 +13608,9 @@ class PPTService:
                     or slides_data,
                     render_spec=layout_gate_source,
                     profile=quality_profile,
-                    quality_threshold_offset=float(route_policy.quality_threshold_offset),
+                    quality_threshold_offset=float(
+                        route_policy.quality_threshold_offset
+                    ),
                     relaxed_codes=relaxed_codes,
                 )
                 content_issues = list(quality_eval.content_issues)
@@ -14596,7 +14609,9 @@ class PPTService:
                 profile=quality_profile,
                 content_issues=[*final_content_issues],
                 layout_issues=[*final_layout_issues],
-                visual_audit=final_visual_audit if isinstance(final_visual_audit, dict) else None,
+                visual_audit=final_visual_audit
+                if isinstance(final_visual_audit, dict)
+                else None,
                 enforce_visual_audit_presence=True,
             )
 
@@ -15295,8 +15310,3 @@ class PPTService:
             logger.warning("[ppt_service] presign failed, fallback direct URL: %s", exc)
 
         return {"job_id": job_id, "status": status, "output_url": output_url}
-
-
-
-
-
