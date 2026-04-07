@@ -227,7 +227,7 @@ async def generate_slide_content(
 ```typescript
 // src/lib/pptx/pptx-exporter.ts
 
-import pptxgen from 'pptxgenjs';
+import pptxgen from 'svg_to_pptx';
 
 interface Slide {
     id: string;
@@ -2043,7 +2043,7 @@ agent/
 | 对话状态机 | LangGraph | 当前项目 + OpenMAIC多轮对话 |
 | 大纲生成 | LLM + JSON Schema | OpenMAIC `outline-generator.ts` |
 | 内容生成 | LLM + Vision | OpenMAIC `scene-generator.ts` |
-| PPTX导出 | pptxgenjs | OpenMAIC `use-export-pptx.ts` |
+| PPTX导出 | svg_to_pptx | OpenMAIC `use-export-pptx.ts` |
 | LaTeX支持 | temml + mathml2omml | OpenMAIC `latex-to-omml.ts` |
 | 视频合成 | Remotion | 当前项目 remotion-mapper |
 | 云端渲染 | AWS Lambda | 本方案设计 |
@@ -2171,7 +2171,7 @@ aws sqs create-queue \
 | P0 | LangGraph对话状态机 | 3天 | 无 | 核心交互流程 |
 | P0 | PPT大纲生成器 | 2天 | P0 | LLM集成 |
 | P1 | PPT内容生成器 | 3天 | P0 | LLM集成 |
-| P1 | PPTX导出器 | 2天 | P1 | pptxgenjs |
+| P1 | PPTX导出器 | 2天 | P1 | svg_to_pptx |
 | P2 | PPT编辑器 | 3天 | P1 | Canvas编辑 |
 | P2 | Remotion视频组件 | 2天 | P2 | 视频模板 |
 | P2 | AWS Lambda渲染 | 3天 | P2 | 云端渲染 |
@@ -2324,7 +2324,7 @@ PPTLambdaErrors:
   - 公开存储桶：https://developers.cloudflare.com/r2/buckets/public-buckets/
 
 - **其他**
-  - pptxgenjs: https://gitbrent.github.io/PptxGenJS/
+  - svg_to_pptx: https://gitbrent.github.io/SVG-to-PPTX/
   - FFmpeg.wasm: https://ffmpegwasm.netlify.app
   - LangGraph: https://langchain-ai.github.io/langgraph/
   - Serverless Framework: https://www.serverless.com/

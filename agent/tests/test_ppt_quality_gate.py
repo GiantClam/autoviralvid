@@ -24,6 +24,52 @@ def test_detect_placeholder_pollution():
     assert any(issue.code == "placeholder_pollution" for issue in result.issues)
 
 
+def test_detect_placeholder_pollution_for_writing_instruction_text():
+    result = validate_slide(
+        {
+            "slide_id": "s1",
+            "title": "GDPR",
+            "elements": [{"type": "text", "content": "先说明 GDPR 的背景与定义"}],
+        }
+    )
+    assert result.ok is False
+    assert any(issue.code == "placeholder_pollution" for issue in result.issues)
+
+
+def test_placeholder_term_definition_is_not_misclassified():
+    result = validate_slide(
+        {
+            "slide_id": "s1",
+            "title": "术语定义",
+            "elements": [
+                {
+                    "type": "text",
+                    "content": "Placeholder 的定义：它指的是模板中的占位符，不是占位文案。",
+                }
+            ],
+        }
+    )
+    assert result.ok is True
+    assert all(issue.code != "placeholder_pollution" for issue in result.issues)
+
+
+def test_placeholder_guardrail_sentence_is_not_misclassified():
+    result = validate_slide(
+        {
+            "slide_id": "s1",
+            "title": "写作规范",
+            "elements": [
+                {
+                    "type": "text",
+                    "content": "请勿使用默认文案，需替换为业务事实与结论。",
+                }
+            ],
+        }
+    )
+    assert result.ok is True
+    assert all(issue.code != "placeholder_pollution" for issue in result.issues)
+
+
 def test_valid_deck_passes():
     result = validate_deck(
         [
@@ -544,7 +590,7 @@ def test_visual_audit_gate_returns_slide_level_retry_targets():
     }
     result = validate_visual_audit(visual_audit=visual_audit, slides=slides, profile="high_density_consulting")
     assert result.ok is False
-    assert any(issue.retry_scope == "slide" for issue in result.issues)
+    assert all(issue.retry_scope == "deck" for issue in result.issues)
     assert any("s2" in (issue.retry_target_ids or []) for issue in result.issues)
 
 

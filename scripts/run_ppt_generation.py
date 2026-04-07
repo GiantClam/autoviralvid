@@ -224,12 +224,12 @@ def main():
                 + '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px;">'
                 + '<div style="background:#1e293b;padding:20px;border-radius:12px;border-left:4px solid #22c55e;"><div style="font-size:28px;font-weight:bold;color:#22c55e;">' + s.outline.slides + '</div><div style="font-size:12px;color:#94a3b8;">Outline Slides</div><div style="font-size:10px;color:#64748b;margin-top:4px;">' + (s.outline.duration/60).toFixed(1) + ' min</div></div>'
                 + '<div style="background:#1e293b;padding:20px;border-radius:12px;border-left:4px solid #3b82f6;"><div style="font-size:28px;font-weight:bold;color:#3b82f6;">' + s.content.total_elements + '</div><div style="font-size:12px;color:#94a3b8;">Total Elements</div><div style="font-size:10px;color:#64748b;margin-top:4px;">' + s.content.slides + ' slides</div></div>'
-                + '<div style="background:#1e293b;padding:20px;border-radius:12px;border-left:4px solid #8b5cf6;"><div style="font-size:28px;font-weight:bold;color:#8b5cf6;">' + (s.export.success ? 'OK' : 'FAIL') + '</div><div style="font-size:12px;color:#94a3b8;">PPTX Export</div><div style="font-size:10px;color:#64748b;margin-top:4px;">pptxgenjs</div></div>'
+                + '<div style="background:#1e293b;padding:20px;border-radius:12px;border-left:4px solid #8b5cf6;"><div style="font-size:28px;font-weight:bold;color:#8b5cf6;">' + (s.export.success ? 'OK' : 'FAIL') + '</div><div style="font-size:12px;color:#94a3b8;">PPTX Export</div><div style="font-size:10px;color:#64748b;margin-top:4px;">svg</div></div>'
                 + '<div style="background:#1e293b;padding:20px;border-radius:12px;border-left:4px solid #f59e0b;"><div style="font-size:28px;font-weight:bold;color:#f59e0b;">' + (s.render.status || 'N/A') + '</div><div style="font-size:12px;color:#94a3b8;">Video Render</div><div style="font-size:10px;color:#64748b;margin-top:4px;">local mode</div></div>'
                 + '</div>'
                 + '<div style="background:#1e293b;padding:20px;border-radius:12px;border:1px solid #334155;">'
                 + '<div style="font-size:14px;font-weight:bold;margin-bottom:12px;">' + s.outline.title + '</div>'
-                + '<div style="font-size:12px;color:#94a3b8;">Pipeline: outline (LLM) \u2192 content (parallel LLM) \u2192 export (pptxgenjs) \u2192 render (Remotion)</div>'
+                + '<div style="font-size:12px;color:#94a3b8;">Pipeline: outline (LLM) \u2192 content (parallel LLM) \u2192 export (svg) \u2192 render (Remotion)</div>'
                 + '</div></div>';
         }""",
             arg=[json.dumps(summary, ensure_ascii=False)],

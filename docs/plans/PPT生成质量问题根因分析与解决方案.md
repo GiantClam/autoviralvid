@@ -30,12 +30,12 @@ Perfect! Now I have all the research completed. Let me synthesize everything int
 │    ↓                                                        │
 │  Node渲染层 (generate-pptx-minimax.mjs)                     │
 │    ↓                                                        │
-│  PptxGenJS (唯一渲染引擎)                                    │
+│  SVG-to-PPTX (唯一渲染引擎)                                    │
 └─────────────────────────────────────────────────────────────┘
 ```
 
 **关键澄清**：
-- **没有两个独立工具**：只有一个渲染引擎（PptxGenJS）
+- **没有两个独立工具**：只有一个渲染引擎（SVG-to-PPTX）
 - **ppt-master不是工具**：是一个技能适配器，用于识别复杂页面并强制使用SVG渲染路径
 - **pptagent不存在**：你看到的是MiniMax官方的`pptx-generator`技能
 
@@ -163,13 +163,13 @@ prompt = f"""
 
 ---
 
-### 问题3：PptxGenJS已知缺陷 ⭐⭐⭐
+### 问题3：SVG-to-PPTX已知缺陷 ⭐⭐⭐
 
 **发现的库级问题**：
 
 | 问题 | 严重性 | 证据 |
 |------|--------|------|
-| 形状损坏 | **高** | `round2SameRect`生成无效XML，导致PowerPoint修复对话框 ([Issue #1418](https://github.com/gitbrent/pptxgenjs/issues/1418)) |
+| 形状损坏 | **高** | `round2SameRect`生成无效XML，导致PowerPoint修复对话框 ([Issue #1418](https://github.com/gitbrent/svg_to_pptx/issues/1418)) |
 | 绝对定位 | **架构级** | 动态内容破坏固定坐标布局 |
 | 复杂形状失败 | 中 | 带关系的形状（超链接、视频、音频）不工作 |
 | 动画不支持 | 中 | 无法生成动画效果 |
@@ -182,8 +182,8 @@ slide.addShape(pres.ShapeType.round2SameRect, {...}); // ❌ 已知问题
 ```
 
 **ppt-master参考PPT质量更好的可能原因**：
-1. 使用了**模板驱动**方式，避开了PptxGenJS的形状生成问题
-2. 使用了**SVG渲染路径**，绕过了PptxGenJS的复杂形状限制
+1. 使用了**模板驱动**方式，避开了SVG-to-PPTX的形状生成问题
+2. 使用了**SVG渲染路径**，绕过了SVG-to-PPTX的复杂形状限制
 3. **串行生成**每页，保持了语义一致性
 
 ---
@@ -198,7 +198,7 @@ slide.addShape(pres.ShapeType.round2SameRect, {...}); // ❌ 已知问题
 |------|---------------|---------|------|
 | **生成方式** | 串行生成，每页独立 | 批量并发生成 | 风格一致性差 |
 | **模板使用** | 预定义模板，视觉稳定 | 启发式选择，边界情况多 | 视觉质量不稳定 |
-| **复杂图形** | SVG优先，表达能力强 | pptxgenjs+svg混用 | 复杂页面质量差 |
+| **复杂图形** | SVG优先，表达能力强 | svg_to_pptx+svg混用 | 复杂页面质量差 |
 | **决策机制** | 单一决策点 | Python+Node双重决策 | 决策冲突 |
 | **约束执行** | 模板内置约束 | 缺少强制约束 | 设计规范不一致 |
 
@@ -213,7 +213,7 @@ slide.addShape(pres.ShapeType.round2SameRect, {...}); // ❌ 已知问题
 
 **当前系统的问题**：
 - ❌ 风格不一致（决策冲突）
-- ❌ 复杂图形模糊（PptxGenJS限制）
+- ❌ 复杂图形模糊（SVG-to-PPTX限制）
 - ❌ 留白不足（无约束检查）
 - ❌ 字号混乱（无强制规范）
 - ❌ 配色冲突（多次选择）
@@ -526,7 +526,7 @@ python scripts/compare_ppt_quality.py \
 1. **架构误解**：没有"pptagent+ppt-master"两个工具，只有统一的技能编排系统
 2. **决策重复**：Python和Node双重决策导致风格冲突（**最严重**）
 3. **Prompt缺陷**：缺少约束和Few-shot示例导致硬编码
-4. **库级限制**：PptxGenJS已知缺陷影响复杂形状
+4. **库级限制**：SVG-to-PPTX已知缺陷影响复杂形状
 
 ### 6.2 优先级建议
 

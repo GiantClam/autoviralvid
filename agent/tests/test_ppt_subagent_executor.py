@@ -16,7 +16,7 @@ def _sample_task() -> dict:
         "slide_id": "s2",
         "slide_type": "content",
         "agent_type": "content-page-generator",
-        "render_path": "pptxgenjs",
+        "render_path": "svg",
         "layout_grid": "",
         "load_skills": ["slide-making-skill", "design-style-skill"],
         "prompt": "Refine this slide for clarity.",
@@ -203,7 +203,7 @@ def test_subagent_executor_loads_skill_markdown_into_prompt(monkeypatch):
     assert "Loaded skill specifications" in captured["content"]
     assert "Page-specific guidance" in captured["content"]
     assert "Only one title area is allowed at the top of the slide." in captured["content"]
-    assert "PptxGenJS Slide Making Skill" in captured["content"]
+    assert "SVG-to-PPTX Slide Making Skill" in captured["content"]
     assert "Slide Page Types (Standard)" in captured["content"]
 
 
@@ -296,3 +296,4 @@ def test_build_llm_input_strips_surrogate_characters():
     assert isinstance(messages, list)
     text = "\n".join(str(item.get("content") or "") for item in messages if isinstance(item, dict))
     assert chr(0xDC80) not in text
+

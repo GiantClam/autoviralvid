@@ -27,7 +27,50 @@ _PLACEHOLDER_PATTERNS = (
     "\u5f85\u8865\u5145",
     "\u8bf7\u586b\u5199",
     "\u5360\u4f4d\u7b26",
+    "\u5360\u4f4d\u6587\u6848",
+    "\u793a\u4f8b\u6587\u6848",
+    "\u9ed8\u8ba4\u6587\u6848",
+    "\u8bf7\u66ff\u6362",
+    "\u6b64\u5904\u63d2\u5165\u5185\u5bb9",
+    r"\bto be filled\b",
+    r"\breplace me\b",
+    r"\bdefault copy\b",
+    r"(?:^|[\n\r])\s*(?:\u5148\u8bf4\u660e|\u518d\u4ea4\u4ee3|\u6700\u540e\u89e3\u91ca|\u56f4\u7ed5.{0,24}\u63d0\u70bc|\u907f\u514d\u53ea\u7f57\u5217\u6807\u9898)",
 )
+
+_PLACEHOLDER_EXPLANATION_PATTERNS = {
+    r"\bplaceholder\b",
+    r"\[placeholder\]",
+    "\u5360\u4f4d\u7b26",
+    "\u5360\u4f4d\u6587\u6848",
+    "\u793a\u4f8b\u6587\u6848",
+    "\u9ed8\u8ba4\u6587\u6848",
+}
+_PLACEHOLDER_EXPLANATION_HINTS = (
+    "definition",
+    "means",
+    "refers to",
+    "concept",
+    "\u5b9a\u4e49",
+    "\u6982\u5ff5",
+    "\u6307\u7684\u662f",
+    "\u4e0d\u662f\u5360\u4f4d",
+    "\u975e\u5360\u4f4d",
+    "\u8bf7\u52ff\u4f7f\u7528",
+    "\u4e0d\u8981\u4f7f\u7528",
+    "\u7981\u6b62\u4f7f\u7528",
+    "do not use",
+    "avoid using",
+)
+
+
+def _is_placeholder_false_positive(*, pattern: str, text: str) -> bool:
+    normalized_pattern = str(pattern or "").strip()
+    if normalized_pattern not in _PLACEHOLDER_EXPLANATION_PATTERNS:
+        return False
+    blob = str(text or "")
+    lowered = blob.lower()
+    return any(hint in lowered or hint in blob for hint in _PLACEHOLDER_EXPLANATION_HINTS)
 
 
 @dataclass(frozen=True)
@@ -550,7 +593,7 @@ def _scene_hard_gate_issues(slides: List[Dict[str, Any]], *, profile: Optional[s
                     slide_id=sid,
                     code="scene_status_report_exec_summary_incomplete",
                     message="Executive summary should cover at least 4 independent items.",
-                    retry_scope="slide",
+                    retry_scope="deck",
                     retry_target_ids=[sid],
                 )
             )
@@ -656,7 +699,7 @@ def validate_slide(
                 slide_id=sid,
                 code="blank_slide",
                 message="Slide is blank (no title/text/elements).",
-                retry_scope="slide",
+                retry_scope="deck",
                 retry_target_ids=[sid],
             )
         )
@@ -668,7 +711,7 @@ def validate_slide(
                 slide_id=sid,
                 code="encoding_invalid",
                 message="Slide contains likely garbled text.",
-                retry_scope="block",
+                retry_scope="deck",
                 retry_target_ids=[sid],
             )
         )
@@ -676,12 +719,14 @@ def validate_slide(
     joined = "\n".join(texts)
     for pattern in _PLACEHOLDER_PATTERNS:
         if re.search(pattern, joined, flags=re.IGNORECASE):
+            if _is_placeholder_false_positive(pattern=pattern, text=joined):
+                continue
             issues.append(
                 QualityIssue(
                     slide_id=sid,
                     code="placeholder_pollution",
                     message=f"Placeholder content detected by pattern: {pattern}",
-                    retry_scope="block",
+                    retry_scope="deck",
                     retry_target_ids=[sid],
                 )
             )
@@ -700,7 +745,7 @@ def validate_slide(
                     slide_id=sid,
                     code="placeholder_chart_data",
                     message="Chart contains placeholder or empty data.",
-                    retry_scope="slide",
+                    retry_scope="deck",
                     retry_target_ids=[sid],
                 )
             )
@@ -719,7 +764,7 @@ def validate_slide(
                         slide_id=sid,
                         code="placeholder_chart_data",
                         message="Chart block contains placeholder or empty data.",
-                        retry_scope="slide",
+                        retry_scope="deck",
                         retry_target_ids=[sid],
                     )
                 )
@@ -742,7 +787,7 @@ def validate_slide(
                         slide_id=sid,
                         code="placeholder_kpi_data",
                         message="KPI block contains placeholder number.",
-                        retry_scope="slide",
+                        retry_scope="deck",
                         retry_target_ids=[sid],
                     )
                 )
@@ -762,7 +807,7 @@ def validate_slide(
                 slide_id=sid,
                 code="flat_typography",
                 message=f"Slide lacks font size hierarchy (need >={max(1, min_typography_levels)} distinct sizes).",
-                retry_scope="slide",
+                retry_scope="deck",
                 retry_target_ids=[sid],
             )
         )
@@ -779,7 +824,7 @@ def validate_slide(
                         f"Content slide has only {content_blocks} non-title blocks "
                         f"(need >={min_content_blocks})."
                     ),
-                    retry_scope="slide",
+                    retry_scope="deck",
                     retry_target_ids=[sid],
                 )
             )
@@ -789,7 +834,7 @@ def validate_slide(
                     slide_id=sid,
                     code="duplicate_text",
                     message="Content slide contains duplicated non-title block text.",
-                    retry_scope="slide",
+                    retry_scope="deck",
                     retry_target_ids=[sid],
                 )
             )
@@ -799,7 +844,7 @@ def validate_slide(
                     slide_id=sid,
                     code="title_echo",
                     message="Content slide repeats title text in non-title blocks.",
-                    retry_scope="slide",
+                    retry_scope="deck",
                     retry_target_ids=[sid],
                 )
             )
@@ -809,7 +854,7 @@ def validate_slide(
                     slide_id=sid,
                     code="weak_emphasis",
                     message="Content slide lacks emphasis signal (emphasis markers or numeric focus).",
-                    retry_scope="slide",
+                    retry_scope="deck",
                     retry_target_ids=[sid],
                 )
             )
@@ -829,7 +874,7 @@ def validate_slide(
                     f"Estimated blank area ratio too high "
                     f"({blank_ratio:.2f}, limit={blank_area_max_ratio:.2f})."
                 ),
-                retry_scope="slide",
+                retry_scope="deck",
                 retry_target_ids=[sid],
             )
         )
@@ -850,7 +895,7 @@ def validate_slide(
                         slide_id=sid,
                         code="image_missing",
                         message="Image block is missing url/src/imageUrl.",
-                        retry_scope="slide",
+                        retry_scope="deck",
                         retry_target_ids=[sid],
                     )
                 )
@@ -873,7 +918,7 @@ def validate_slide(
                     slide_id=sid,
                     code="image_missing",
                     message="Content slide lacks image anchor block.",
-                    retry_scope="slide",
+                    retry_scope="deck",
                     retry_target_ids=[sid],
                 )
             )
@@ -887,7 +932,7 @@ def validate_slide(
                 slide_id=sid,
                 code="chart_readability_low",
                 message=f"Chart font size too small ({min_chart_font:.1f} < {chart_min_font_size:g}).",
-                retry_scope="slide",
+                retry_scope="deck",
                 retry_target_ids=[sid],
             )
         )
@@ -1428,7 +1473,7 @@ def validate_visual_audit(
                 slide_id=target_ids[0] if target_ids else sid,
                 code="visual_blank_slide_ratio_high",
                 message=f"blank_slide_ratio={blank_slide_ratio:.2f} exceeds limit={blank_slide_limit:.2f}",
-                retry_scope="slide" if target_ids else "deck",
+                retry_scope="deck",
                 retry_target_ids=target_ids,
             )
         )
@@ -1444,7 +1489,7 @@ def validate_visual_audit(
                 slide_id=target_ids[0] if target_ids else sid,
                 code="visual_low_contrast_ratio_high",
                 message=f"low_contrast_ratio={low_contrast_ratio:.2f} exceeds limit={low_contrast_limit:.2f}",
-                retry_scope="slide" if target_ids else "deck",
+                retry_scope="deck",
                 retry_target_ids=target_ids,
             )
         )
@@ -1460,7 +1505,7 @@ def validate_visual_audit(
                 slide_id=target_ids[0] if target_ids else sid,
                 code="visual_blank_area_ratio_high",
                 message=f"blank_area_ratio={blank_area_ratio:.2f} exceeds limit={blank_area_limit:.2f}",
-                retry_scope="slide" if target_ids else "deck",
+                retry_scope="deck",
                 retry_target_ids=target_ids,
             )
         )
@@ -1476,7 +1521,7 @@ def validate_visual_audit(
                 slide_id=target_ids[0] if target_ids else sid,
                 code="visual_style_drift_ratio_high",
                 message=f"style_drift_ratio={style_drift_ratio:.2f} exceeds limit={style_drift_limit:.2f}",
-                retry_scope="slide" if target_ids else "deck",
+                retry_scope="deck",
                 retry_target_ids=target_ids,
             )
         )
@@ -1538,7 +1583,7 @@ def validate_visual_audit(
                     f"{issue_code}_ratio={ratio:.2f} exceeds limit={limit:.2f} "
                     f"(estimated_affected_slides={affected})."
                 ),
-                retry_scope="slide" if target_ids else "deck",
+                retry_scope="deck",
                 retry_target_ids=target_ids,
             )
         )

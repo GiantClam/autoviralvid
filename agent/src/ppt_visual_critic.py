@@ -121,7 +121,7 @@ def _derive_actions(issue_codes: List[str], slide: Dict[str, Any]) -> Dict[str, 
         "visual_style_inconsistent_ratio_high",
     } & codes:
         actions["visual_patch"]["force_high_contrast"] = True
-        actions["render_path"] = "pptxgenjs"
+        actions["render_path"] = "svg"
 
     if {"irrelevant_image", "image_distortion", "visual_irrelevant_image_ratio_high"} & codes:
         actions["ensure_image_block"] = True

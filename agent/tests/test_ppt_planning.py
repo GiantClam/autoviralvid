@@ -269,11 +269,11 @@ def test_build_slide_content_strategy_enforces_assertive_title_for_generic_messa
     assert strategy.assertion != "市场分析"
     assert any(ch.isdigit() for ch in strategy.assertion)
     assert strategy.page_role == "evidence"
-    assert strategy.render_path == "pptxgenjs"
+    assert strategy.render_path == "svg"
     assert strategy.evidence
 
 
-def test_build_slide_content_strategy_keeps_timeline_on_pptxgenjs_before_exception_markers():
+def test_build_slide_content_strategy_routes_timeline_to_svg():
     note = StickyNote(
         page_number=4,
         core_message="Execution timeline",
@@ -285,6 +285,6 @@ def test_build_slide_content_strategy_keeps_timeline_on_pptxgenjs_before_excepti
         speaker_notes="",
     )
     strategy = build_slide_content_strategy(note, is_zh=False, research_points=[])
-    assert strategy.render_path == "pptxgenjs"
+    assert strategy.render_path == "svg"
     assert strategy.page_role == "transition"
     assert strategy.density_hint == "medium"

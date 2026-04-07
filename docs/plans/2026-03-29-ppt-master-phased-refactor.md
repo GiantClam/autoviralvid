@@ -3,8 +3,8 @@
 > Use this plan to execute the work task-by-task with tight verification after each step.
 
 **Goal:** 在现有 MiniMax PPT 生成链路中引入 ppt-master 风格的 `design_spec + 双轨渲染 + 分级降级`，并保证每阶段可测试、可回归。
-**Architecture:** 保持 Python 编排 + Node 渲染主干不变，在 Python 侧新增 `design_spec` 与 `render_path` 决策，在 Node 侧新增 `SVG -> PptxGenJS(Custom Geometry)` 渲染器，并在重试编排层补齐跨路径降级。每个阶段都以测试先行，先补失败测试，再实现最小改动使其通过。
-**Tech Stack:** Python(FastAPI/pytest), Node.js(PptxGenJS/node:test), template-catalog contract
+**Architecture:** 保持 Python 编排 + Node 渲染主干不变，在 Python 侧新增 `design_spec` 与 `render_path` 决策，在 Node 侧新增 `SVG -> SVG-to-PPTX(Custom Geometry)` 渲染器，并在重试编排层补齐跨路径降级。每个阶段都以测试先行，先补失败测试，再实现最小改动使其通过。
+**Tech Stack:** Python(FastAPI/pytest), Node.js(SVG-to-PPTX/node:test), template-catalog contract
 
 ---
 
@@ -28,7 +28,7 @@ def test_build_payload_contains_design_spec_contract():
 
 def test_visual_orchestration_assigns_render_path_by_slide_semantics():
     out = _apply_visual_orchestration(payload)
-    assert out["slides"][0]["render_path"] == "pptxgenjs"
+    assert out["slides"][0]["render_path"] == "svg_to_pptx"
     assert any(s["render_path"] == "svg" for s in out["slides"] if s["slide_type"] == "content")
 ```
 
@@ -57,7 +57,7 @@ git commit -m "feat(ppt): add design_spec and render_path contract for ppt-maste
 
 ---
 
-### Task 2: Phase 2 - SVG to PptxGenJS Custom Geometry Renderer
+### Task 2: Phase 2 - SVG to SVG-to-PPTX Custom Geometry Renderer
 
 **Files:**
 - Create: `scripts/minimax/svg-slide-renderer.mjs`
@@ -104,7 +104,7 @@ git commit -m "feat(ppt): add svg to custom-geometry renderer and wire dual-trac
 
 ---
 
-### Task 3: Phase 3 - Retry Downgrade Loop (pptxgenjs -> svg -> png)
+### Task 3: Phase 3 - Retry Downgrade Loop (svg_to_pptx -> svg -> png)
 
 **Files:**
 - Modify: `agent/src/ppt_retry_orchestrator.py`
@@ -234,7 +234,7 @@ Expected: PASS.
 
 - `Phase 3` status: completed
 - `Phase 3` implementation:
-  - 新增 `compute_render_path_downgrade(...)`，按 `pptxgenjs -> svg -> png_fallback` 分级降级
+  - 新增 `compute_render_path_downgrade(...)`，按 `svg_to_pptx -> svg -> png_fallback` 分级降级
   - 在 `ppt_service` 重试分支按失败码对目标 slide 更新 `render_path/svg_fallback_png`。
   - 将降级行为写入 `diagnostics`（`render_path_downgrade`）。
   - `Phase 3` verification:
@@ -629,7 +629,7 @@ Expected: PASS.
   - `cd agent && uv run pytest tests/test_ppt_subagent_executor.py tests/test_minimax_exporter_module_retry.py tests/test_ppt_export_retry_flow.py -q` -> `19 passed`
   - `node --test scripts/tests/slide-module-orchestrator.harness.test.mjs scripts/tests/orchestrate-pptx-modules.harness.test.mjs` -> `9 passed`
   - smoke:
-    - `cd agent && echo '{"slide_id":"s1","slide_type":"content","render_path":"pptxgenjs","load_skills":["slide-making-skill"],"prompt":"refine","slide_data":{"title":"x"}}' | uv run python -m src.ppt_subagent_executor`
+    - `cd agent && echo '{"slide_id":"s1","slide_type":"content","render_path":"svg_to_pptx","load_skills":["slide-making-skill"],"prompt":"refine","slide_data":{"title":"x"}}' | uv run python -m src.ppt_subagent_executor`
     - expected: JSON output with `ok=true` and `skipped=true` when no LLM key configured.
 - `Phase 25` status: completed
 - `Phase 25` scope: deployment/runtime enablement docs for module retry + subagent executor

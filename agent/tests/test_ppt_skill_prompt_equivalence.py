@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import os
 from pathlib import Path
@@ -13,7 +13,7 @@ def _sample_task(load_skills: list[str]) -> dict:
         "slide_id": "s-eq-1",
         "slide_type": "content",
         "agent_type": "content-page-generator",
-        "render_path": "pptxgenjs",
+        "render_path": "svg",
         "layout_grid": "",
         "load_skills": list(load_skills),
         "prompt": "Generate a high-quality enterprise slide.",
@@ -145,4 +145,5 @@ def test_skill_prompt_block_matches_direct_skill_markdown(
     assert llm_input.get("model") == "openai/gpt-5.3-codex"
     assert actual == expected
     assert expected in actual
+
 

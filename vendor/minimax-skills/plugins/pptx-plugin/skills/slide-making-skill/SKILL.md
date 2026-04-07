@@ -1,15 +1,15 @@
 ---
 name: slide-making-skill
-description: "Implement single-slide PowerPoint pages with PptxGenJS. Use when writing or fixing slide JS files: dimensions, positioning, text/image/chart APIs, styling rules, and export expectations for native .pptx output."
+description: "Implement single-slide PowerPoint pages with SVG-to-PPTX. Use when writing or fixing slide JS files: dimensions, positioning, text/image/chart APIs, styling rules, and export expectations for native .pptx output."
 ---
 
-# PptxGenJS Slide Making Skill
+# SVG-to-PPTX Slide Making Skill
 
-This skill teaches how to generate native .pptx slides using PptxGenJS (JavaScript).
+This skill teaches how to generate native .pptx slides using SVG-to-PPTX (JavaScript).
 
-## PptxGenJS Reference
+## SVG-to-PPTX Reference
 
-**Read [pptxgenjs.md](pptxgenjs.md) for the complete PptxGenJS API reference**, including:
+**Read [svg_to_pptx.md](svg_to_pptx.md) for the complete SVG-to-PPTX API reference**, including:
 - Setup & basic structure
 - Text & formatting
 - Lists & bullets
@@ -156,7 +156,7 @@ Each subagent outputs a **complete, runnable JS file**:
 
 ```javascript
 // slide-01.js
-const pptxgen = require("pptxgenjs");
+const pptxgen = require("svg_to_pptx");
 
 const slideConfig = {
   type: 'cover',

@@ -6,7 +6,7 @@
 
 **Architecture:** 两阶段生成流水线（大纲 + 内容），PPT 与视频共享同一内容源，Remotion Lambda 分布式渲染自动分片并行，渲染结果上传 Cloudflare R2。
 
-**Tech Stack:** React, Remotion (@remotion/transitions, renderMediaOnLambda), pptxgenjs, AWS Lambda, Cloudflare R2 (S3-compatible), FastAPI, Supabase
+**Tech Stack:** React, Remotion (@remotion/transitions, renderMediaOnLambda), svg_to_pptx, AWS Lambda, Cloudflare R2 (S3-compatible), FastAPI, Supabase
 
 ---
 
@@ -49,7 +49,7 @@
 │  Stage 3a: PPT导出  │  │  Stage 3b: Remotion Lambda 渲染         │
 │                     │  │                                         │
 │  FastAPI 后端       │  │  ┌───────────────────────────────────┐  │
-│  pptxgenjs          │  │  │  renderMediaOnLambda()            │  │
+│  svg_to_pptx          │  │  │  renderMediaOnLambda()            │  │
 │  ↓                  │  │  │                                   │  │
 │  slides.pptx → R2   │  │  │  自动分片 → 并行 Lambda 渲染       │  │
 │                     │  │  │  ┌─────┐ ┌─────┐     ┌─────┐     │  │
@@ -582,13 +582,13 @@ function SlideElementRenderer({ element }: { element: SlideElement }) {
 
 ---
 
-## 六、PPT 导出 (pptxgenjs)
+## 六、PPT 导出 (svg_to_pptx)
 
 参考 OpenMAIC 的 `lib/export/use-export-pptx.ts`。
 
 ```typescript
 // src/lib/export/use-export-pptx.ts
-import pptxgen from 'pptxgenjs';
+import pptxgen from 'svg_to_pptx';
 
 export async function exportToPPTX(
   slides: SlideContent[],
@@ -690,7 +690,7 @@ agent/src/
 ├── content_generator.py          # Stage 2: 内容填充 (并行)
 ├── presentation_service.py       # PPT 项目生命周期管理
 ├── tts_synthesizer.py            # TTS 旁白合成
-├── pptx_exporter.py              # PPT 导出 (Python 端调用 pptxgenjs 或原生实现)
+├── pptx_exporter.py              # PPT 导出 (Python 端调用 svg_to_pptx 或原生实现)
 └── lambda_renderer.py            # Remotion Lambda 渲染调用
 
 src/
@@ -844,7 +844,7 @@ process.stdout.write(JSON.stringify({
 |------|------|------|
 | 大纲生成 | **LLM + JSON Schema** | 扩展现有 `plan_storyboard_impl()` |
 | 内容生成 | **LLM 并行填充** | 每页独立调用，Promise.all |
-| PPT 导出 | **pptxgenjs** | OpenMAIC 验证，图表/表格/LaTeX 支持 |
+| PPT 导出 | **svg_to_pptx** | OpenMAIC 验证，图表/表格/LaTeX 支持 |
 | 视频组件 | **Remotion SlidePresentation** | TransitionSeries + 元素动画 |
 | 渲染引擎 | **renderMediaOnLambda** | 分布式并行，自动分片+合并 |
 | 渲染存储 | **AWS S3** (Lambda 临时) | Remotion Lambda 内部使用 |
@@ -863,7 +863,7 @@ process.stdout.write(JSON.stringify({
 - API 端点 + 基础 UI
 
 ### Phase 2: PPT 导出 (1 周)
-- 前端集成 pptxgenjs
+- 前端集成 svg_to_pptx
 - 实现 HTML→PPTX 文本转换
 - 实现图表/表格/LaTeX 导出
 - 后端 `pptx_exporter.py` + R2 上传

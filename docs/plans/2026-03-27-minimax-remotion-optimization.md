@@ -6,7 +6,7 @@
 
 **Architecture:** 采用“生成-校验-分片重试-合并-渲染”五段式流水线。PPTX 为唯一事实源（source of truth），视频默认基于 PPT 栅格图层呈现，再叠加 Remotion 动效层。失败按 `deck/slide/block` 三级定位，严格禁止本地规则改写用户文案。
 
-**Tech Stack:** FastAPI(Python), Node(PptxGenJS), Remotion, Supabase, R2
+**Tech Stack:** FastAPI(Python), Node(SVG-to-PPTX), Remotion, Supabase, R2
 
 ---
 
@@ -18,7 +18,7 @@
 4. Azure Retry Pattern 强调：只对 transient fault 重试；终态错误快速失败；与 circuit breaker 组合。
 5. Temporal 文档强调活动需幂等（idempotent），因为 Activity 存在至少一次执行语义。
 6. MiniMax 官方 skills 仓库中的 `pptx-generator` 与 `pptx-plugin`均强调：有完整设计系统、模板编辑工作流、子任务化生成，不应被单一本地模板压平。
-7. PptxGenJS 文档强调可使用 Slide Master 与亚洲字体支持，适合企业级一致样式输出。
+7. SVG-to-PPTX 文档强调可使用 Slide Master 与亚洲字体支持，适合企业级一致样式输出。
 8. PPTAgent/PPTEval（社区研究）提出应同时评估 Content / Design / Coherence 三维度，适合作为验收指标。
 
 ---

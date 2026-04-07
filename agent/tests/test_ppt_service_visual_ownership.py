@@ -7,7 +7,7 @@ def test_collect_visual_owner_conflicts_detects_mismatch():
             "slide_id": "s1",
             "template_family": "hero_dark",
             "layout_grid": "split_2",
-            "render_path": "pptxgenjs",
+            "render_path": "svg",
         }
     ]
     decision = {
@@ -18,7 +18,7 @@ def test_collect_visual_owner_conflicts_detects_mismatch():
     conflicts = ppt_service._collect_visual_owner_conflicts(slides, decision)
     assert conflicts
     assert any("s1:layout_grid:split_2->timeline" in item for item in conflicts)
-    assert any("s1:render_path:pptxgenjs->svg" in item for item in conflicts)
+    assert not any("s1:render_path:" in item for item in conflicts)
 
 
 def test_collect_visual_owner_conflicts_ignores_auto_values():
@@ -26,7 +26,7 @@ def test_collect_visual_owner_conflicts_ignores_auto_values():
     decision = {
         "version": "v1",
         "deck": {"template_family": "ops_lifecycle_light"},
-        "slides": [{"slide_id": "s1", "layout_grid": "timeline", "render_path": "pptxgenjs"}],
+        "slides": [{"slide_id": "s1", "layout_grid": "timeline", "render_path": "svg"}],
     }
     conflicts = ppt_service._collect_visual_owner_conflicts(slides, decision)
     assert conflicts == []

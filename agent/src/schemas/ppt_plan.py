@@ -104,7 +104,7 @@ class SlideContentStrategy(BaseModel):
     data_anchor: str = Field(default="", max_length=160)
     page_role: Literal["argument", "evidence", "transition", "summary"] = "argument"
     density_hint: Literal["high", "medium", "low", "breathing"] = "medium"
-    render_path: Literal["pptxgenjs", "svg"] = "pptxgenjs"
+    render_path: Literal["svg"] = "svg"
 
 
 class SlidePlan(BaseModel):

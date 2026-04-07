@@ -6,7 +6,7 @@
 
 **Architecture:** Keep the existing Python->Node pipeline, but fix semantic drift at boundaries: preserve semantic page subtype, normalize a single canonical content model (`blocks` as source of truth), and map it losslessly for official adapter compatibility. Rebalance template routing away from architecture-only defaults, then add quality gates and regression tests to prevent text-only regressions.
 
-**Tech Stack:** Python (FastAPI, pytest), Node.js (PptxGenJS, node --test harness), existing MiniMax renderer modules in `scripts/minimax/*`.
+**Tech Stack:** Python (FastAPI, pytest), Node.js (SVG-to-PPTX, node --test harness), existing MiniMax renderer modules in `scripts/minimax/*`.
 
 **Related skills:** @writing-plans @pptx
 

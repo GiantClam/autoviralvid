@@ -11,7 +11,7 @@ description: >
 
 同一套设计可通过调整圆角（rectRadius）和间距呈现4种不同风格。根据场景选择合适的风格配方。
 
-> **单位说明**: PptxGenJS 使用英寸(inch)作为单位。幻灯片尺寸为 10" × 5.625" (LAYOUT_16x9)
+> **单位说明**: SVG-to-PPTX 使用英寸(inch)作为单位。幻灯片尺寸为 10" × 5.625" (LAYOUT_16x9)
 
 ## 风格概览
 
@@ -107,7 +107,7 @@ description: >
 | **徽章/Badge** | rectRadius: 0.02 | rectRadius: 0.05 | rectRadius: 0.08 | rectRadius: 0.15 |
 | **头像框** | rectRadius: 0 | rectRadius: 0.1 | rectRadius: 0.2 | rectRadius: 0.5 (圆形) |
 
-### PptxGenJS 圆角示例
+### SVG-to-PPTX 圆角示例
 
 ```javascript
 // Sharp 风格卡片

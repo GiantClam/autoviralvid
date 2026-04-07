@@ -5,12 +5,12 @@ from src.ppt_render_path_policy import (
 )
 
 
-def test_policy_keeps_terminal_pages_on_pptxgenjs():
+def test_policy_uses_svg_for_terminal_pages():
     slide = {"slide_type": "cover", "layout_grid": "workflow", "blocks": [{"block_type": "workflow"}]}
-    assert choose_render_path_by_policy(slide, svg_mode="on") == "pptxgenjs"
+    assert choose_render_path_by_policy(slide, svg_mode="on") == "svg"
 
 
-def test_policy_keeps_dense_text_page_on_pptxgenjs():
+def test_policy_keeps_dense_text_signal_but_routes_svg():
     slide = {
         "slide_type": "content",
         "layout_grid": "split_2",
@@ -21,11 +21,11 @@ def test_policy_keeps_dense_text_page_on_pptxgenjs():
         ],
     }
     decision = classify_render_path(slide, svg_mode="on")
-    assert decision["render_path"] == "pptxgenjs"
+    assert decision["render_path"] == "svg"
     assert "density_only" in decision["forbidden_triggers"]
 
 
-def test_policy_does_not_route_to_svg_for_technical_theme_only():
+def test_policy_marks_forbidden_triggers_for_technical_theme_only():
     slide = {
         "slide_type": "content",
         "layout_grid": "split_2",
@@ -39,12 +39,12 @@ def test_policy_does_not_route_to_svg_for_technical_theme_only():
         ],
     }
     decision = classify_render_path(slide, svg_mode="on")
-    assert decision["render_path"] == "pptxgenjs"
+    assert decision["render_path"] == "svg"
     assert "density_only" in decision["forbidden_triggers"]
     assert "template_fallback_available" in decision["forbidden_triggers"]
 
 
-def test_policy_keeps_split_continuation_page_on_pptxgenjs():
+def test_policy_keeps_split_continuation_signal_but_routes_svg():
     slide = {
         "slide_type": "content",
         "layout_grid": "workflow",
@@ -55,8 +55,8 @@ def test_policy_keeps_split_continuation_page_on_pptxgenjs():
         "blocks": [{"block_type": "workflow"}],
     }
     decision = classify_render_path(slide, svg_mode="on")
-    assert decision["render_path"] == "pptxgenjs"
-    assert decision["reason"] == "split_merge_first_keep_template"
+    assert decision["render_path"] == "svg"
+    assert decision["reason"] == "split_merge_applied_svg_only"
 
 
 def test_policy_allows_svg_after_split_merge_only_with_explicit_exception_marker():
@@ -87,7 +87,7 @@ def test_policy_allows_svg_for_structural_exception_page():
     assert any("layout:workflow" == reason for reason in decision["allowed_exception_reasons"])
 
 
-def test_policy_does_not_route_technical_theme_only_to_svg():
+def test_policy_does_not_require_technical_theme_for_svg():
     slide = {
         "slide_type": "content",
         "layout_grid": "split_2",
@@ -99,19 +99,19 @@ def test_policy_does_not_route_technical_theme_only_to_svg():
         ],
     }
     decision = classify_render_path(slide, svg_mode="on")
-    assert decision["render_path"] == "pptxgenjs"
+    assert decision["render_path"] == "svg"
     assert decision["allowed_exception_reasons"] == []
 
 
-def test_policy_requires_split_merge_or_explicit_marker_before_svg_exception():
+def test_policy_uses_svg_without_split_merge_gate():
     slide = {
         "slide_type": "content",
         "layout_grid": "workflow",
         "blocks": [{"block_type": "workflow"}],
     }
     decision = classify_render_path(slide, svg_mode="on")
-    assert decision["render_path"] == "pptxgenjs"
-    assert decision["reason"] == "split_merge_first_required"
+    assert decision["render_path"] == "svg"
+    assert decision["reason"] in {"layout:workflow", "svg_only_default_route"}
 
 
 def test_policy_treats_storyline_as_weak_modifier_only():
@@ -122,7 +122,7 @@ def test_policy_treats_storyline_as_weak_modifier_only():
         "blocks": [{"block_type": "body", "content": "Narrative flow summary"}],
     }
     decision = classify_render_path(slide, svg_mode="on")
-    assert decision["render_path"] == "pptxgenjs"
+    assert decision["render_path"] == "svg"
 
 
 def test_policy_does_not_promote_svg_from_intent_tokens_even_when_split_merge_exhausted():
@@ -136,7 +136,7 @@ def test_policy_does_not_promote_svg_from_intent_tokens_even_when_split_merge_ex
         "blocks": [{"block_type": "body", "content": "Narrative-heavy summary"}],
     }
     decision = classify_render_path(slide, svg_mode="on")
-    assert decision["render_path"] == "pptxgenjs"
+    assert decision["render_path"] == "svg"
 
 
 def test_policy_allows_explicit_single_slide_exception_after_split_merge():
@@ -156,11 +156,11 @@ def test_policy_allows_explicit_single_slide_exception_after_split_merge():
     assert "split_or_merge_already_applied" in decision["forbidden_triggers"]
 
 
-def test_policy_restricts_visual_critic_svg_fallback_for_dense_standard_page():
+def test_policy_allows_visual_critic_svg_fallback_for_dense_standard_page():
     slide = {
         "slide_type": "content",
         "layout_grid": "grid_4",
         "content_density": "high",
         "blocks": [{"block_type": "body", "content": ";".join([f"item {i}" for i in range(8)])}],
     }
-    assert allow_visual_critic_svg_fallback(slide, ["card_overlap"]) is False
+    assert allow_visual_critic_svg_fallback(slide, ["card_overlap"]) is True

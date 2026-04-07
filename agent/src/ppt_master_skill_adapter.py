@@ -165,14 +165,14 @@ def _skill_search_roots() -> List[Path]:
     roots.extend(_parse_env_paths(os.getenv("PPT_MASTER_SKILL_ROOTS", "")))
     roots.extend(
         [
+            repo_root / "vendor" / "minimax-skills" / "skills",
+            repo_root / "skills",
             agent_root
             / "tests"
             / "fixtures"
             / "skills_reference"
             / "ppt-master"
             / "skills",
-            repo_root / "vendor" / "minimax-skills" / "skills",
-            repo_root / "skills",
         ]
     )
     out: List[Path] = []
@@ -197,7 +197,7 @@ def resolve_ppt_master_skill_spec_path() -> str:
 def _resolve_render_path(slide: Dict[str, Any], state: Dict[str, Any]) -> str:
     return _normalize_key(
         state.get("render_path") or slide.get("render_path"),
-        "pptxgenjs",
+        "svg",
     )
 
 
@@ -226,7 +226,7 @@ def is_ppt_master_candidate(
 ) -> bool:
     runtime = state if isinstance(state, dict) else {}
     render_path = _resolve_render_path(slide, runtime)
-    if render_path in {"svg", "png_fallback"}:
+    if render_path == "svg":
         return True
     layout = _resolve_layout_grid(slide, runtime)
     if layout in _COMPLEX_LAYOUT_HINTS:
@@ -291,7 +291,7 @@ def execute_ppt_master_skill(
     complex_candidate = is_ppt_master_candidate(slide, state)
     render_path = _resolve_render_path(slide, state)
     current_profile = _normalize_key(state.get("skill_profile"), "")
-    if complex_candidate and render_path == "pptxgenjs":
+    if complex_candidate and render_path != "svg":
         patch["render_path"] = "svg"
     if complex_candidate and not current_profile:
         patch["skill_profile"] = "architecture"

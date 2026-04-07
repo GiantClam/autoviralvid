@@ -6,7 +6,7 @@
 |------|-------|
 | Read/analyze content | `python -m markitdown presentation.pptx` |
 | Edit or create from template | Read `ppt-editing-skill` |
-| Create from scratch | Use subagents + PptxGenJS, see below |
+| Create from scratch | Use subagents + SVG-to-PPTX, see below |
 
 ---
 

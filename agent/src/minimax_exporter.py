@@ -23,6 +23,7 @@ from src.ppt_template_catalog import (
     template_profiles,
 )
 from src.ppt_master_design_spec import apply_render_paths, build_design_spec
+from src.ppt_svg_finalizer import PPTSvgFinalizer
 from src.ppt_visual_identity import canonicalize_theme_recipe, resolve_style_variant, resolve_tone
 from src.ppt_svg_renderer import render_slide_svg_markup, resolve_slide_svg_markup
 from src.pptx_theme_patch import patch_pptx_theme_colors
@@ -366,6 +367,8 @@ def _assemble_pptx_with_drawingml(
     temp_root: Path,
 ) -> tuple[bytes, Dict[str, int]]:
     svg_files, notes = _write_svg_files(slides=slides, temp_root=temp_root)
+    finalizer = PPTSvgFinalizer()
+    finalizer_result = finalizer.finalize_svg_files(svg_files)
     output_path = temp_root / "presentation.pptx"
     ok = create_pptx_with_native_svg(
         svg_files=svg_files,
@@ -382,6 +385,15 @@ def _assemble_pptx_with_drawingml(
         raise RuntimeError("drawingml_export_failed")
     return output_path.read_bytes(), {
         "notes_slide_count": int(len(notes)),
+        "svg_finalize_processed_files": int(finalizer_result.processed_files),
+        "svg_finalize_steps_run": int(len(finalizer_result.steps_run)),
+        "svg_finalize_step_errors": int(
+            sum(
+                int((stats or {}).get("errors") or 0)
+                for stats in (finalizer_result.step_stats or {}).values()
+            )
+        ),
+        "svg_finalize_skipped_steps": int(len(finalizer_result.skipped_steps)),
     }
 
 
@@ -731,9 +743,10 @@ def build_payload(
         "minimax_palette_key": theme["palette"],
         "verbatim_content": bool(verbatim_content),
         "deck_id": deck_id,
-        "retry_scope": retry_scope,
-        "target_slide_ids": [s for s in (target_slide_ids or []) if str(s).strip()],
-        "target_block_ids": [s for s in (target_block_ids or []) if str(s).strip()],
+        # DrawingML export always operates at full-deck scope.
+        "retry_scope": "deck",
+        "target_slide_ids": [],
+        "target_block_ids": [],
         "retry_hint": retry_hint,
         "idempotency_key": idempotency_key,
         "route_mode": str(route_mode or "standard").strip().lower() or "standard",
@@ -839,12 +852,16 @@ def export_minimax_pptx(
 
     requested_channel = _normalize_render_channel(payload.get("render_channel"))
     effective_channel = "local"
-    channel_fallback_reason = ""
     if requested_channel == "remote":
-        channel_fallback_reason = (
-            "remote_channel_not_configured: drawingml export currently runs in local mode"
+        classification = classify_failure("remote channel unsupported")
+        raise MiniMaxExportError(
+            message="MiniMax PPTX export failed: remote render_channel is not supported",
+            classification=classification,
+            detail=(
+                "remote channel is disabled for drawingml exporter; "
+                "call with render_channel=local and upload in service layer"
+            ),
         )
-        logger.warning("[minimax_exporter] %s", channel_fallback_reason)
 
     try:
         prepared_slides, svg_stats = _prepare_svg_slides(
@@ -904,10 +921,6 @@ def export_minimax_pptx(
             **svg_stats,
             **assembly_stats,
         }
-        if channel_fallback_reason:
-            generator_meta["channel_fallback_used"] = True
-            generator_meta["channel_fallback_reason"] = channel_fallback_reason
-
         themed_bytes = patch_pptx_theme_colors(
             output_bytes,
             payload.get("minimax_palette_key") or payload.get("theme", {}).get("palette") or "",
@@ -920,7 +933,6 @@ def export_minimax_pptx(
                 **payload,
                 "generator_mode": effective_mode,
                 "render_channel": effective_channel,
-                "requested_render_channel": requested_channel,
             },
             "generator_mode": effective_mode,
             "render_channel": effective_channel,

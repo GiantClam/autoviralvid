@@ -684,9 +684,9 @@ async def _execute_export(req: Dict[str, Any]) -> Dict[str, Any]:
     theme_recipe = str(req.get("theme_recipe", "auto") or "auto")
     tone = str(req.get("tone", "auto") or "auto")
     verbatim_content = bool(req.get("verbatim_content", False))
-    retry_scope = str(req.get("retry_scope", "deck") or "deck")
-    target_slide_ids = [str(s).strip() for s in req.get("target_slide_ids", []) if str(s).strip()]
-    target_block_ids = [str(s).strip() for s in req.get("target_block_ids", []) if str(s).strip()]
+    retry_scope = "deck"
+    target_slide_ids: List[str] = []
+    target_block_ids: List[str] = []
     retry_hint = str(req.get("retry_hint", "") or "")
     idempotency_key = str(req.get("idempotency_key", "") or "")
     route_mode = str(req.get("route_mode", "auto") or "auto")
@@ -732,6 +732,7 @@ async def _execute_export(req: Dict[str, Any]) -> Dict[str, Any]:
         retry_hint=retry_hint,
         idempotency_key=idempotency_key,
         route_mode=route_mode,
+        render_channel="local",
         generator_mode=requested_generator_mode,
         enable_legacy_fallback=enable_legacy_fallback,
         original_style=original_style,
@@ -926,7 +927,7 @@ async def export_submit(req: dict, request: Request, user: AuthUser = Depends(ge
                 "request_meta": {
                     "slide_count": len(slides),
                     "idempotency_key": str(req.get("idempotency_key", "") or ""),
-                    "retry_scope": str(req.get("retry_scope", "") or ""),
+                    "retry_scope": "deck",
                 },
                 "created_at": _utc_now_iso(),
                 "started_at": None,

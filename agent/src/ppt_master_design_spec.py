@@ -6,7 +6,7 @@ import re
 from typing import Any, Dict, Iterable, List
 
 from src.ppt_render_path_policy import (
-    DEFAULT_PPTXGENJS_SLIDE_TYPES,
+    DEFAULT_SVG_SLIDE_TYPES,
     SVG_EXCEPTION_BLOCK_TYPES,
     SVG_EXCEPTION_LAYOUTS,
     choose_render_path_by_policy,
@@ -86,7 +86,7 @@ def _normalize_tone(value: str) -> str:
 
 
 def choose_render_path(slide: Dict[str, Any], *, svg_mode: str = "on") -> str:
-    """Return per-slide render path: pptxgenjs|svg."""
+    """Return per-slide render path (svg-only pipeline)."""
     return choose_render_path_by_policy(slide, svg_mode=svg_mode)
 
 
@@ -116,7 +116,7 @@ def build_design_spec(
     visual_priority: bool = True,
     topic: str = "",
 ) -> Dict[str, Any]:
-    """Build a normalized design_spec contract for Node rendering."""
+    """Build a normalized design_spec contract for DrawingML-first rendering."""
     source = dict(theme or {})
     recipe = canonicalize_theme_recipe(
         theme_recipe
@@ -193,7 +193,7 @@ def build_design_spec(
             "light_template": normalized_tone == "light" or family in _LIGHT_TEMPLATE_FAMILIES,
         },
         "render_policy": {
-            "default_pptxgenjs_slide_types": sorted(DEFAULT_PPTXGENJS_SLIDE_TYPES),
+            "default_svg_slide_types": sorted(DEFAULT_SVG_SLIDE_TYPES),
             "svg_complex_layouts": sorted(SVG_EXCEPTION_LAYOUTS),
             "svg_complex_block_types": sorted(SVG_EXCEPTION_BLOCK_TYPES),
             "textual_block_types": sorted(_TEXTUAL_BLOCK_TYPES),

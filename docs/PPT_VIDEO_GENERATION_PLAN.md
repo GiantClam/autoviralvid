@@ -102,7 +102,7 @@
 | Speaker Notes | 演讲者备注 |
 
 **核心依赖**：
-- `pptxgenjs` - PPT 生成
+- `svg_to_pptx` - PPT 生成
 - `temml` - LaTeX → MathML
 - `mathml2omml` - MathML → OMML
 
@@ -295,7 +295,7 @@ interface ChunkInfo {
 | 1.2 大纲生成 API | `src/app/api/outline/route.ts` | 1 天 | 对话式生成场景大纲 |
 | 1.3 大纲确认 UI | `src/components/OutlineConfirm.tsx` | 0.5 天 | 大纲展示 + 修改 + 确认 |
 | 1.4 内容生成 Pipeline | `src/lib/generation/pipeline.ts` | 1.5 天 | Outline → Scene Content + Actions |
-| 1.5 PPT 导出核心 | `src/lib/export/pptx-generator.ts` | 2 天 | pptxgenjs 封装 |
+| 1.5 PPT 导出核心 | `src/lib/export/pptx-generator.ts` | 2 天 | svg_to_pptx 封装 |
 | 1.6 LaTeX 公式支持 | `src/lib/export/latex-to-omml.ts` | 1 天 | temml + mathml2omml |
 | 1.7 Shape/Chart/Table | `src/lib/export/layer-mappers.ts` | 1 天 | 扩展层类型映射 |
 
@@ -481,7 +481,7 @@ Response (completed):
 
 | 功能 | 技术选型 |
 |------|----------|
-| PPT 生成 | pptxgenjs + Railway CPU |
+| PPT 生成 | svg_to_pptx + Railway CPU |
 | LaTeX 公式 | temml + mathml2omml |
 | 视频渲染 | @remotion/lambda + AWS Lambda |
 | 视频存储 | Cloudflare R2 |

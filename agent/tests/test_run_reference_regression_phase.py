@@ -505,7 +505,7 @@ def test_build_visual_critic_patch_targets_low_similarity_pages():
     first = patch["slide_mutations"][0]
     assert first.get("page") == 1
     assert first.get("layout_hint") in {"split_2", "grid_3", "asymmetric_2"}
-    assert first.get("render_path") in {"pptxgenjs", "svg"}
+    assert first.get("render_path") in {"svg"}
     assert isinstance(first.get("template_family_whitelist"), list)
     assert len(first.get("template_family_whitelist") or []) >= 1
     assert str(first.get("template_family") or "").strip()
@@ -901,4 +901,5 @@ def test_wait_for_path_unlock_handles_missing_and_existing_file(tmp_path: Path):
     existing = tmp_path / "existing.pptx"
     existing.write_bytes(b"pptx")
     assert mod._wait_for_path_unlock(existing, timeout_sec=0.2, poll_sec=0.05) is True
+
 

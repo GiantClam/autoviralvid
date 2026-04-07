@@ -6,7 +6,7 @@ import re
 from typing import Any, Dict, Iterable, List, Set
 
 
-DEFAULT_PPTXGENJS_SLIDE_TYPES = {"cover", "summary", "toc", "divider", "section", "hero_1"}
+DEFAULT_SVG_SLIDE_TYPES = {"cover", "summary", "toc", "divider", "section", "hero_1"}
 
 SVG_EXCEPTION_LAYOUTS = {
     "timeline",
@@ -289,43 +289,31 @@ def classify_render_path(slide: Dict[str, Any], *, svg_mode: str = "on") -> Dict
     if explicit_exception:
         allowed_exception_reasons.append("explicit_exception_marker")
 
-    if explicit in {"pptxgenjs", "svg", "png_fallback"}:
-        chosen = "pptxgenjs" if svg_mode_norm == "off" and explicit == "svg" else explicit
+    if svg_mode_norm == "off":
+        forbidden_triggers.append("svg_mode_off_ignored")
+
+    if explicit == "svg":
         return _decision(
-            chosen,
+            "svg",
             "explicit_render_path",
             allowed_exception_reasons=allowed_exception_reasons,
             forbidden_triggers=forbidden_triggers,
         )
-    if slide_type in DEFAULT_PPTXGENJS_SLIDE_TYPES:
+    if slide_type in DEFAULT_SVG_SLIDE_TYPES:
         return _decision(
-            "pptxgenjs",
-            "default_terminal_or_template_slide",
-            allowed_exception_reasons=allowed_exception_reasons,
-            forbidden_triggers=forbidden_triggers,
-        )
-    if svg_mode_norm == "off":
-        return _decision(
-            "pptxgenjs",
-            "svg_mode_off",
+            "svg",
+            "default_terminal_slide",
             allowed_exception_reasons=allowed_exception_reasons,
             forbidden_triggers=forbidden_triggers,
         )
     if split_merge_applied and not explicit_exception:
         return _decision(
-            "pptxgenjs",
-            "split_merge_first_keep_template",
+            "svg",
+            "split_merge_applied_svg_only",
             allowed_exception_reasons=allowed_exception_reasons,
             forbidden_triggers=forbidden_triggers,
         )
     if allowed_exception_reasons:
-        if not explicit_exception and not split_merge_exhausted:
-            return _decision(
-                "pptxgenjs",
-                "split_merge_first_required",
-                allowed_exception_reasons=allowed_exception_reasons,
-                forbidden_triggers=forbidden_triggers,
-            )
         return _decision(
             "svg",
             allowed_exception_reasons[0],
@@ -333,15 +321,15 @@ def classify_render_path(slide: Dict[str, Any], *, svg_mode: str = "on") -> Dict
             forbidden_triggers=forbidden_triggers,
         )
     return _decision(
-        "pptxgenjs",
-        "default_template_route",
+        "svg",
+        "svg_only_default_route",
         allowed_exception_reasons=allowed_exception_reasons,
         forbidden_triggers=forbidden_triggers,
     )
 
 
 def choose_render_path_by_policy(slide: Dict[str, Any], *, svg_mode: str = "on") -> str:
-    return str(classify_render_path(slide, svg_mode=svg_mode).get("render_path") or "pptxgenjs")
+    return str(classify_render_path(slide, svg_mode=svg_mode).get("render_path") or "svg")
 
 
 def allow_visual_critic_svg_fallback(slide: Dict[str, Any], issue_codes: Iterable[str]) -> bool:

@@ -104,25 +104,139 @@
     "premium_light": "platinum_white_gold"
   },
   "palettes": {
-    "modern_wellness": ["006D77", "83C5BE", "EDF6F9", "FFDDD2", "E29578"],
-    "business_authority": ["2B2D42", "8D99AE", "EDF2F4", "EF233C", "D90429"],
-    "nature_outdoors": ["606C38", "283618", "FEFAE0", "DDA15E", "BC6C25"],
-    "vintage_academic": ["780000", "C1121F", "FDF0D5", "003049", "669BBC"],
-    "soft_creative": ["CDB4DB", "FFC8DD", "FFAFCC", "BDE0FE", "A2D2FF"],
-    "bohemian": ["CCD5AE", "E9EDC9", "FEFAE0", "FAEDCD", "D4A373"],
-    "vibrant_tech": ["8ECAE6", "219EBC", "023047", "FFB703", "FB8500"],
-    "craft_artisan": ["7F5539", "A68A64", "EDE0D4", "656D4A", "414833"],
-    "tech_night": ["000814", "001D3D", "003566", "FFC300", "FFD60A"],
-    "education_charts": ["264653", "2A9D8F", "E9C46A", "F4A261", "E76F51"],
-    "education_office_classic": ["1F497D", "4F81BD", "C0504D", "9BBB59", "8064A2"],
-    "forest_eco": ["DAD7CD", "A3B18A", "588157", "3A5A40", "344E41"],
-    "elegant_fashion": ["EDAFB8", "F7E1D7", "DEDBD2", "B0C4B1", "4A5759"],
-    "art_food": ["335C67", "FFF3B0", "E09F3E", "9E2A2B", "540B0E"],
-    "luxury_mysterious": ["22223B", "4A4E69", "9A8C98", "C9ADA7", "F2E9E4"],
-    "pure_tech_blue": ["03045E", "0077B6", "00B4D8", "90E0EF", "CAF0F8"],
-    "coastal_coral": ["0081A7", "00AFB9", "FDFCDC", "FED9B7", "F07167"],
-    "vibrant_orange_mint": ["FF9F1C", "FFBF69", "FFFFFF", "CBF3F0", "2EC4B6"],
-    "platinum_white_gold": ["0A0A0A", "0070F3", "F5F5F5", "D4AF37", "FFFFFF"]
+    "modern_wellness": [
+      "006D77",
+      "83C5BE",
+      "EDF6F9",
+      "FFDDD2",
+      "E29578"
+    ],
+    "business_authority": [
+      "2B2D42",
+      "8D99AE",
+      "EDF2F4",
+      "EF233C",
+      "D90429"
+    ],
+    "nature_outdoors": [
+      "606C38",
+      "283618",
+      "FEFAE0",
+      "DDA15E",
+      "BC6C25"
+    ],
+    "vintage_academic": [
+      "780000",
+      "C1121F",
+      "FDF0D5",
+      "003049",
+      "669BBC"
+    ],
+    "soft_creative": [
+      "CDB4DB",
+      "FFC8DD",
+      "FFAFCC",
+      "BDE0FE",
+      "A2D2FF"
+    ],
+    "bohemian": [
+      "CCD5AE",
+      "E9EDC9",
+      "FEFAE0",
+      "FAEDCD",
+      "D4A373"
+    ],
+    "vibrant_tech": [
+      "8ECAE6",
+      "219EBC",
+      "023047",
+      "FFB703",
+      "FB8500"
+    ],
+    "craft_artisan": [
+      "7F5539",
+      "A68A64",
+      "EDE0D4",
+      "656D4A",
+      "414833"
+    ],
+    "tech_night": [
+      "000814",
+      "001D3D",
+      "003566",
+      "FFC300",
+      "FFD60A"
+    ],
+    "education_charts": [
+      "264653",
+      "2A9D8F",
+      "E9C46A",
+      "F4A261",
+      "E76F51"
+    ],
+    "education_office_classic": [
+      "1F497D",
+      "4F81BD",
+      "C0504D",
+      "9BBB59",
+      "8064A2"
+    ],
+    "forest_eco": [
+      "DAD7CD",
+      "A3B18A",
+      "588157",
+      "3A5A40",
+      "344E41"
+    ],
+    "elegant_fashion": [
+      "EDAFB8",
+      "F7E1D7",
+      "DEDBD2",
+      "B0C4B1",
+      "4A5759"
+    ],
+    "art_food": [
+      "335C67",
+      "FFF3B0",
+      "E09F3E",
+      "9E2A2B",
+      "540B0E"
+    ],
+    "luxury_mysterious": [
+      "22223B",
+      "4A4E69",
+      "9A8C98",
+      "C9ADA7",
+      "F2E9E4"
+    ],
+    "pure_tech_blue": [
+      "03045E",
+      "0077B6",
+      "00B4D8",
+      "90E0EF",
+      "CAF0F8"
+    ],
+    "coastal_coral": [
+      "0081A7",
+      "00AFB9",
+      "FDFCDC",
+      "FED9B7",
+      "F07167"
+    ],
+    "vibrant_orange_mint": [
+      "FF9F1C",
+      "FFBF69",
+      "FFFFFF",
+      "CBF3F0",
+      "2EC4B6"
+    ],
+    "platinum_white_gold": [
+      "0A0A0A",
+      "0070F3",
+      "F5F5F5",
+      "D4AF37",
+      "FFFFFF"
+    ]
   },
   "palette_keywords": {
     "科技|AI|人工智能|cloud|tech": "pure_tech_blue",
@@ -137,47 +251,347 @@
   "keyword_rules": [
     {
       "template": "architecture_dark_panel",
-      "keywords": ["architecture", "orchestration", "sandbox", "dsl", "workflow engine", "编排", "架构"]
+      "keywords": [
+        "architecture",
+        "orchestration",
+        "sandbox",
+        "dsl",
+        "workflow engine",
+        "编排",
+        "架构"
+      ]
     },
     {
       "template": "neural_blueprint_light",
-      "keywords": ["canvas", "blueprint", "workflow", "node editor", "画布", "蓝图"]
+      "keywords": [
+        "canvas",
+        "blueprint",
+        "workflow",
+        "node editor",
+        "画布",
+        "蓝图"
+      ]
     },
     {
       "template": "ops_lifecycle_light",
-      "keywords": ["llmops", "observability", "opentelemetry", "langsmith", "langfuse", "监控", "可观测"]
+      "keywords": [
+        "llmops",
+        "observability",
+        "opentelemetry",
+        "langsmith",
+        "langfuse",
+        "监控",
+        "可观测"
+      ]
     },
     {
       "template": "ecosystem_orange_dark",
-      "keywords": ["iot", "ecosystem", "hardware", "platform", "生态", "硬件"]
+      "keywords": [
+        "iot",
+        "ecosystem",
+        "hardware",
+        "platform",
+        "生态",
+        "硬件"
+      ]
     },
     {
       "template": "consulting_warm_light",
-      "keywords": ["consulting", "recommendation", "business", "strategy", "建议", "策略"]
+      "keywords": [
+        "consulting",
+        "recommendation",
+        "business",
+        "strategy",
+        "建议",
+        "策略"
+      ]
     },
     {
       "template": "bento_mosaic_dark",
-      "keywords": ["showcase", "mosaic", "portfolio", "展示", "拼贴"]
+      "keywords": [
+        "showcase",
+        "mosaic",
+        "portfolio",
+        "展示",
+        "拼贴"
+      ]
     },
     {
       "template": "kpi_dashboard_dark",
-      "keywords": ["kpi", "metric", "dashboard", "trend", "performance", "scorecard"]
+      "keywords": [
+        "kpi",
+        "metric",
+        "dashboard",
+        "trend",
+        "performance",
+        "scorecard"
+      ]
     },
     {
       "template": "image_showcase_light",
-      "keywords": ["showcase", "gallery", "photo", "image", "visual story", "portfolio"]
+      "keywords": [
+        "showcase",
+        "gallery",
+        "photo",
+        "image",
+        "visual story",
+        "portfolio"
+      ]
     },
     {
       "template": "process_flow_dark",
-      "keywords": ["process", "workflow", "pipeline", "step", "roadmap", "phase"]
+      "keywords": [
+        "process",
+        "workflow",
+        "pipeline",
+        "step",
+        "roadmap",
+        "phase"
+      ]
     },
     {
       "template": "comparison_cards_light",
-      "keywords": ["comparison", "versus", "vs", "difference", "advantage", "benchmark"]
+      "keywords": [
+        "comparison",
+        "versus",
+        "vs",
+        "difference",
+        "advantage",
+        "benchmark"
+      ]
     },
     {
       "template": "quote_hero_dark",
-      "keywords": ["quote", "insight", "statement", "vision", "principle", "mission"]
+      "keywords": [
+        "quote",
+        "insight",
+        "statement",
+        "vision",
+        "principle",
+        "mission"
+      ]
+    },
+    {
+      "template": "pm_academic_defense_light",
+      "keywords": [
+        "academic_defense",
+        "pm_academic_defense_light",
+        "Academic",
+        "Defense",
+        "Research",
+        "Standard"
+      ]
+    },
+    {
+      "template": "pm_ai_ops_light",
+      "keywords": [
+        "ai_ops",
+        "pm_ai_ops_light",
+        "Telecom",
+        "AI operations",
+        "Digital intelligence",
+        "High density",
+        "Architecture view"
+      ]
+    },
+    {
+      "template": "pm_anthropic_light",
+      "keywords": [
+        "anthropic",
+        "pm_anthropic_light",
+        "AI",
+        "LLM",
+        "Developer",
+        "Technology"
+      ]
+    },
+    {
+      "template": "pm_exhibit_dark",
+      "keywords": [
+        "exhibit",
+        "pm_exhibit_dark",
+        "Exhibit",
+        "Board",
+        "Executive",
+        "Strategy",
+        "Conclusion-first"
+      ]
+    },
+    {
+      "template": "pm_google_style_light",
+      "keywords": [
+        "google_style",
+        "pm_google_style_light",
+        "Google",
+        "Brand style",
+        "Technical sharing",
+        "Annual report"
+      ]
+    },
+    {
+      "template": "pm_government_blue_light",
+      "keywords": [
+        "government_blue",
+        "pm_government_blue_light",
+        "Government affairs",
+        "Government blue",
+        "Smart city",
+        "Digitalization"
+      ]
+    },
+    {
+      "template": "pm_government_red_light",
+      "keywords": [
+        "government_red",
+        "pm_government_red_light",
+        "Government affairs",
+        "Party building",
+        "Government red",
+        "Authoritative"
+      ]
+    },
+    {
+      "template": "pm_mckinsey_light",
+      "keywords": [
+        "mckinsey",
+        "pm_mckinsey_light",
+        "McKinsey",
+        "Consulting",
+        "Structured",
+        "Executive presentation"
+      ]
+    },
+    {
+      "template": "pm_medical_university_light",
+      "keywords": [
+        "medical_university",
+        "pm_medical_university_light",
+        "Medical",
+        "Hospital",
+        "Case study",
+        "Research"
+      ]
+    },
+    {
+      "template": "pm_pixel_retro_dark",
+      "keywords": [
+        "pixel_retro",
+        "pm_pixel_retro_dark",
+        "Pixel art",
+        "Retro gaming",
+        "Cyberpunk",
+        "Technology"
+      ]
+    },
+    {
+      "template": "pm_psychology_attachment_light",
+      "keywords": [
+        "psychology_attachment",
+        "pm_psychology_attachment_light",
+        "Psychology",
+        "Healing",
+        "Counseling",
+        "Warm"
+      ]
+    },
+    {
+      "template": "pm_smart_red_light",
+      "keywords": [
+        "smart_red",
+        "pm_smart_red_light",
+        "Red-orange business",
+        "Tech enterprise",
+        "Education",
+        "Vibrant"
+      ]
+    },
+    {
+      "template": "pm_powerchina_standard_light",
+      "keywords": [
+        "powerchina_standard",
+        "pm_powerchina_standard_light",
+        "PowerChina",
+        "State-owned enterprise",
+        "Engineering",
+        "Energy"
+      ]
+    },
+    {
+      "template": "pm_powerchina_modern_light",
+      "keywords": [
+        "powerchina_modern",
+        "pm_powerchina_modern_light",
+        "PowerChina",
+        "International engineering",
+        "Modern engineering",
+        "Technology"
+      ]
+    },
+    {
+      "template": "pm_catarc_business_light",
+      "keywords": [
+        "catarc_business",
+        "pm_catarc_business_light",
+        "CATARC",
+        "Certification",
+        "Business",
+        "Technology"
+      ]
+    },
+    {
+      "template": "pm_catarc_standard_light",
+      "keywords": [
+        "catarc_standard",
+        "pm_catarc_standard_light",
+        "CATARC",
+        "Certification",
+        "Testing",
+        "Authoritative"
+      ]
+    },
+    {
+      "template": "pm_catarc_modern_light",
+      "keywords": [
+        "catarc_modern",
+        "pm_catarc_modern_light",
+        "CATARC",
+        "Future tech",
+        "Cutting-edge technology",
+        "Launch event"
+      ]
+    },
+    {
+      "template": "pm_cmb_finance_light",
+      "keywords": [
+        "cmb_finance",
+        "pm_cmb_finance_light",
+        "China Merchants Bank",
+        "Finance",
+        "Premium report",
+        "Annual report"
+      ]
+    },
+    {
+      "template": "pm_tech_blue_business_light",
+      "keywords": [
+        "tech_blue_business",
+        "pm_tech_blue_business_light",
+        "Tech blue",
+        "Business",
+        "Solution proposal",
+        "Corporate report"
+      ]
+    },
+    {
+      "template": "pm_chongqing_university_light",
+      "keywords": [
+        "chongqing_university",
+        "pm_chongqing_university_light",
+        "Chongqing University",
+        "Academic",
+        "Defense",
+        "University"
+      ]
     }
   ],
   "route_policies": {
@@ -214,83 +628,209 @@
     "recommendation": {
       "refine_if_pages_gt": 15,
       "refine_if_constraints_gte": 3,
-      "refine_quality_profiles": ["high_density_consulting"],
+      "refine_quality_profiles": [
+        "high_density_consulting"
+      ],
       "fast_if_pages_lte": 5,
       "fast_if_constraints_eq": 0,
-      "fast_quality_profiles": ["", "auto", "default", "lenient_draft"],
-      "fast_visual_densities": ["", "auto", "balanced", "sparse"]
+      "fast_quality_profiles": [
+        "",
+        "auto",
+        "default",
+        "lenient_draft"
+      ],
+      "fast_visual_densities": [
+        "",
+        "auto",
+        "balanced",
+        "sparse"
+      ]
     }
   },
   "contract_profiles": {
     "minimal": {
-      "required_block_types": ["title"],
+      "required_block_types": [
+        "title"
+      ],
       "required_one_of_groups": [],
       "min_text_blocks": 1,
       "min_visual_blocks": 0,
-      "visual_anchor_types": ["image", "chart", "kpi", "workflow", "diagram"],
+      "visual_anchor_types": [
+        "image",
+        "chart",
+        "kpi",
+        "workflow",
+        "diagram"
+      ],
       "require_emphasis_signal": false,
       "forbid_duplicate_text": false
     },
     "default": {
-      "required_block_types": ["title"],
-      "required_one_of_groups": [["body", "list", "quote", "icon_text", "workflow"]],
+      "required_block_types": [
+        "title"
+      ],
+      "required_one_of_groups": [
+        [
+          "body",
+          "list",
+          "quote",
+          "icon_text",
+          "workflow"
+        ]
+      ],
       "min_text_blocks": 2,
       "min_visual_blocks": 0,
-      "visual_anchor_types": ["image", "chart", "kpi", "workflow", "diagram"],
+      "visual_anchor_types": [
+        "image",
+        "chart",
+        "kpi",
+        "workflow",
+        "diagram"
+      ],
       "require_emphasis_signal": true,
       "forbid_duplicate_text": true
     },
     "cover_meta_required": {
-      "required_block_types": ["title"],
-      "required_one_of_groups": [["subtitle", "body", "quote"]],
+      "required_block_types": [
+        "title"
+      ],
+      "required_one_of_groups": [
+        [
+          "subtitle",
+          "body",
+          "quote"
+        ]
+      ],
       "min_text_blocks": 1,
       "min_visual_blocks": 0,
-      "visual_anchor_types": ["image", "diagram"],
+      "visual_anchor_types": [
+        "image",
+        "diagram"
+      ],
       "require_emphasis_signal": false,
       "forbid_duplicate_text": false
     },
     "visual_anchor_required": {
-      "required_block_types": ["title"],
-      "required_one_of_groups": [["body", "list", "workflow"]],
+      "required_block_types": [
+        "title"
+      ],
+      "required_one_of_groups": [
+        [
+          "body",
+          "list",
+          "workflow"
+        ]
+      ],
       "min_text_blocks": 2,
       "min_visual_blocks": 1,
-      "visual_anchor_types": ["image", "chart", "kpi", "workflow", "diagram"],
+      "visual_anchor_types": [
+        "image",
+        "chart",
+        "kpi",
+        "workflow",
+        "diagram"
+      ],
       "require_emphasis_signal": true,
       "forbid_duplicate_text": true
     },
     "chart_or_kpi_required": {
-      "required_block_types": ["title"],
-      "required_one_of_groups": [["body", "list"], ["chart", "kpi", "table"]],
+      "required_block_types": [
+        "title"
+      ],
+      "required_one_of_groups": [
+        [
+          "body",
+          "list"
+        ],
+        [
+          "chart",
+          "kpi",
+          "table"
+        ]
+      ],
       "min_text_blocks": 2,
       "min_visual_blocks": 1,
-      "visual_anchor_types": ["chart", "kpi", "table"],
+      "visual_anchor_types": [
+        "chart",
+        "kpi",
+        "table"
+      ],
       "require_emphasis_signal": true,
       "forbid_duplicate_text": true
     },
     "hierarchy_blocks_required": {
-      "required_block_types": ["title"],
-      "required_one_of_groups": [["body", "list"], ["workflow", "diagram", "icon_text"]],
+      "required_block_types": [
+        "title"
+      ],
+      "required_one_of_groups": [
+        [
+          "body",
+          "list"
+        ],
+        [
+          "workflow",
+          "diagram",
+          "icon_text"
+        ]
+      ],
       "min_text_blocks": 2,
       "min_visual_blocks": 1,
-      "visual_anchor_types": ["workflow", "diagram", "image"],
+      "visual_anchor_types": [
+        "workflow",
+        "diagram",
+        "image"
+      ],
       "require_emphasis_signal": true,
       "forbid_duplicate_text": true
     },
     "kpi_or_diagram_required": {
-      "required_block_types": ["title"],
-      "required_one_of_groups": [["body", "list"], ["kpi", "diagram", "chart"]],
+      "required_block_types": [
+        "title"
+      ],
+      "required_one_of_groups": [
+        [
+          "body",
+          "list"
+        ],
+        [
+          "kpi",
+          "diagram",
+          "chart"
+        ]
+      ],
       "min_text_blocks": 2,
       "min_visual_blocks": 1,
-      "visual_anchor_types": ["kpi", "diagram", "chart", "image"],
+      "visual_anchor_types": [
+        "kpi",
+        "diagram",
+        "chart",
+        "image"
+      ],
       "require_emphasis_signal": true,
       "forbid_duplicate_text": true
     },
     "image_or_list_required": {
-      "required_block_types": ["title"],
-      "required_one_of_groups": [["body", "list"], ["image", "list"]],
+      "required_block_types": [
+        "title"
+      ],
+      "required_one_of_groups": [
+        [
+          "body",
+          "list"
+        ],
+        [
+          "image",
+          "list"
+        ]
+      ],
       "min_text_blocks": 2,
       "min_visual_blocks": 0,
-      "visual_anchor_types": ["image", "chart", "kpi", "workflow"],
+      "visual_anchor_types": [
+        "image",
+        "chart",
+        "kpi",
+        "workflow"
+      ],
       "require_emphasis_signal": true,
       "forbid_duplicate_text": true
     }
@@ -349,8 +889,17 @@
         "require_image_anchor": false,
         "dense_layout_remap": {
           "enabled": false,
-          "replace_from": ["split_2", "asymmetric_2"],
-          "cycle": ["grid_3", "grid_4", "bento_5", "timeline", "bento_6"]
+          "replace_from": [
+            "split_2",
+            "asymmetric_2"
+          ],
+          "cycle": [
+            "grid_3",
+            "grid_4",
+            "bento_5",
+            "timeline",
+            "bento_6"
+          ]
         },
         "prevent_adjacent_layout_repeat": true,
         "family_convergence": {
@@ -359,7 +908,13 @@
           "layout_to_family": {},
           "default_family": "dashboard_dark",
           "lock_after_apply": true,
-          "skip_slide_types": ["cover", "summary", "toc", "divider", "hero_1"]
+          "skip_slide_types": [
+            "cover",
+            "summary",
+            "toc",
+            "divider",
+            "hero_1"
+          ]
         },
         "theme_cohesion": {
           "enabled": true,
@@ -400,7 +955,7 @@
       "visual_style_drift_max_ratio": 0.55,
       "visual_text_overlap_max_ratio": 0.35,
       "visual_occlusion_max_ratio": 0.35,
-      "visual_card_overlap_max_ratio": 0.30,
+      "visual_card_overlap_max_ratio": 0.3,
       "visual_title_crowded_max_ratio": 0.35,
       "visual_multi_title_max_ratio": 0.25,
       "visual_text_overflow_max_ratio": 0.35,
@@ -422,8 +977,17 @@
         "require_image_anchor": true,
         "dense_layout_remap": {
           "enabled": true,
-          "replace_from": ["split_2", "asymmetric_2"],
-          "cycle": ["grid_3", "grid_4", "bento_5", "timeline", "bento_6"]
+          "replace_from": [
+            "split_2",
+            "asymmetric_2"
+          ],
+          "cycle": [
+            "grid_3",
+            "grid_4",
+            "bento_5",
+            "timeline",
+            "bento_6"
+          ]
         },
         "prevent_adjacent_layout_repeat": true,
         "family_convergence": {
@@ -440,7 +1004,13 @@
           },
           "default_family": "consulting_warm_light",
           "lock_after_apply": true,
-          "skip_slide_types": ["cover", "summary", "toc", "divider", "hero_1"]
+          "skip_slide_types": [
+            "cover",
+            "summary",
+            "toc",
+            "divider",
+            "hero_1"
+          ]
         },
         "theme_cohesion": {
           "enabled": true,
@@ -578,7 +1148,13 @@
             "grid_4": "education_textbook_light"
           },
           "lock_after_apply": true,
-          "skip_slide_types": ["cover", "summary", "toc", "divider", "hero_1"]
+          "skip_slide_types": [
+            "cover",
+            "summary",
+            "toc",
+            "divider",
+            "hero_1"
+          ]
         },
         "theme_cohesion": {
           "enabled": true,
@@ -693,10 +1269,27 @@
       "quality_profile": "default",
       "header_style": "solid",
       "capabilities": {
-        "supported_slide_types": ["cover", "summary", "divider", "toc"],
-        "supported_layouts": ["hero_1"],
-        "supported_block_types": ["title", "subtitle", "body", "quote", "list"],
-        "density_range": { "min": "sparse", "max": "balanced", "recommended": "sparse" },
+        "supported_slide_types": [
+          "cover",
+          "summary",
+          "divider",
+          "toc"
+        ],
+        "supported_layouts": [
+          "hero_1"
+        ],
+        "supported_block_types": [
+          "title",
+          "subtitle",
+          "body",
+          "quote",
+          "list"
+        ],
+        "density_range": {
+          "min": "sparse",
+          "max": "balanced",
+          "recommended": "sparse"
+        },
         "visual_anchor_capacity": 0,
         "data_block_capacity": 0
       }
@@ -709,10 +1302,26 @@
       "quality_profile": "default",
       "header_style": "solid",
       "capabilities": {
-        "supported_slide_types": ["cover", "summary", "divider"],
-        "supported_layouts": ["hero_1"],
-        "supported_block_types": ["title", "subtitle", "body", "quote", "image"],
-        "density_range": { "min": "sparse", "max": "balanced", "recommended": "balanced" },
+        "supported_slide_types": [
+          "cover",
+          "summary",
+          "divider"
+        ],
+        "supported_layouts": [
+          "hero_1"
+        ],
+        "supported_block_types": [
+          "title",
+          "subtitle",
+          "body",
+          "quote",
+          "image"
+        ],
+        "density_range": {
+          "min": "sparse",
+          "max": "balanced",
+          "recommended": "balanced"
+        },
         "visual_anchor_capacity": 1,
         "data_block_capacity": 0
       }
@@ -725,10 +1334,32 @@
       "quality_profile": "high_density_consulting",
       "header_style": "band",
       "capabilities": {
-        "supported_slide_types": ["content", "data", "comparison"],
-        "supported_layouts": ["grid_3", "grid_4", "bento_5", "bento_6"],
-        "supported_block_types": ["title", "body", "list", "kpi", "chart", "image", "icon_text", "table"],
-        "density_range": { "min": "balanced", "max": "dense", "recommended": "dense" },
+        "supported_slide_types": [
+          "content",
+          "data",
+          "comparison"
+        ],
+        "supported_layouts": [
+          "grid_3",
+          "grid_4",
+          "bento_5",
+          "bento_6"
+        ],
+        "supported_block_types": [
+          "title",
+          "body",
+          "list",
+          "kpi",
+          "chart",
+          "image",
+          "icon_text",
+          "table"
+        ],
+        "density_range": {
+          "min": "balanced",
+          "max": "dense",
+          "recommended": "dense"
+        },
         "visual_anchor_capacity": 2,
         "data_block_capacity": 2
       }
@@ -741,10 +1372,28 @@
       "quality_profile": "high_density_consulting",
       "header_style": "gradient",
       "capabilities": {
-        "supported_slide_types": ["content", "showcase"],
-        "supported_layouts": ["bento_5", "bento_6", "grid_4"],
-        "supported_block_types": ["title", "body", "list", "image", "kpi", "icon_text"],
-        "density_range": { "min": "balanced", "max": "dense", "recommended": "dense" },
+        "supported_slide_types": [
+          "content",
+          "showcase"
+        ],
+        "supported_layouts": [
+          "bento_5",
+          "bento_6",
+          "grid_4"
+        ],
+        "supported_block_types": [
+          "title",
+          "body",
+          "list",
+          "image",
+          "kpi",
+          "icon_text"
+        ],
+        "density_range": {
+          "min": "balanced",
+          "max": "dense",
+          "recommended": "dense"
+        },
         "visual_anchor_capacity": 3,
         "data_block_capacity": 1
       }
@@ -755,13 +1404,37 @@
       "schema_profile": "ppt-template/v2-split-media",
       "contract_profile": "default",
       "quality_profile": "default",
-      "preferred_archetypes": ["media_showcase_1p2s", "thesis_assertion", "comparison_2col"],
+      "preferred_archetypes": [
+        "media_showcase_1p2s",
+        "thesis_assertion",
+        "comparison_2col"
+      ],
       "header_style": "line",
       "capabilities": {
-        "supported_slide_types": ["content", "comparison", "data"],
-        "supported_layouts": ["split_2", "asymmetric_2"],
-        "supported_block_types": ["title", "body", "list", "quote", "image", "kpi", "chart", "workflow"],
-        "density_range": { "min": "balanced", "max": "dense", "recommended": "balanced" },
+        "supported_slide_types": [
+          "content",
+          "comparison",
+          "data"
+        ],
+        "supported_layouts": [
+          "split_2",
+          "asymmetric_2"
+        ],
+        "supported_block_types": [
+          "title",
+          "body",
+          "list",
+          "quote",
+          "image",
+          "kpi",
+          "chart",
+          "workflow"
+        ],
+        "density_range": {
+          "min": "balanced",
+          "max": "dense",
+          "recommended": "balanced"
+        },
         "visual_anchor_capacity": 1,
         "data_block_capacity": 1
       }
@@ -772,13 +1445,39 @@
       "schema_profile": "ppt-template/v2-dashboard",
       "contract_profile": "chart_or_kpi_required",
       "quality_profile": "high_density_consulting",
-      "preferred_archetypes": ["dashboard_kpi_4", "chart_single_focus", "chart_dual_compare"],
+      "preferred_archetypes": [
+        "dashboard_kpi_4",
+        "chart_single_focus",
+        "chart_dual_compare"
+      ],
       "header_style": "band",
       "capabilities": {
-        "supported_slide_types": ["content", "data", "comparison"],
-        "supported_layouts": ["grid_3", "grid_4", "split_2", "bento_6"],
-        "supported_block_types": ["title", "body", "list", "chart", "kpi", "table", "image", "workflow"],
-        "density_range": { "min": "balanced", "max": "dense", "recommended": "dense" },
+        "supported_slide_types": [
+          "content",
+          "data",
+          "comparison"
+        ],
+        "supported_layouts": [
+          "grid_3",
+          "grid_4",
+          "split_2",
+          "bento_6"
+        ],
+        "supported_block_types": [
+          "title",
+          "body",
+          "list",
+          "chart",
+          "kpi",
+          "table",
+          "image",
+          "workflow"
+        ],
+        "density_range": {
+          "min": "balanced",
+          "max": "dense",
+          "recommended": "dense"
+        },
         "visual_anchor_capacity": 2,
         "data_block_capacity": 3
       }
@@ -789,13 +1488,38 @@
       "schema_profile": "ppt-template/v2-kpi-dashboard",
       "contract_profile": "chart_or_kpi_required",
       "quality_profile": "high_density_consulting",
-      "preferred_archetypes": ["dashboard_kpi_4", "chart_single_focus", "chart_dual_compare"],
+      "preferred_archetypes": [
+        "dashboard_kpi_4",
+        "chart_single_focus",
+        "chart_dual_compare"
+      ],
       "header_style": "band",
       "capabilities": {
-        "supported_slide_types": ["content", "data", "comparison"],
-        "supported_layouts": ["grid_3", "grid_4", "bento_6"],
-        "supported_block_types": ["title", "body", "list", "chart", "kpi", "table", "image", "icon_text"],
-        "density_range": { "min": "balanced", "max": "dense", "recommended": "dense" },
+        "supported_slide_types": [
+          "content",
+          "data",
+          "comparison"
+        ],
+        "supported_layouts": [
+          "grid_3",
+          "grid_4",
+          "bento_6"
+        ],
+        "supported_block_types": [
+          "title",
+          "body",
+          "list",
+          "chart",
+          "kpi",
+          "table",
+          "image",
+          "icon_text"
+        ],
+        "density_range": {
+          "min": "balanced",
+          "max": "dense",
+          "recommended": "dense"
+        },
         "visual_anchor_capacity": 2,
         "data_block_capacity": 3
       }
@@ -808,10 +1532,29 @@
       "quality_profile": "default",
       "header_style": "underline-light",
       "capabilities": {
-        "supported_slide_types": ["content", "showcase", "comparison"],
-        "supported_layouts": ["split_2", "asymmetric_2", "grid_3"],
-        "supported_block_types": ["title", "body", "list", "image", "quote", "icon_text"],
-        "density_range": { "min": "sparse", "max": "balanced", "recommended": "balanced" },
+        "supported_slide_types": [
+          "content",
+          "showcase",
+          "comparison"
+        ],
+        "supported_layouts": [
+          "split_2",
+          "asymmetric_2",
+          "grid_3"
+        ],
+        "supported_block_types": [
+          "title",
+          "body",
+          "list",
+          "image",
+          "quote",
+          "icon_text"
+        ],
+        "density_range": {
+          "min": "sparse",
+          "max": "balanced",
+          "recommended": "balanced"
+        },
         "visual_anchor_capacity": 3,
         "data_block_capacity": 1,
         "requires_image_asset": true
@@ -825,10 +1568,30 @@
       "quality_profile": "high_density_consulting",
       "header_style": "line",
       "capabilities": {
-        "supported_slide_types": ["content", "workflow", "timeline"],
-        "supported_layouts": ["timeline", "split_2", "grid_3"],
-        "supported_block_types": ["title", "body", "list", "workflow", "diagram", "icon_text", "chart"],
-        "density_range": { "min": "balanced", "max": "dense", "recommended": "balanced" },
+        "supported_slide_types": [
+          "content",
+          "workflow",
+          "timeline"
+        ],
+        "supported_layouts": [
+          "timeline",
+          "split_2",
+          "grid_3"
+        ],
+        "supported_block_types": [
+          "title",
+          "body",
+          "list",
+          "workflow",
+          "diagram",
+          "icon_text",
+          "chart"
+        ],
+        "density_range": {
+          "min": "balanced",
+          "max": "dense",
+          "recommended": "balanced"
+        },
         "visual_anchor_capacity": 1,
         "data_block_capacity": 1
       }
@@ -839,13 +1602,39 @@
       "schema_profile": "ppt-template/v2-comparison-cards",
       "contract_profile": "default",
       "quality_profile": "default",
-      "preferred_archetypes": ["comparison_2col", "chart_dual_compare", "risk_mitigation"],
+      "preferred_archetypes": [
+        "comparison_2col",
+        "chart_dual_compare",
+        "risk_mitigation"
+      ],
       "header_style": "underline-light",
       "capabilities": {
-        "supported_slide_types": ["content", "comparison", "data"],
-        "supported_layouts": ["split_2", "asymmetric_2", "grid_3"],
-        "supported_block_types": ["title", "comparison", "body", "list", "quote", "kpi", "chart", "table", "icon_text"],
-        "density_range": { "min": "sparse", "max": "balanced", "recommended": "balanced" },
+        "supported_slide_types": [
+          "content",
+          "comparison",
+          "data"
+        ],
+        "supported_layouts": [
+          "split_2",
+          "asymmetric_2",
+          "grid_3"
+        ],
+        "supported_block_types": [
+          "title",
+          "comparison",
+          "body",
+          "list",
+          "quote",
+          "kpi",
+          "chart",
+          "table",
+          "icon_text"
+        ],
+        "density_range": {
+          "min": "sparse",
+          "max": "balanced",
+          "recommended": "balanced"
+        },
         "visual_anchor_capacity": 1,
         "data_block_capacity": 2
       }
@@ -858,10 +1647,36 @@
       "quality_profile": "training_deck",
       "header_style": "underline-light",
       "capabilities": {
-        "supported_slide_types": ["content", "data", "comparison", "summary", "timeline"],
-        "supported_layouts": ["split_2", "asymmetric_2", "grid_3", "grid_4", "timeline"],
-        "supported_block_types": ["title", "body", "list", "quote", "chart", "kpi", "table", "comparison", "workflow"],
-        "density_range": { "min": "sparse", "max": "balanced", "recommended": "balanced" },
+        "supported_slide_types": [
+          "content",
+          "data",
+          "comparison",
+          "summary",
+          "timeline"
+        ],
+        "supported_layouts": [
+          "split_2",
+          "asymmetric_2",
+          "grid_3",
+          "grid_4",
+          "timeline"
+        ],
+        "supported_block_types": [
+          "title",
+          "body",
+          "list",
+          "quote",
+          "chart",
+          "kpi",
+          "table",
+          "comparison",
+          "workflow"
+        ],
+        "density_range": {
+          "min": "sparse",
+          "max": "balanced",
+          "recommended": "balanced"
+        },
         "visual_anchor_capacity": 1,
         "data_block_capacity": 2
       }
@@ -874,10 +1689,27 @@
       "quality_profile": "default",
       "header_style": "gradient",
       "capabilities": {
-        "supported_slide_types": ["content", "summary", "divider"],
-        "supported_layouts": ["hero_1", "split_2"],
-        "supported_block_types": ["title", "body", "quote", "subtitle", "image"],
-        "density_range": { "min": "sparse", "max": "balanced", "recommended": "sparse" },
+        "supported_slide_types": [
+          "content",
+          "summary",
+          "divider"
+        ],
+        "supported_layouts": [
+          "hero_1",
+          "split_2"
+        ],
+        "supported_block_types": [
+          "title",
+          "body",
+          "quote",
+          "subtitle",
+          "image"
+        ],
+        "density_range": {
+          "min": "sparse",
+          "max": "balanced",
+          "recommended": "sparse"
+        },
         "visual_anchor_capacity": 1,
         "data_block_capacity": 0
       }
@@ -890,10 +1722,30 @@
       "quality_profile": "high_density_consulting",
       "header_style": "gradient",
       "capabilities": {
-        "supported_slide_types": ["content", "comparison", "workflow"],
-        "supported_layouts": ["split_2", "asymmetric_2", "grid_3"],
-        "supported_block_types": ["title", "body", "list", "workflow", "diagram", "icon_text", "image"],
-        "density_range": { "min": "balanced", "max": "dense", "recommended": "balanced" },
+        "supported_slide_types": [
+          "content",
+          "comparison",
+          "workflow"
+        ],
+        "supported_layouts": [
+          "split_2",
+          "asymmetric_2",
+          "grid_3"
+        ],
+        "supported_block_types": [
+          "title",
+          "body",
+          "list",
+          "workflow",
+          "diagram",
+          "icon_text",
+          "image"
+        ],
+        "density_range": {
+          "min": "balanced",
+          "max": "dense",
+          "recommended": "balanced"
+        },
         "visual_anchor_capacity": 2,
         "data_block_capacity": 1
       }
@@ -906,10 +1758,30 @@
       "quality_profile": "high_density_consulting",
       "header_style": "line",
       "capabilities": {
-        "supported_slide_types": ["content", "data", "comparison"],
-        "supported_layouts": ["grid_3", "grid_4", "split_2"],
-        "supported_block_types": ["title", "body", "list", "kpi", "diagram", "chart", "image"],
-        "density_range": { "min": "balanced", "max": "dense", "recommended": "balanced" },
+        "supported_slide_types": [
+          "content",
+          "data",
+          "comparison"
+        ],
+        "supported_layouts": [
+          "grid_3",
+          "grid_4",
+          "split_2"
+        ],
+        "supported_block_types": [
+          "title",
+          "body",
+          "list",
+          "kpi",
+          "diagram",
+          "chart",
+          "image"
+        ],
+        "density_range": {
+          "min": "balanced",
+          "max": "dense",
+          "recommended": "balanced"
+        },
         "visual_anchor_capacity": 2,
         "data_block_capacity": 2
       }
@@ -922,10 +1794,30 @@
       "quality_profile": "high_density_consulting",
       "header_style": "underline-light",
       "capabilities": {
-        "supported_slide_types": ["content", "workflow", "comparison"],
-        "supported_layouts": ["grid_4", "split_2", "asymmetric_2"],
-        "supported_block_types": ["title", "body", "list", "workflow", "diagram", "image", "kpi"],
-        "density_range": { "min": "balanced", "max": "dense", "recommended": "dense" },
+        "supported_slide_types": [
+          "content",
+          "workflow",
+          "comparison"
+        ],
+        "supported_layouts": [
+          "grid_4",
+          "split_2",
+          "asymmetric_2"
+        ],
+        "supported_block_types": [
+          "title",
+          "body",
+          "list",
+          "workflow",
+          "diagram",
+          "image",
+          "kpi"
+        ],
+        "density_range": {
+          "min": "balanced",
+          "max": "dense",
+          "recommended": "dense"
+        },
         "visual_anchor_capacity": 2,
         "data_block_capacity": 1,
         "requires_image_asset": true
@@ -937,13 +1829,39 @@
       "schema_profile": "ppt-template/v2-ops-lifecycle",
       "contract_profile": "chart_or_kpi_required",
       "quality_profile": "high_density_consulting",
-      "preferred_archetypes": ["dashboard_kpi_4", "chart_single_focus", "process_flow_4step", "timeline_horizontal"],
+      "preferred_archetypes": [
+        "dashboard_kpi_4",
+        "chart_single_focus",
+        "process_flow_4step",
+        "timeline_horizontal"
+      ],
       "header_style": "underline-light",
       "capabilities": {
-        "supported_slide_types": ["content", "data", "timeline"],
-        "supported_layouts": ["timeline", "grid_3", "split_2"],
-        "supported_block_types": ["title", "body", "list", "chart", "kpi", "table", "workflow", "image"],
-        "density_range": { "min": "balanced", "max": "dense", "recommended": "dense" },
+        "supported_slide_types": [
+          "content",
+          "data",
+          "timeline"
+        ],
+        "supported_layouts": [
+          "timeline",
+          "grid_3",
+          "split_2"
+        ],
+        "supported_block_types": [
+          "title",
+          "body",
+          "list",
+          "chart",
+          "kpi",
+          "table",
+          "workflow",
+          "image"
+        ],
+        "density_range": {
+          "min": "balanced",
+          "max": "dense",
+          "recommended": "dense"
+        },
         "visual_anchor_capacity": 2,
         "data_block_capacity": 3
       }
@@ -954,16 +1872,1141 @@
       "schema_profile": "ppt-template/v2-consulting-warm",
       "contract_profile": "image_or_list_required",
       "quality_profile": "high_density_consulting",
-      "preferred_archetypes": ["thesis_assertion", "evidence_cards_3", "comparison_2col"],
+      "preferred_archetypes": [
+        "thesis_assertion",
+        "evidence_cards_3",
+        "comparison_2col"
+      ],
       "header_style": "underline-warm",
       "capabilities": {
-        "supported_slide_types": ["content", "comparison", "summary"],
-        "supported_layouts": ["split_2", "grid_3", "asymmetric_2"],
-        "supported_block_types": ["title", "body", "list", "quote", "kpi", "chart", "image", "table"],
-        "density_range": { "min": "balanced", "max": "dense", "recommended": "dense" },
+        "supported_slide_types": [
+          "content",
+          "comparison",
+          "summary"
+        ],
+        "supported_layouts": [
+          "split_2",
+          "grid_3",
+          "asymmetric_2"
+        ],
+        "supported_block_types": [
+          "title",
+          "body",
+          "list",
+          "quote",
+          "kpi",
+          "chart",
+          "image",
+          "table"
+        ],
+        "density_range": {
+          "min": "balanced",
+          "max": "dense",
+          "recommended": "dense"
+        },
         "visual_anchor_capacity": 1,
         "data_block_capacity": 2,
         "requires_image_asset": true
+      }
+    },
+    "pm_academic_defense_light": {
+      "skill_profile": "education-textbook",
+      "hardness_profile": "balanced",
+      "schema_profile": "ppt-template/v2-ppt-master-academic_defense",
+      "contract_profile": "default",
+      "quality_profile": "training_deck",
+      "header_style": "underline-light",
+      "source_layout": "academic_defense",
+      "source_pack": "ppt-master",
+      "tone": "light",
+      "requires_keyword_match": true,
+      "capabilities": {
+        "supported_slide_types": [
+          "cover",
+          "toc",
+          "divider",
+          "content",
+          "comparison",
+          "data",
+          "summary",
+          "timeline"
+        ],
+        "supported_layouts": [
+          "hero_1",
+          "split_2",
+          "asymmetric_2",
+          "grid_3",
+          "grid_4",
+          "timeline",
+          "bento_5"
+        ],
+        "supported_block_types": [
+          "title",
+          "subtitle",
+          "body",
+          "list",
+          "quote",
+          "icon_text",
+          "image",
+          "chart",
+          "kpi",
+          "table",
+          "workflow",
+          "diagram",
+          "comparison"
+        ],
+        "density_range": {
+          "min": "sparse",
+          "max": "balanced",
+          "recommended": "balanced"
+        },
+        "visual_anchor_capacity": 2,
+        "data_block_capacity": 2
+      }
+    },
+    "pm_ai_ops_light": {
+      "skill_profile": "architecture-explainer",
+      "hardness_profile": "balanced",
+      "schema_profile": "ppt-template/v2-ppt-master-ai_ops",
+      "contract_profile": "hierarchy_blocks_required",
+      "quality_profile": "high_density_consulting",
+      "header_style": "underline-light",
+      "source_layout": "ai_ops",
+      "source_pack": "ppt-master",
+      "tone": "light",
+      "requires_keyword_match": true,
+      "capabilities": {
+        "supported_slide_types": [
+          "cover",
+          "toc",
+          "divider",
+          "content",
+          "comparison",
+          "data",
+          "summary",
+          "timeline"
+        ],
+        "supported_layouts": [
+          "hero_1",
+          "split_2",
+          "asymmetric_2",
+          "grid_3",
+          "grid_4",
+          "timeline",
+          "bento_5"
+        ],
+        "supported_block_types": [
+          "title",
+          "subtitle",
+          "body",
+          "list",
+          "quote",
+          "icon_text",
+          "image",
+          "chart",
+          "kpi",
+          "table",
+          "workflow",
+          "diagram",
+          "comparison"
+        ],
+        "density_range": {
+          "min": "balanced",
+          "max": "dense",
+          "recommended": "balanced"
+        },
+        "visual_anchor_capacity": 2,
+        "data_block_capacity": 2
+      }
+    },
+    "pm_anthropic_light": {
+      "skill_profile": "architecture-explainer",
+      "hardness_profile": "balanced",
+      "schema_profile": "ppt-template/v2-ppt-master-anthropic",
+      "contract_profile": "hierarchy_blocks_required",
+      "quality_profile": "high_density_consulting",
+      "header_style": "underline-light",
+      "source_layout": "anthropic",
+      "source_pack": "ppt-master",
+      "tone": "light",
+      "requires_keyword_match": true,
+      "capabilities": {
+        "supported_slide_types": [
+          "cover",
+          "toc",
+          "divider",
+          "content",
+          "comparison",
+          "data",
+          "summary",
+          "timeline"
+        ],
+        "supported_layouts": [
+          "hero_1",
+          "split_2",
+          "asymmetric_2",
+          "grid_3",
+          "grid_4",
+          "timeline",
+          "bento_5"
+        ],
+        "supported_block_types": [
+          "title",
+          "subtitle",
+          "body",
+          "list",
+          "quote",
+          "icon_text",
+          "image",
+          "chart",
+          "kpi",
+          "table",
+          "workflow",
+          "diagram",
+          "comparison"
+        ],
+        "density_range": {
+          "min": "balanced",
+          "max": "dense",
+          "recommended": "balanced"
+        },
+        "visual_anchor_capacity": 2,
+        "data_block_capacity": 2
+      }
+    },
+    "pm_exhibit_dark": {
+      "skill_profile": "consulting-recommendation",
+      "hardness_profile": "balanced",
+      "schema_profile": "ppt-template/v2-ppt-master-exhibit",
+      "contract_profile": "default",
+      "quality_profile": "high_density_consulting",
+      "header_style": "gradient",
+      "source_layout": "exhibit",
+      "source_pack": "ppt-master",
+      "tone": "dark",
+      "requires_keyword_match": true,
+      "capabilities": {
+        "supported_slide_types": [
+          "cover",
+          "toc",
+          "divider",
+          "content",
+          "comparison",
+          "data",
+          "summary",
+          "timeline"
+        ],
+        "supported_layouts": [
+          "hero_1",
+          "split_2",
+          "asymmetric_2",
+          "grid_3",
+          "grid_4",
+          "timeline",
+          "bento_5"
+        ],
+        "supported_block_types": [
+          "title",
+          "subtitle",
+          "body",
+          "list",
+          "quote",
+          "icon_text",
+          "image",
+          "chart",
+          "kpi",
+          "table",
+          "workflow",
+          "diagram",
+          "comparison"
+        ],
+        "density_range": {
+          "min": "balanced",
+          "max": "dense",
+          "recommended": "balanced"
+        },
+        "visual_anchor_capacity": 2,
+        "data_block_capacity": 2
+      }
+    },
+    "pm_google_style_light": {
+      "skill_profile": "architecture-explainer",
+      "hardness_profile": "balanced",
+      "schema_profile": "ppt-template/v2-ppt-master-google_style",
+      "contract_profile": "default",
+      "quality_profile": "default",
+      "header_style": "underline-light",
+      "source_layout": "google_style",
+      "source_pack": "ppt-master",
+      "tone": "light",
+      "requires_keyword_match": true,
+      "capabilities": {
+        "supported_slide_types": [
+          "cover",
+          "toc",
+          "divider",
+          "content",
+          "comparison",
+          "data",
+          "summary",
+          "timeline"
+        ],
+        "supported_layouts": [
+          "hero_1",
+          "split_2",
+          "asymmetric_2",
+          "grid_3",
+          "grid_4",
+          "timeline",
+          "bento_5"
+        ],
+        "supported_block_types": [
+          "title",
+          "subtitle",
+          "body",
+          "list",
+          "quote",
+          "icon_text",
+          "image",
+          "chart",
+          "kpi",
+          "table",
+          "workflow",
+          "diagram",
+          "comparison"
+        ],
+        "density_range": {
+          "min": "balanced",
+          "max": "dense",
+          "recommended": "balanced"
+        },
+        "visual_anchor_capacity": 2,
+        "data_block_capacity": 2
+      }
+    },
+    "pm_government_blue_light": {
+      "skill_profile": "architecture-explainer",
+      "hardness_profile": "balanced",
+      "schema_profile": "ppt-template/v2-ppt-master-government_blue",
+      "contract_profile": "hierarchy_blocks_required",
+      "quality_profile": "high_density_consulting",
+      "header_style": "underline-light",
+      "source_layout": "government_blue",
+      "source_pack": "ppt-master",
+      "tone": "light",
+      "requires_keyword_match": true,
+      "capabilities": {
+        "supported_slide_types": [
+          "cover",
+          "toc",
+          "divider",
+          "content",
+          "comparison",
+          "data",
+          "summary",
+          "timeline"
+        ],
+        "supported_layouts": [
+          "hero_1",
+          "split_2",
+          "asymmetric_2",
+          "grid_3",
+          "grid_4",
+          "timeline",
+          "bento_5"
+        ],
+        "supported_block_types": [
+          "title",
+          "subtitle",
+          "body",
+          "list",
+          "quote",
+          "icon_text",
+          "image",
+          "chart",
+          "kpi",
+          "table",
+          "workflow",
+          "diagram",
+          "comparison"
+        ],
+        "density_range": {
+          "min": "balanced",
+          "max": "dense",
+          "recommended": "balanced"
+        },
+        "visual_anchor_capacity": 2,
+        "data_block_capacity": 2
+      }
+    },
+    "pm_government_red_light": {
+      "skill_profile": "architecture-explainer",
+      "hardness_profile": "balanced",
+      "schema_profile": "ppt-template/v2-ppt-master-government_red",
+      "contract_profile": "hierarchy_blocks_required",
+      "quality_profile": "high_density_consulting",
+      "header_style": "underline-light",
+      "source_layout": "government_red",
+      "source_pack": "ppt-master",
+      "tone": "light",
+      "requires_keyword_match": true,
+      "capabilities": {
+        "supported_slide_types": [
+          "cover",
+          "toc",
+          "divider",
+          "content",
+          "comparison",
+          "data",
+          "summary",
+          "timeline"
+        ],
+        "supported_layouts": [
+          "hero_1",
+          "split_2",
+          "asymmetric_2",
+          "grid_3",
+          "grid_4",
+          "timeline",
+          "bento_5"
+        ],
+        "supported_block_types": [
+          "title",
+          "subtitle",
+          "body",
+          "list",
+          "quote",
+          "icon_text",
+          "image",
+          "chart",
+          "kpi",
+          "table",
+          "workflow",
+          "diagram",
+          "comparison"
+        ],
+        "density_range": {
+          "min": "balanced",
+          "max": "dense",
+          "recommended": "balanced"
+        },
+        "visual_anchor_capacity": 2,
+        "data_block_capacity": 2
+      }
+    },
+    "pm_mckinsey_light": {
+      "skill_profile": "consulting-recommendation",
+      "hardness_profile": "balanced",
+      "schema_profile": "ppt-template/v2-ppt-master-mckinsey",
+      "contract_profile": "default",
+      "quality_profile": "high_density_consulting",
+      "header_style": "underline-light",
+      "source_layout": "mckinsey",
+      "source_pack": "ppt-master",
+      "tone": "light",
+      "requires_keyword_match": true,
+      "capabilities": {
+        "supported_slide_types": [
+          "cover",
+          "toc",
+          "divider",
+          "content",
+          "comparison",
+          "data",
+          "summary",
+          "timeline"
+        ],
+        "supported_layouts": [
+          "hero_1",
+          "split_2",
+          "asymmetric_2",
+          "grid_3",
+          "grid_4",
+          "timeline",
+          "bento_5"
+        ],
+        "supported_block_types": [
+          "title",
+          "subtitle",
+          "body",
+          "list",
+          "quote",
+          "icon_text",
+          "image",
+          "chart",
+          "kpi",
+          "table",
+          "workflow",
+          "diagram",
+          "comparison"
+        ],
+        "density_range": {
+          "min": "balanced",
+          "max": "dense",
+          "recommended": "balanced"
+        },
+        "visual_anchor_capacity": 2,
+        "data_block_capacity": 2
+      }
+    },
+    "pm_medical_university_light": {
+      "skill_profile": "education-textbook",
+      "hardness_profile": "balanced",
+      "schema_profile": "ppt-template/v2-ppt-master-medical_university",
+      "contract_profile": "default",
+      "quality_profile": "training_deck",
+      "header_style": "underline-light",
+      "source_layout": "medical_university",
+      "source_pack": "ppt-master",
+      "tone": "light",
+      "requires_keyword_match": true,
+      "capabilities": {
+        "supported_slide_types": [
+          "cover",
+          "toc",
+          "divider",
+          "content",
+          "comparison",
+          "data",
+          "summary",
+          "timeline"
+        ],
+        "supported_layouts": [
+          "hero_1",
+          "split_2",
+          "asymmetric_2",
+          "grid_3",
+          "grid_4",
+          "timeline",
+          "bento_5"
+        ],
+        "supported_block_types": [
+          "title",
+          "subtitle",
+          "body",
+          "list",
+          "quote",
+          "icon_text",
+          "image",
+          "chart",
+          "kpi",
+          "table",
+          "workflow",
+          "diagram",
+          "comparison"
+        ],
+        "density_range": {
+          "min": "sparse",
+          "max": "balanced",
+          "recommended": "balanced"
+        },
+        "visual_anchor_capacity": 2,
+        "data_block_capacity": 2
+      }
+    },
+    "pm_pixel_retro_dark": {
+      "skill_profile": "architecture-explainer",
+      "hardness_profile": "balanced",
+      "schema_profile": "ppt-template/v2-ppt-master-pixel_retro",
+      "contract_profile": "default",
+      "quality_profile": "default",
+      "header_style": "gradient",
+      "source_layout": "pixel_retro",
+      "source_pack": "ppt-master",
+      "tone": "dark",
+      "requires_keyword_match": true,
+      "capabilities": {
+        "supported_slide_types": [
+          "cover",
+          "toc",
+          "divider",
+          "content",
+          "comparison",
+          "data",
+          "summary",
+          "timeline"
+        ],
+        "supported_layouts": [
+          "hero_1",
+          "split_2",
+          "asymmetric_2",
+          "grid_3",
+          "grid_4",
+          "timeline",
+          "bento_5"
+        ],
+        "supported_block_types": [
+          "title",
+          "subtitle",
+          "body",
+          "list",
+          "quote",
+          "icon_text",
+          "image",
+          "chart",
+          "kpi",
+          "table",
+          "workflow",
+          "diagram",
+          "comparison"
+        ],
+        "density_range": {
+          "min": "balanced",
+          "max": "dense",
+          "recommended": "balanced"
+        },
+        "visual_anchor_capacity": 2,
+        "data_block_capacity": 2
+      }
+    },
+    "pm_psychology_attachment_light": {
+      "skill_profile": "architecture-explainer",
+      "hardness_profile": "balanced",
+      "schema_profile": "ppt-template/v2-ppt-master-psychology_attachment",
+      "contract_profile": "hierarchy_blocks_required",
+      "quality_profile": "high_density_consulting",
+      "header_style": "underline-light",
+      "source_layout": "psychology_attachment",
+      "source_pack": "ppt-master",
+      "tone": "light",
+      "requires_keyword_match": true,
+      "capabilities": {
+        "supported_slide_types": [
+          "cover",
+          "toc",
+          "divider",
+          "content",
+          "comparison",
+          "data",
+          "summary",
+          "timeline"
+        ],
+        "supported_layouts": [
+          "hero_1",
+          "split_2",
+          "asymmetric_2",
+          "grid_3",
+          "grid_4",
+          "timeline",
+          "bento_5"
+        ],
+        "supported_block_types": [
+          "title",
+          "subtitle",
+          "body",
+          "list",
+          "quote",
+          "icon_text",
+          "image",
+          "chart",
+          "kpi",
+          "table",
+          "workflow",
+          "diagram",
+          "comparison"
+        ],
+        "density_range": {
+          "min": "sparse",
+          "max": "balanced",
+          "recommended": "balanced"
+        },
+        "visual_anchor_capacity": 2,
+        "data_block_capacity": 2
+      }
+    },
+    "pm_smart_red_light": {
+      "skill_profile": "architecture-explainer",
+      "hardness_profile": "balanced",
+      "schema_profile": "ppt-template/v2-ppt-master-smart_red",
+      "contract_profile": "default",
+      "quality_profile": "training_deck",
+      "header_style": "underline-light",
+      "source_layout": "smart_red",
+      "source_pack": "ppt-master",
+      "tone": "light",
+      "requires_keyword_match": true,
+      "capabilities": {
+        "supported_slide_types": [
+          "cover",
+          "toc",
+          "divider",
+          "content",
+          "comparison",
+          "data",
+          "summary",
+          "timeline"
+        ],
+        "supported_layouts": [
+          "hero_1",
+          "split_2",
+          "asymmetric_2",
+          "grid_3",
+          "grid_4",
+          "timeline",
+          "bento_5"
+        ],
+        "supported_block_types": [
+          "title",
+          "subtitle",
+          "body",
+          "list",
+          "quote",
+          "icon_text",
+          "image",
+          "chart",
+          "kpi",
+          "table",
+          "workflow",
+          "diagram",
+          "comparison"
+        ],
+        "density_range": {
+          "min": "balanced",
+          "max": "dense",
+          "recommended": "balanced"
+        },
+        "visual_anchor_capacity": 2,
+        "data_block_capacity": 2
+      }
+    },
+    "pm_powerchina_standard_light": {
+      "skill_profile": "general-content",
+      "hardness_profile": "balanced",
+      "schema_profile": "ppt-template/v2-ppt-master-powerchina_standard",
+      "contract_profile": "default",
+      "quality_profile": "default",
+      "header_style": "underline-light",
+      "source_layout": "powerchina_standard",
+      "source_pack": "ppt-master",
+      "tone": "light",
+      "requires_keyword_match": true,
+      "capabilities": {
+        "supported_slide_types": [
+          "cover",
+          "toc",
+          "divider",
+          "content",
+          "comparison",
+          "data",
+          "summary",
+          "timeline"
+        ],
+        "supported_layouts": [
+          "hero_1",
+          "split_2",
+          "asymmetric_2",
+          "grid_3",
+          "grid_4",
+          "timeline",
+          "bento_5"
+        ],
+        "supported_block_types": [
+          "title",
+          "subtitle",
+          "body",
+          "list",
+          "quote",
+          "icon_text",
+          "image",
+          "chart",
+          "kpi",
+          "table",
+          "workflow",
+          "diagram",
+          "comparison"
+        ],
+        "density_range": {
+          "min": "balanced",
+          "max": "dense",
+          "recommended": "balanced"
+        },
+        "visual_anchor_capacity": 2,
+        "data_block_capacity": 2
+      }
+    },
+    "pm_powerchina_modern_light": {
+      "skill_profile": "architecture-explainer",
+      "hardness_profile": "balanced",
+      "schema_profile": "ppt-template/v2-ppt-master-powerchina_modern",
+      "contract_profile": "default",
+      "quality_profile": "default",
+      "header_style": "underline-light",
+      "source_layout": "powerchina_modern",
+      "source_pack": "ppt-master",
+      "tone": "light",
+      "requires_keyword_match": true,
+      "capabilities": {
+        "supported_slide_types": [
+          "cover",
+          "toc",
+          "divider",
+          "content",
+          "comparison",
+          "data",
+          "summary",
+          "timeline"
+        ],
+        "supported_layouts": [
+          "hero_1",
+          "split_2",
+          "asymmetric_2",
+          "grid_3",
+          "grid_4",
+          "timeline",
+          "bento_5"
+        ],
+        "supported_block_types": [
+          "title",
+          "subtitle",
+          "body",
+          "list",
+          "quote",
+          "icon_text",
+          "image",
+          "chart",
+          "kpi",
+          "table",
+          "workflow",
+          "diagram",
+          "comparison"
+        ],
+        "density_range": {
+          "min": "balanced",
+          "max": "dense",
+          "recommended": "balanced"
+        },
+        "visual_anchor_capacity": 2,
+        "data_block_capacity": 2
+      }
+    },
+    "pm_catarc_business_light": {
+      "skill_profile": "architecture-explainer",
+      "hardness_profile": "balanced",
+      "schema_profile": "ppt-template/v2-ppt-master-catarc_business",
+      "contract_profile": "default",
+      "quality_profile": "default",
+      "header_style": "underline-light",
+      "source_layout": "catarc_business",
+      "source_pack": "ppt-master",
+      "tone": "light",
+      "requires_keyword_match": true,
+      "capabilities": {
+        "supported_slide_types": [
+          "cover",
+          "toc",
+          "divider",
+          "content",
+          "comparison",
+          "data",
+          "summary",
+          "timeline"
+        ],
+        "supported_layouts": [
+          "hero_1",
+          "split_2",
+          "asymmetric_2",
+          "grid_3",
+          "grid_4",
+          "timeline",
+          "bento_5"
+        ],
+        "supported_block_types": [
+          "title",
+          "subtitle",
+          "body",
+          "list",
+          "quote",
+          "icon_text",
+          "image",
+          "chart",
+          "kpi",
+          "table",
+          "workflow",
+          "diagram",
+          "comparison"
+        ],
+        "density_range": {
+          "min": "balanced",
+          "max": "dense",
+          "recommended": "balanced"
+        },
+        "visual_anchor_capacity": 2,
+        "data_block_capacity": 2
+      }
+    },
+    "pm_catarc_standard_light": {
+      "skill_profile": "general-content",
+      "hardness_profile": "balanced",
+      "schema_profile": "ppt-template/v2-ppt-master-catarc_standard",
+      "contract_profile": "default",
+      "quality_profile": "default",
+      "header_style": "underline-light",
+      "source_layout": "catarc_standard",
+      "source_pack": "ppt-master",
+      "tone": "light",
+      "requires_keyword_match": true,
+      "capabilities": {
+        "supported_slide_types": [
+          "cover",
+          "toc",
+          "divider",
+          "content",
+          "comparison",
+          "data",
+          "summary",
+          "timeline"
+        ],
+        "supported_layouts": [
+          "hero_1",
+          "split_2",
+          "asymmetric_2",
+          "grid_3",
+          "grid_4",
+          "timeline",
+          "bento_5"
+        ],
+        "supported_block_types": [
+          "title",
+          "subtitle",
+          "body",
+          "list",
+          "quote",
+          "icon_text",
+          "image",
+          "chart",
+          "kpi",
+          "table",
+          "workflow",
+          "diagram",
+          "comparison"
+        ],
+        "density_range": {
+          "min": "balanced",
+          "max": "dense",
+          "recommended": "balanced"
+        },
+        "visual_anchor_capacity": 2,
+        "data_block_capacity": 2
+      }
+    },
+    "pm_catarc_modern_light": {
+      "skill_profile": "architecture-explainer",
+      "hardness_profile": "balanced",
+      "schema_profile": "ppt-template/v2-ppt-master-catarc_modern",
+      "contract_profile": "default",
+      "quality_profile": "default",
+      "header_style": "underline-light",
+      "source_layout": "catarc_modern",
+      "source_pack": "ppt-master",
+      "tone": "light",
+      "requires_keyword_match": true,
+      "capabilities": {
+        "supported_slide_types": [
+          "cover",
+          "toc",
+          "divider",
+          "content",
+          "comparison",
+          "data",
+          "summary",
+          "timeline"
+        ],
+        "supported_layouts": [
+          "hero_1",
+          "split_2",
+          "asymmetric_2",
+          "grid_3",
+          "grid_4",
+          "timeline",
+          "bento_5"
+        ],
+        "supported_block_types": [
+          "title",
+          "subtitle",
+          "body",
+          "list",
+          "quote",
+          "icon_text",
+          "image",
+          "chart",
+          "kpi",
+          "table",
+          "workflow",
+          "diagram",
+          "comparison"
+        ],
+        "density_range": {
+          "min": "balanced",
+          "max": "dense",
+          "recommended": "balanced"
+        },
+        "visual_anchor_capacity": 2,
+        "data_block_capacity": 2
+      }
+    },
+    "pm_cmb_finance_light": {
+      "skill_profile": "consulting-recommendation",
+      "hardness_profile": "balanced",
+      "schema_profile": "ppt-template/v2-ppt-master-cmb_finance",
+      "contract_profile": "default",
+      "quality_profile": "high_density_consulting",
+      "header_style": "underline-light",
+      "source_layout": "cmb_finance",
+      "source_pack": "ppt-master",
+      "tone": "light",
+      "requires_keyword_match": true,
+      "capabilities": {
+        "supported_slide_types": [
+          "cover",
+          "toc",
+          "divider",
+          "content",
+          "comparison",
+          "data",
+          "summary",
+          "timeline"
+        ],
+        "supported_layouts": [
+          "hero_1",
+          "split_2",
+          "asymmetric_2",
+          "grid_3",
+          "grid_4",
+          "timeline",
+          "bento_5"
+        ],
+        "supported_block_types": [
+          "title",
+          "subtitle",
+          "body",
+          "list",
+          "quote",
+          "icon_text",
+          "image",
+          "chart",
+          "kpi",
+          "table",
+          "workflow",
+          "diagram",
+          "comparison"
+        ],
+        "density_range": {
+          "min": "balanced",
+          "max": "dense",
+          "recommended": "balanced"
+        },
+        "visual_anchor_capacity": 2,
+        "data_block_capacity": 2
+      }
+    },
+    "pm_tech_blue_business_light": {
+      "skill_profile": "architecture-explainer",
+      "hardness_profile": "balanced",
+      "schema_profile": "ppt-template/v2-ppt-master-tech_blue_business",
+      "contract_profile": "default",
+      "quality_profile": "default",
+      "header_style": "underline-light",
+      "source_layout": "tech_blue_business",
+      "source_pack": "ppt-master",
+      "tone": "light",
+      "requires_keyword_match": true,
+      "capabilities": {
+        "supported_slide_types": [
+          "cover",
+          "toc",
+          "divider",
+          "content",
+          "comparison",
+          "data",
+          "summary",
+          "timeline"
+        ],
+        "supported_layouts": [
+          "hero_1",
+          "split_2",
+          "asymmetric_2",
+          "grid_3",
+          "grid_4",
+          "timeline",
+          "bento_5"
+        ],
+        "supported_block_types": [
+          "title",
+          "subtitle",
+          "body",
+          "list",
+          "quote",
+          "icon_text",
+          "image",
+          "chart",
+          "kpi",
+          "table",
+          "workflow",
+          "diagram",
+          "comparison"
+        ],
+        "density_range": {
+          "min": "balanced",
+          "max": "dense",
+          "recommended": "balanced"
+        },
+        "visual_anchor_capacity": 2,
+        "data_block_capacity": 2
+      }
+    },
+    "pm_chongqing_university_light": {
+      "skill_profile": "education-textbook",
+      "hardness_profile": "balanced",
+      "schema_profile": "ppt-template/v2-ppt-master-chongqing_university",
+      "contract_profile": "default",
+      "quality_profile": "training_deck",
+      "header_style": "underline-light",
+      "source_layout": "chongqing_university",
+      "source_pack": "ppt-master",
+      "tone": "light",
+      "requires_keyword_match": true,
+      "capabilities": {
+        "supported_slide_types": [
+          "cover",
+          "toc",
+          "divider",
+          "content",
+          "comparison",
+          "data",
+          "summary",
+          "timeline"
+        ],
+        "supported_layouts": [
+          "hero_1",
+          "split_2",
+          "asymmetric_2",
+          "grid_3",
+          "grid_4",
+          "timeline",
+          "bento_5"
+        ],
+        "supported_block_types": [
+          "title",
+          "subtitle",
+          "body",
+          "list",
+          "quote",
+          "icon_text",
+          "image",
+          "chart",
+          "kpi",
+          "table",
+          "workflow",
+          "diagram",
+          "comparison"
+        ],
+        "density_range": {
+          "min": "sparse",
+          "max": "balanced",
+          "recommended": "balanced"
+        },
+        "visual_anchor_capacity": 2,
+        "data_block_capacity": 2
       }
     }
   }

@@ -60,7 +60,7 @@ Consider: Purpose (corporate/educational/creative), Audience, Tone, Content Volu
 
 1. **Analyze**: Understand topic, audience, purpose
 2. **Choose Layout**: Select based on content
-3. **Write Slide**: Use PptxGenJS. Use shapes and SVG elements for visual interest.
+3. **Write Slide**: Use SVG-to-PPTX. Use shapes and SVG elements for visual interest.
 4. **Verify**: Generate preview as `slide-XX-preview.pptx`. Extract text with `python -m markitdown slide-XX-preview.pptx`, verify all content present and no placeholder text remains.
 
 ---
@@ -144,7 +144,7 @@ Consider: Purpose (corporate/educational/creative), Audience, Tone, Content Volu
 1. **Analyze**: Section list, count, presentation context
 2. **Choose Layout**: Based on section count and content
 3. **Plan Visual Hierarchy**: Numbering style, font sizes, spacing
-4. **Write Slide**: Use PptxGenJS. Use shapes for decorative elements. **MUST include page number badge.**
+4. **Write Slide**: Use SVG-to-PPTX. Use shapes for decorative elements. **MUST include page number badge.**
 5. **Verify**: Generate preview, extract text with markitdown, verify content and badge.
 
 ---
@@ -218,7 +218,7 @@ Consider: Purpose (corporate/educational/creative), Audience, Tone, Content Volu
 
 1. **Analyze**: Section number, title, optional intro
 2. **Choose Layout**: Based on content and tone
-3. **Write Slide**: Use PptxGenJS. Use shapes for decorative elements. **MUST include page number badge.**
+3. **Write Slide**: Use SVG-to-PPTX. Use shapes for decorative elements. **MUST include page number badge.**
 4. **Verify**: Generate preview, extract text, verify content and badge.
 
 ---
@@ -314,7 +314,7 @@ Pick a subtype based on the content. Each content slide belongs to exactly ONE s
 
 1. **Analyze**: Content, determine subtype, plan layout
 2. **Choose Layout**: Best fit for subtype and content volume
-3. **Write Slide**: Use PptxGenJS. Use shapes for charts, decorative elements, icons. **MUST include page number badge.**
+3. **Write Slide**: Use SVG-to-PPTX. Use shapes for charts, decorative elements, icons. **MUST include page number badge.**
 4. **Verify**: Generate preview as `slide-XX-preview.pptx`. Extract text with markitdown, verify all content present, no placeholder text, badge included.
 
 ---
@@ -393,7 +393,7 @@ Pick a subtype based on the content. Each content slide belongs to exactly ONE s
 
 1. **Analyze**: Closing content — takeaways, CTA, contact, thank-you
 2. **Choose Layout**: Based on content type
-3. **Write Slide**: Use PptxGenJS. Use shapes for decorative elements. **MUST include page number badge.**
+3. **Write Slide**: Use SVG-to-PPTX. Use shapes for decorative elements. **MUST include page number badge.**
 4. **Verify**: Generate preview, extract text, verify content and badge.
 
 ---

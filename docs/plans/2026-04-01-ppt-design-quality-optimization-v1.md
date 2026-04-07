@@ -6,7 +6,7 @@
 
 **Architecture:** 保留现有能力模块（layout solver / quality gate / visual critic / retry policy），但重构编排方式：一次决策、一次渲染、一次评估、有限重试。核心是建立唯一决策源（Design Decision），并让 Python 与 Node 渲染端只消费决策，不再重复启发式选型。
 
-**Tech Stack:** FastAPI (Python), PptxGenJS (Node), pytest, template catalog
+**Tech Stack:** FastAPI (Python), SVG-to-PPTX (Node), pytest, template catalog
 
 ## 执行进展（2026-04-01）
 

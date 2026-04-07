@@ -36,7 +36,6 @@ from src.schemas.ppt import (
     VideoRenderConfig,
 )
 from src.schemas.ppt_outline import (
-    LayoutType,
     OutlinePlan,
     OutlinePlanRequest,
     StickyNote,
@@ -68,7 +67,6 @@ from src.ppt_planning import (
     enforce_template_family_cohesion,
     density_level_for_layout,
     paginate_content_overflow,
-    recommend_layout,
 )
 from src.ppt_template_catalog import (
     template_capabilities as shared_template_capabilities,
@@ -106,7 +104,6 @@ from src.ppt_storyline_planning import (
 )
 from src.ppt_visual_identity import (
     canonicalize_theme_recipe,
-    resolve_style_variant,
     resolve_tone,
     style_variant_for_theme_recipe,
     suggest_theme_recipe_from_context,
@@ -434,21 +431,25 @@ def _assert_skill_runtime_success(
 
 def _resolve_export_channel(requested: str | None) -> str:
     configured = str(_env_value("PPT_EXPORT_CHANNEL", "local")).strip().lower()
-    if configured not in {"local", "remote", "auto"}:
+    if configured not in {"local", "auto"}:
         configured = "local"
     channel = str(requested or "auto").strip().lower()
-    if channel not in {"local", "remote", "auto"}:
+    if channel not in {"local", "auto", "remote"}:
         channel = "auto"
     if channel == "auto":
         channel = "local" if configured == "auto" else configured
-    if channel not in {"local", "remote"}:
+    if channel == "remote":
+        raise ValueError(
+            "remote export_channel is not supported in drawingml-only export flow"
+        )
+    if channel != "local":
         return "local"
     return channel
 
 
 def _normalize_retry_scope(value: Any) -> str:
     scope = str(value or "").strip().lower()
-    if scope in {"deck", "slide", "block"}:
+    if scope == "deck":
         return scope
     return "deck"
 
@@ -645,7 +646,7 @@ def _resolve_quality_profile_id(
     if any(
         token in text
         for token in (
-            "技术评审",
+            "抢术?",
             "架构评审",
             "tech review",
             "architecture review",
@@ -658,7 +659,7 @@ def _resolve_quality_profile_id(
         for token in (
             "营销",
             "品牌",
-            "发布会",
+            "发布?",
             "marketing",
             "campaign",
             "launch",
@@ -742,10 +743,8 @@ def _requested_skills_for_slide(
         or slide_type in {"cover", "toc", "divider", "summary"}
     ):
         skills.append("color-font-skill")
-    if (
-        render_path in {"svg", "png_fallback"}
-        or layout_grid == "timeline"
-        or (block_types & {"workflow", "diagram"})
+    if render_path == "svg" or layout_grid == "timeline" or (
+        block_types & {"workflow", "diagram"}
     ):
         skills.append("pptx")
     if should_force_ppt_master_hit(
@@ -1179,6 +1178,7 @@ def _run_layer1_design_skill_chain(
         "design-style-skill",
         "pptx",
     ]
+    first_slide = dict(slides[0]) if slides and isinstance(slides[0], dict) else {}
     if should_force_ppt_master_hit(
         requested_execution_profile=resolved_execution_profile,
         requested_force_flag=resolved_force_ppt_master,
@@ -1189,7 +1189,6 @@ def _run_layer1_design_skill_chain(
         requested_skills.append("ppt-master")
     if effective_template and effective_template not in {"auto"}:
         requested_skills.append("ppt-editing-skill")
-    first_slide = dict(slides[0]) if slides and isinstance(slides[0], dict) else {}
     deck_context_blob = " ".join(
         part
         for part in [
@@ -2381,7 +2380,7 @@ def _build_render_payload_from_reference_desc(
                 "visual": raw.get("visual")
                 if isinstance(raw.get("visual"), dict)
                 else {},
-                "render_path": str(raw.get("render_path") or "pptxgenjs"),
+                "render_path": str(raw.get("render_path") or "svg"),
                 "slide_layout_path": str(raw.get("slide_layout_path") or ""),
                 "slide_layout_name": str(raw.get("slide_layout_name") or ""),
                 "slide_master_path": str(raw.get("slide_master_path") or ""),
@@ -2641,25 +2640,25 @@ _ABSTRACT_IMAGE_INTENT_TOKENS = {
     "机制",
     "能力",
     "平台",
-    "路线图",
+    "路线?",
 }
 
 _ICON_BG_TOKEN_MAP: Dict[str, str] = {
-    "growth": "↗",
-    "trend": "↗",
+    "growth": "?",
+    "trend": "?",
     "sales": "$",
     "finance": "$",
     "security": "S",
-    "cloud": "☁",
-    "ai": "✦",
-    "automation": "⚙",
-    "workflow": "⇄",
-    "strategy": "◎",
-    "roadmap": "◈",
-    "数据": "◍",
-    "增长": "↗",
-    "流程": "⇄",
-    "架构": "◈",
+    "cloud": "?",
+    "ai": "?",
+    "automation": "?",
+    "workflow": "?",
+    "strategy": "?",
+    "roadmap": "?",
+    "数据": "?",
+    "增长": "?",
+    "流程": "?",
+    "架构": "?",
     "安全": "S",
 }
 
@@ -2678,7 +2677,7 @@ def _resolve_icon_bg_symbol(
     for token, symbol in _ICON_BG_TOKEN_MAP.items():
         if token in blob:
             return symbol
-    return "◆"
+    return "?"
 
 
 def _ai_svg_visual_data_uri(title: str, subtitle: str = "") -> str:
@@ -2710,7 +2709,7 @@ def _ai_svg_visual_data_uri(title: str, subtitle: str = "") -> str:
 
 def _icon_background_svg_data_uri(title: str, symbol: str) -> str:
     heading = html.escape(str(title or "Visual anchor"), quote=True)
-    icon = html.escape(str(symbol or "◆"), quote=True)
+    icon = html.escape(str(symbol or "?"), quote=True)
     svg = (
         '<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="675" viewBox="0 0 1200 675">'
         '<rect width="1200" height="675" rx="28" fill="#0D1630"/>'
@@ -2742,7 +2741,7 @@ def _build_image_search_query(
         if len(parts) >= 4:
             break
     if hl == "zh-cn":
-        return " ".join(parts) if parts else "科技 商务 场景 图"
+        return " ".join(parts) if parts else "科技 商务 场景 ?"
     return " ".join(parts) if parts else "technology business scene image"
 
 
@@ -3166,7 +3165,7 @@ def _build_presentation_contract_v2(deck: Dict[str, Any]) -> Dict[str, Any]:
             )[:3],
             "archetype_plan": archetype_plan,
             "layout_grid": str(slide.get("layout_grid") or "split_2").strip().lower(),
-            "render_path": str(slide.get("render_path") or "pptxgenjs").strip().lower(),
+            "render_path": str(slide.get("render_path") or "svg").strip().lower(),
             "component_slots": [
                 str((block or {}).get("card_id") or "").strip()
                 for block in (
@@ -3193,7 +3192,7 @@ def _build_presentation_contract_v2(deck: Dict[str, Any]) -> Dict[str, Any]:
             },
             "visual_channel": {
                 "layout": str(slide.get("layout_grid") or "split_2").strip().lower(),
-                "render_path": str(slide.get("render_path") or "pptxgenjs")
+                "render_path": str(slide.get("render_path") or "svg")
                 .strip()
                 .lower(),
                 "component_slots": [
@@ -3443,7 +3442,7 @@ def _apply_layout_solution_actions(
     }
 
 
-_SPLIT_TEXT_RE = re.compile(r"[;；,\n，。.!?]+")
+_SPLIT_TEXT_RE = re.compile(r"[;?\n?!?]+")
 _TEXTUAL_BLOCK_TYPES = {
     "title",
     "subtitle",
@@ -3469,8 +3468,8 @@ _PLACEHOLDER_TEXT_PATTERNS: List[re.Pattern[str]] = [
         r"\b(?:table of contents|monitoring view|thank you)\b", flags=re.IGNORECASE
     ),
     re.compile(r"^\[(?:xls|xlsx|pdf|doc|docx|ppt|pptx)\]\s*", flags=re.IGNORECASE),
-    re.compile(r"(?:已编辑汇总|编辑汇总)\s*\d+\s*册"),
-    re.compile(r"待补充|请填写|占位符"),
+    re.compile(r"(?:已编辑汇总|编辑稿?\s*\d+\s*次?)"),
+    re.compile(r"待补充|请填写|占位词?"),
 ]
 _PLACEHOLDER_LONE_TOKENS = {
     "slide",
@@ -3497,7 +3496,7 @@ def _split_topic_focus(topic: str, *, prefer_zh: bool) -> tuple[str, str]:
     if not text:
         return ("slide" if not prefer_zh else "主题", "")
     if prefer_zh:
-        parts = re.split(r"[：:]", text, maxsplit=1)
+        parts = re.split(r"[?]", text, maxsplit=1)
         subject = str(parts[0] if parts else text).strip()
         focus = str(parts[1] if len(parts) > 1 else "").strip()
         subject = (
@@ -3516,7 +3515,7 @@ def _collapse_redundant_text(text: str) -> str:
     cleaned = str(text or "").strip()
     if not cleaned:
         return ""
-    cleaned = re.sub(r"([\u4e00-\u9fff]{4,})(?:[，,。；;\s]+\1)+", r"\1", cleaned)
+    cleaned = re.sub(r"([\u4e00-\u9fff]{4,})(?:[?。；;\s]+\1)+", r"\1", cleaned)
     cleaned = re.sub(
         r"\b([A-Za-z]+(?:\s+[A-Za-z]+){1,4})\s+\1\b",
         r"\1",
@@ -3537,13 +3536,13 @@ def _looks_placeholder_like_text(text: str) -> bool:
     if any(pattern.search(value) for pattern in _PLACEHOLDER_TEXT_PATTERNS):
         # Keep real process expressions such as "Step 1: drafting bill".
         if re.search(
-            r"\bstep\s*\d+\s*[:：-]\s*[A-Za-z\u4e00-\u9fff]{2,}",
+            r"\bstep\s*\d+\s*[:?]\s*[A-Za-z\u4e00-\u9fff]{2,}",
             value,
             flags=re.IGNORECASE,
         ):
             return False
         if re.search(
-            r"\bsection\s*\d+\s*[:：-]\s*[A-Za-z\u4e00-\u9fff]{2,}",
+            r"\bsection\s*\d+\s*[:?]\s*[A-Za-z\u4e00-\u9fff]{2,}",
             value,
             flags=re.IGNORECASE,
         ):
@@ -3692,11 +3691,16 @@ def _sanitize_placeholder_text(text: str, *, prefer_zh: bool) -> str:
             ),
             "",
         ),
-        (re.compile(r"待补充|请填写|占位符"), ""),
+        (re.compile(r"待补充|请填写|占位词?"), ""),
     ]
     for pattern, target in replacements:
         cleaned = pattern.sub(target, cleaned)
-    if re.search(r"(?:已编辑汇总|编辑汇总)\s*\d+\s*册", cleaned):
+    if re.match(
+        r"^\s*(?:·|•|\-|—|–)\s+",
+        cleaned,
+    ):
+        return ""
+    if re.search(r"(?:已编辑汇总|编辑稿?\s*\d+\s*次?)", cleaned):
         return ""
     if re.fullmatch(r"\d{6,}", cleaned):
         return ""
@@ -3705,7 +3709,7 @@ def _sanitize_placeholder_text(text: str, *, prefer_zh: bool) -> str:
         cjk_count = len(re.findall(r"[\u4e00-\u9fff]", cleaned))
         if cjk_count > 0 and cjk_count <= max(4, int(latin_count * 0.18)):
             cleaned = re.sub(r"[\u4e00-\u9fff]+", " ", cleaned)
-    cleaned = re.sub(r"\s{2,}", " ", cleaned).strip(" -:;,.，。；")
+    cleaned = re.sub(r"\s{2,}", " ", cleaned).strip(" -:;,.，；")
     cleaned = _collapse_redundant_text(cleaned)
     if _looks_mojibake(cleaned, allow_repair=False):
         return ""
@@ -3721,7 +3725,7 @@ def _visual_units_of_text(text: str) -> float:
             units += 1.7
         elif ch.isspace():
             units += 0.45
-        elif ch in ",.;:!?，。；：！？":
+        elif ch in ",.;:!?，；：！？":
             units += 0.55
         else:
             units += 1.0
@@ -3739,7 +3743,7 @@ def _clip_text_by_visual_units(text: str, *, max_units: float, suffix: str) -> s
             step = 1.7
         elif ch.isspace():
             step = 0.45
-        elif ch in ",.;:!?，。；：！？":
+        elif ch in ",.;:!?，；：！？":
             step = 0.55
         else:
             step = 1.0
@@ -3747,7 +3751,7 @@ def _clip_text_by_visual_units(text: str, *, max_units: float, suffix: str) -> s
             break
         out_chars.append(ch)
         used += step
-    clipped = "".join(out_chars).rstrip(" ,，；;。.!?！？")
+    clipped = "".join(out_chars).rstrip(" ,，；;?!?！？")
     return f"{clipped}{suffix}" if clipped else suffix
 
 
@@ -3769,7 +3773,7 @@ def _clip_text_for_visual_budget(
             limit = 42 if prefer_zh else 90
         # Remove repeated segments in long titles to prevent clipping/crowding.
         title_parts = [
-            part.strip() for part in re.split(r"[：:|-]", cleaned) if part.strip()
+            part.strip() for part in re.split(r"[?|-]", cleaned) if part.strip()
         ]
         if len(title_parts) >= 2:
             deduped_parts: List[str] = []
@@ -3782,7 +3786,7 @@ def _clip_text_for_visual_budget(
                 deduped_parts.append(part)
             if deduped_parts:
                 cleaned = (
-                    "：".join(deduped_parts) if prefer_zh else ": ".join(deduped_parts)
+                    "；".join(deduped_parts) if prefer_zh else ": ".join(deduped_parts)
                 )
     elif normalized_role == "subtitle":
         limit = 40 if prefer_zh else 116
@@ -3792,7 +3796,7 @@ def _clip_text_for_visual_budget(
         return cleaned
     parts = [
         str(part or "").strip()
-        for part in re.split(r"[；;。.!?！？\n]+", cleaned)
+        for part in re.split(r"[??!?！？\n]+", cleaned)
         if str(part or "").strip()
     ]
     candidate = parts[0] if parts else cleaned
@@ -3863,7 +3867,7 @@ def _extract_slide_keypoints(slide: Dict[str, Any], title_text: str) -> List[str
             if len(phrase) < min_phrase_len:
                 continue
             if len(phrase) > max_phrase_len:
-                phrase = phrase[:max_phrase_len].rstrip(" ,，；;。")
+                phrase = phrase[:max_phrase_len].rstrip(" ,，；;?")
             key = _normalize_text_key(phrase)
             if not key or key in seen or _is_low_signal_point_text(phrase):
                 continue
@@ -3965,7 +3969,7 @@ def _pick_input_derived_point(
         )
     seq = max(1, int(index) + 1)
     if prefer_zh:
-        suffixes = ["关键点", "机制", "案例", "影响", "结论", "行动建议"]
+        suffixes = ["关键?", "机制", "案例", "影响", "结论", "行动建议"]
         synthetic_candidates = [
             f"{base}{suffixes[(seq - 1 + off) % len(suffixes)]}"
             for off in range(len(suffixes))
@@ -7364,17 +7368,6 @@ def _apply_visual_orchestration(render_payload: Dict[str, Any]) -> Dict[str, Any
                 str(current.get("layout_grid") or "split_2").strip().lower()
                 or "split_2"
             )
-            block_types = {
-                str((block or {}).get("block_type") or (block or {}).get("type") or "")
-                .strip()
-                .lower()
-                for block in (
-                    current.get("blocks")
-                    if isinstance(current.get("blocks"), list)
-                    else []
-                )
-                if isinstance(block, dict)
-            }
             candidate_pool = []
             for key in ("template_candidates", "template_family_whitelist"):
                 raw = current.get(key)
@@ -8327,7 +8320,7 @@ def _apply_visual_orchestration(render_payload: Dict[str, Any]) -> Dict[str, Any
             if not isinstance(slide, dict):
                 continue
             if str(slide.get("slide_type") or "").strip().lower() == "content":
-                slide["render_path"] = "pptxgenjs"
+                slide["render_path"] = "svg"
     out["design_spec"] = build_design_spec(
         theme=theme_obj,
         template_family=str(out.get("template_family") or ""),
@@ -8421,7 +8414,7 @@ def _apply_visual_orchestration(render_payload: Dict[str, Any]) -> Dict[str, Any
             slide_type = str(slide.get("slide_type") or "").strip().lower()
             if slide_type == "content":
                 _set_slide_family(slide, "education_textbook_light")
-                slide["render_path"] = "pptxgenjs"
+                slide["render_path"] = "svg"
                 blocks = (
                     slide.get("blocks") if isinstance(slide.get("blocks"), list) else []
                 )
@@ -8687,7 +8680,7 @@ def _build_research_gaps(req: ResearchRequest, *, is_zh: bool) -> List[ResearchG
             ResearchGap(
                 code="audience",
                 severity="high",
-                message="受众描述过于泛化，缺少明确角色与决策层级。"
+                message="受众描述过于泛化，缺少明确角色与决策层级?"
                 if is_zh
                 else "Audience definition is too generic; role and decision level are missing.",
                 query_hint="目标受众 分层" if is_zh else "target audience segmentation",
@@ -8698,7 +8691,7 @@ def _build_research_gaps(req: ResearchRequest, *, is_zh: bool) -> List[ResearchG
             ResearchGap(
                 code="purpose",
                 severity="medium",
-                message="演示目标不够明确，难以确定叙事重点。"
+                message="演示目标不够明确，难以确定叙事重?"
                 if is_zh
                 else "Presentation objective is not specific enough for clear narrative focus.",
                 query_hint="商业目标 KPI" if is_zh else "business objective KPI",
@@ -8709,7 +8702,7 @@ def _build_research_gaps(req: ResearchRequest, *, is_zh: bool) -> List[ResearchG
             ResearchGap(
                 code="style",
                 severity="low",
-                message="视觉风格偏好不明确，建议补充调性或品牌约束。"
+                message="视觉风格偏好不明确，建议补充调或品牌约束?"
                 if is_zh
                 else "Visual style preference is vague; add tone or brand constraints.",
                 query_hint="品牌视觉 风格" if is_zh else "brand visual style",
@@ -8720,7 +8713,7 @@ def _build_research_gaps(req: ResearchRequest, *, is_zh: bool) -> List[ResearchG
             ResearchGap(
                 code="required_facts",
                 severity="high",
-                message="缺少必须展示的数据点，图表选型依据不足。"
+                message="缺少必须展示的数据点，图表型依据不足?"
                 if is_zh
                 else "Missing must-have facts, limiting chart and evidence selection.",
                 query_hint="核心指标 数据" if is_zh else "core metrics data",
@@ -8731,10 +8724,10 @@ def _build_research_gaps(req: ResearchRequest, *, is_zh: bool) -> List[ResearchG
             ResearchGap(
                 code="time_range",
                 severity="medium",
-                message="缺少时间范围，趋势数据无法限定口径。"
+                message="缺少时间范围，趋势数据无法限定口?"
                 if is_zh
                 else "Time range is missing, making trend framing ambiguous.",
-                query_hint="近3年 趋势" if is_zh else "last 3 years trend",
+                query_hint="??趋势" if is_zh else "last 3 years trend",
             )
         )
     if not str(req.geography or "").strip():
@@ -8742,7 +8735,7 @@ def _build_research_gaps(req: ResearchRequest, *, is_zh: bool) -> List[ResearchG
             ResearchGap(
                 code="geography",
                 severity="low",
-                message="缺少地域范围，市场数据可能口径不一致。"
+                message="缺少地域范围，市场数据可能口径不丢致?"
                 if is_zh
                 else "Geographic scope is missing; market figures may be inconsistent.",
                 query_hint="中国 市场" if is_zh else "regional market",
@@ -8756,18 +8749,18 @@ def _normalize_research_topic(topic: str, *, is_zh: bool) -> str:
     if not raw:
         return ""
     text = (
-        raw.replace("“", '"')
-        .replace("”", '"')
+        raw.replace("“", "\"")
+        .replace("”", "\"")
         .replace("‘", "'")
         .replace("’", "'")
         .strip()
     )
     if is_zh:
-        for marker in ("主题为", "主题是", "主题:", "主题："):
+        for marker in ("主题为", "主题是", "主题:", "主题：", "关于", "围绕"): 
             if marker not in text:
                 continue
             candidate = text.split(marker, 1)[1].strip().strip("\"' ")
-            candidate = re.split(r"[。！？!?]", candidate)[0].strip()
+            candidate = re.split(r"[。！？?]", candidate)[0].strip()
             if candidate:
                 return candidate[:120]
     quoted = re.findall(r"[\"']([^\"']{3,160})[\"']", text)
@@ -8776,7 +8769,7 @@ def _normalize_research_topic(topic: str, *, is_zh: bool) -> str:
         if candidate:
             return candidate[:120]
     text = re.sub(
-        r"^(请|帮我)?\s*(制作|生成|创建|做)\s*(一份|一个|一套)?",
+        r"^(请|帮我)?\s*(制作|生成|创建|撰写|做)\s*(一份|一个|一套)?",
         "",
         text,
         flags=re.IGNORECASE,
@@ -8784,7 +8777,7 @@ def _normalize_research_topic(topic: str, *, is_zh: bool) -> str:
     text = re.sub(
         r"(课堂展示)?课件|演示课件|演示文稿|ppt", "", text, flags=re.IGNORECASE
     ).strip()
-    text = re.sub(r"\s+", " ", text).strip("，,。:：;；")
+    text = re.sub(r"\s+", " ", text).strip("：:，,。！？!?")
     return text[:120] if text else raw[:120]
 
 
@@ -8800,16 +8793,16 @@ def _build_fallback_topic_points(
         if scaffold:
             return _dedup_strings(scaffold, limit=8)
     if is_zh:
-        impact = focus or f"{subject}的核心议题"
+        impact = focus or f"{subject}的核心议?"
         return _dedup_strings(
             [
                 f"{subject}的背景与定义",
                 f"{subject}的关键机制与结构",
-                f"{subject}的主要参与方与职责",
+                f"{subject}的主要参与方与职?",
                 f"{subject}的流程步骤与关键节点",
-                f"{subject}在国际关系中的影响路径",
-                f"{subject}的代表性案例与数据证据",
-                f"{subject}面临的争议、风险与约束",
+                f"{subject}在国际关系中的影响路?",
+                f"{subject}的代表案例与数据证据",
+                f"{subject}面临的争议风险与约束",
                 f"{impact}的案例与启示",
             ],
             limit=8,
@@ -8986,17 +8979,17 @@ _RELEVANCE_ZH_NOISE = {
     "主题",
     "问题",
 }
-_MOJIBAKE_MARKERS = ("Ã", "Â", "â€", "ï¼", "æ", "ç", "è", "é", "ð")
+_MOJIBAKE_MARKERS = ("Ã", "Â", "â?", "ï¼", "æ", "ç", "è", "é", "ð")
 _MOJIBAKE_CJK_MARKERS = (
-    "鍙",
-    "鐨",
-    "銆",
-    "锛",
-    "闄",
-    "鏁",
-    "璇",
-    "鎹",
-    "澶",
+    "?",
+    "?",
+    "?",
+    "?",
+    "?",
+    "?",
+    "?",
+    "?",
+    "?",
     "涓€",
 )
 _MOJIBAKE_CJK_TOKENS = (
@@ -9010,19 +9003,19 @@ _MOJIBAKE_CJK_TOKENS = (
     "猫麓",
     "聙聟",
     "澶ф暟",
-    "鍏虫暟",
-    "鏍稿績",
-    "鍥介檯",
-    "绔嬫硶",
-    "鐮旂┒",
+    "鍏虫?",
+    "?0?",
+    "鍥介?",
+    "绔嬫?",
+    "鐮旂?",
 )
-_MOJIBAKE_CJK_CHARS = set("聹禄聯潞莽職聞赂娄聛麓聦庐聙聟鍙鐨銆锛闄鏁璇鎹澶涓鏄鏈")
-_COMMON_ZH_FUNCTION_CHARS = "的一是在不了和对与其将由及中而可也"
-_TOPIC_ZH_HINT_CHARS = "背景目标策略机制流程案例数据趋势方法实践应用教育商业技术政策"
+_MOJIBAKE_CJK_CHARS = set("聹禄聯潞莽職聞赂娄聛麓聦庐聙聟鍙鐨銆锛闄鏁璇鎹澶涓鏄?")
+_COMMON_ZH_FUNCTION_CHARS = "的一是在不了和对与其将由及中而可?"
+_TOPIC_ZH_HINT_CHARS = "背景目标策略机制流程案例数据趋势方法实践应用教育商业抢术?"
 _SOFTWARE_TOPIC_HINTS = {
     "ai",
     "github",
-    "开源",
+    "?",
     "代码",
     "编程",
     "软件",
@@ -9036,10 +9029,10 @@ _RESEARCH_NOISE_TERMS = {
     "gitee",
     "pptagent",
     "pypi",
-    "开源",
+    "?",
     "仓库",
-    "贡献者",
-    "速速收藏",
+    "贡献?",
+    "速收?",
 }
 
 
@@ -9052,7 +9045,7 @@ def _text_naturalness_score(text: str, *, prefer_zh: bool) -> float:
         cjk_len = float(max(1, len(cjk_chars)))
         common_hits = sum(value.count(ch) for ch in _COMMON_ZH_FUNCTION_CHARS)
         topic_hits = sum(value.count(ch) for ch in _TOPIC_ZH_HINT_CHARS)
-        punct_hits = sum(value.count(ch) for ch in "，。；：、！？（）《》“”")
+        punct_hits = sum(value.count(ch) for ch in "，；：！？（?")
         marker_hits = sum(value.count(marker) for marker in _MOJIBAKE_MARKERS)
         token_hits = sum(1 for token in _MOJIBAKE_CJK_TOKENS if token in value)
         return (
@@ -9670,7 +9663,7 @@ def _infer_image_context(
         "数控",
         "机床",
         "加工",
-        "制造",
+        "?",
         "工业",
         "factory",
         "manufacturing",
@@ -9792,7 +9785,7 @@ def _extract_image_keywords(
         "diagram": "clean vector process diagram",
     }
 
-    split_re = re.compile(r"[;；,\n\r，。.!?、|]+")
+    split_re = re.compile(r"[;?\n\r?!?、|]+")
     expanded: List[str] = []
     for item in raw_terms:
         text = str(item or "").strip()
@@ -10002,9 +9995,9 @@ async def _hydrate_image_assets(render_payload: Dict[str, Any]) -> Dict[str, Any
     deck_blob = " ".join(token for token in deck_tokens if token).strip()
     fallback_stock_terms = (
         [
-            f"{deck_blob} 场景 图",
+            f"{deck_blob} 场景 ?",
             f"{deck_blob} 商业 插画",
-            "科技 商务 数据 可视化",
+            "科技 商务 数据 可视?",
         ]
         if hl == "zh-cn"
         else [
@@ -10676,27 +10669,27 @@ class PPTService:
                 ResearchQuestion(
                     question="这份PPT的核心受众是谁？",
                     category="audience",
-                    why="受众决定表达深度、叙事方式和术语密度。",
+                    why="受众决定表达深度、叙事方式和术语密度?",
                 ),
                 ResearchQuestion(
-                    question="这次演示最核心的目标是什么？",
+                    question="这次演示朢核心的目标是仢么？",
                     category="purpose",
-                    why="目标会影响结构是偏说服、汇报还是教学。",
+                    why="目标会影响结构是偏说服汇报还是教?",
                 ),
                 ResearchQuestion(
-                    question="希望呈现怎样的视觉风格和语气？",
+                    question="希望呈现怎样的视觉风格和语气?",
                     category="style",
-                    why="风格偏好会直接影响配色、排版和内容密度。",
+                    why="风格偏好会直接影响配色排版和内容密度?",
                 ),
                 ResearchQuestion(
-                    question="必须展示的关键数据有哪些？",
+                    question="必须展示的关键数据有哪些?",
                     category="data",
-                    why="关键数据决定图表、KPI和证据链是否完整。",
+                    why="关键数据决定图表、KPI和证据链是否完整?",
                 ),
                 ResearchQuestion(
                     question="页数、时长和重点章节有哪些限制？",
                     category="scope",
-                    why="范围约束决定每页信息量和取舍策略。",
+                    why="范围约束决定每页信息量和取舍策略?",
                 ),
             ]
             fallback_key_data_points = _dedup_strings(
@@ -10940,7 +10933,7 @@ class PPTService:
                     code="citations",
                     severity="high",
                     message=(
-                        f"可用参考来源不足（{len(dedup_refs)}/{req.desired_citations}）"
+                        f"可用参来源不足（{len(dedup_refs)}/{req.desired_citations}?"
                         if is_zh
                         else f"Insufficient references ({len(dedup_refs)}/{req.desired_citations})"
                     ),
@@ -11073,9 +11066,9 @@ class PPTService:
                 title = str(m.group(2) or "").strip()
                 if page_no >= 1 and title:
                     return page_no, title[:120]
-            # Format: 第3页必须体现：标题 / 第3页主题锚点：标题
+            # Format: ?页必须体现：标题 / ?页主题锚点：标题
             m = re.search(
-                r"第\s*([1-9]\d*)\s*页[^：:]{0,20}[：:]\s*(.+)$",
+                r"第\s*([1-9]\d*)\s*页[^?]{0,20}[?]\s*(.+)$",
                 raw,
                 flags=re.IGNORECASE,
             )
@@ -11178,7 +11171,7 @@ class PPTService:
             style_suggestion="rounded" if instructional_context else "soft",
             notes=notes,
             logic_flow=(
-                "先建立内容导航，再依次展开关键问题、证据与结论。"
+                "先建立内容导航，再依次展弢关键问题证据与结论?"
                 if is_zh
                 else "Open with navigation, then build key issues, evidence, and conclusions."
             ),
@@ -11222,7 +11215,7 @@ class PPTService:
                 text = str(raw or "").strip()
                 if not text:
                     continue
-                for piece in re.split(r"[;；,\n，。.!?]+", text):
+                for piece in re.split(r"[;?\n?!?]+", text):
                     item = str(piece or "").strip()
                     if len(item) < 4:
                         continue
@@ -11256,7 +11249,7 @@ class PPTService:
                 ):
                     overlap_like += 1
                 if len(item) <= (18 if is_zh else 32) and not re.search(
-                    r"[，。；;,.!?：:]", item
+                    r"[，；;,.!??]", item
                 ):
                     short_heading_like += 1
             if len(meaningful) >= 3 and overlap_like < len(meaningful):
@@ -11274,11 +11267,11 @@ class PPTService:
             r"\bplaceholder\b",
             r"\bitem\s*\d+\b",
             r"指标[a-eA-E]",
-            r"待补充",
+            r"待补?",
             r"占位文案",
             r"默认文案",
             r"示例文案",
-            r"请替换",
+            r"请替?",
             r"to be filled",
             r"replace me",
             r"default copy",
@@ -11316,7 +11309,7 @@ class PPTService:
                 normalized = re.sub(r"\s+", " ", str(value or "").strip())
                 normalized = normalized.replace("\ufffd", " ")
                 normalized = re.sub(
-                    r"^(?:核心问题|课堂提示|关键主体|角色分工|互动关系|起点|推进|转折点|传导起点|外部影响|反馈效应|案例背景|关键证据|课堂结论|争议焦点|现实约束|延伸思考|核心信息|逻辑关系|结论提示)\s*[:：-]\s*",
+                    r"^(?:核心问题|课堂提示|关键主体|角色分工|互动关系|起点|推进|转折点|传导起点|外部影响|反馈效应|案例背景|关键证据|课堂结论|争议焦点|现实约束|延伸思|核心信息|逻辑关系|结论提示)\s*[:?]\s*",
                     "",
                     normalized,
                     flags=re.IGNORECASE,
@@ -11338,7 +11331,7 @@ class PPTService:
                     r"\bitem\s*\d+\b", " ", normalized, flags=re.IGNORECASE
                 )
                 normalized = re.sub(r"指标[a-eA-E]", "指标", normalized)
-                normalized = re.sub(r"\s{2,}", " ", normalized).strip(" -:;,.，。；")
+                normalized = re.sub(r"\s{2,}", " ", normalized).strip(" -:;,.，；")
                 return normalized
 
             safe_fallback = _normalize_candidate(fallback)
@@ -11522,7 +11515,6 @@ class PPTService:
         ]
         for note_idx, note in enumerate(req.outline.notes):
             note_slide_type = _resolve_note_slide_type(note, note_idx)
-            lower_elements = [str(item).strip().lower() for item in note.data_elements]
             strategy = build_slide_content_strategy(
                 note,
                 is_zh=is_zh,
@@ -11847,7 +11839,7 @@ class PPTService:
                                     or "增长" in title_text
                                     or not is_zh
                                 )
-                                else "点",
+                                else "?",
                                 "trend": 6 + (note.page_number % 12),
                                 "label": title_text[:24],
                             },
@@ -12004,14 +11996,14 @@ class PPTService:
                         data_anchor=str(strategy.data_anchor or "")[:160],
                         page_role=str(strategy.page_role or "argument"),
                         density_hint=str(strategy.density_hint or "medium"),
-                        render_path=str(strategy.render_path or "pptxgenjs"),
+                        render_path=str(strategy.render_path or "svg"),
                     ),
                     notes_for_designer=(
                         _build_cover_support_note(title_text)
                         if note_slide_type == "cover"
                         else (
                             (
-                                "先看整体结构，再进入核心概念、机制、案例与总结。"
+                                "先看整体结构，再进入核心概念、机制案例与总结?"
                                 if is_zh
                                 else "Start with the full lesson map, then move into concepts, mechanisms, cases, and summary."
                             )
@@ -12036,16 +12028,15 @@ class PPTService:
         )
 
     async def run_ppt_pipeline(self, req: PPTPipelineRequest) -> PPTPipelineResult:
-        from src.minimax_exporter import export_minimax_pptx
+        from src.ppt_export_service import PPTExportService
         from src.ppt_quality_gate import (
-            score_visual_professional_metrics,
             score_deck_quality,
             validate_deck,
             validate_layout_diversity,
-            validate_visual_audit,
         )
         from src.ppt_route_strategy import resolve_route_policy
 
+        export_service = PPTExportService()
         run_id = _new_id()
         stages: List[PPTPipelineStageStatus] = []
         requested_execution_profile = _resolve_execution_profile_for_runtime(
@@ -12737,7 +12728,7 @@ class PPTService:
                     try:
                         export_data = await asyncio.wait_for(
                             asyncio.to_thread(
-                                export_minimax_pptx,
+                                export_service.export_once,
                                 slides=render_payload["slides"],
                                 title=req.title or presentation_plan.title,
                                 author=req.author,
@@ -12809,35 +12800,10 @@ class PPTService:
             if isinstance(export_data, dict):
                 pptx_bytes = export_data.pop("pptx_bytes", None)
                 if isinstance(pptx_bytes, (bytes, bytearray)):
-                    if export_channel == "remote":
-                        try:
-                            pptx_url = await r2.upload_bytes_to_r2(
-                                bytes(pptx_bytes),
-                                key=f"projects/{run_id}/pptx/pipeline.pptx",
-                                content_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
-                            )
-                            export_data["pptx_url"] = pptx_url
-                            export_data["url"] = pptx_url
-                            export_data["inline_delivery"] = "r2_url"
-                        except Exception as exc:
-                            if requested_execution_profile == "dev_strict":
-                                raise RuntimeError(
-                                    "pipeline_export_remote_upload_failed:"
-                                    + str(exc)[:220]
-                                ) from exc
-                            logger.warning(
-                                "[ppt_service] pipeline export R2 upload failed: %s",
-                                exc,
-                            )
-                            export_data["pptx_base64"] = base64.b64encode(
-                                bytes(pptx_bytes)
-                            ).decode("ascii")
-                            export_data["inline_delivery"] = "base64"
-                    else:
-                        export_data["pptx_base64"] = base64.b64encode(
-                            bytes(pptx_bytes)
-                        ).decode("ascii")
-                        export_data["inline_delivery"] = "base64"
+                    export_data["pptx_base64"] = base64.b64encode(
+                        bytes(pptx_bytes)
+                    ).decode("ascii")
+                    export_data["inline_delivery"] = "base64"
                 export_data["style_variant"] = pipeline_style_variant
                 export_data["palette_key"] = pipeline_palette_key
                 export_data["theme_recipe"] = pipeline_theme_recipe
@@ -12876,22 +12842,19 @@ class PPTService:
     async def export_pptx(self, req: ExportRequest) -> Dict[str, Any]:
         import asyncio
 
-        from src.minimax_exporter import MiniMaxExportError, export_minimax_pptx
+        from src.minimax_exporter import MiniMaxExportError
+        from src.ppt_export_service import PPTExportService
         from src.ppt_export_pipeline import ExportPipelineTimeline
         from src.ppt_failure_classifier import classify_failure
         from src.ppt_patch_merge import merge_render_spec
         from src.ppt_quality_gate import (
+            score_visual_professional_metrics,
             score_deck_quality,
-            validate_deck,
-            validate_layout_diversity,
             validate_visual_audit,
         )
+        from src.ppt_quality_service import PPTQualityService
         from src.ppt_route_strategy import resolve_route_policy
-        from src.ppt_retry_orchestrator import (
-            build_retry_hint,
-            compute_render_path_downgrade,
-            make_retry_decision,
-        )
+        from src.ppt_retry_service import PPTRetryService
         from src.ppt_visual_qa import (
             audit_rendered_slides,
             audit_textual_slides,
@@ -12905,6 +12868,9 @@ class PPTService:
         from src.pptx_rasterizer import rasterize_pptx_bytes_to_png_bytes
 
         pipeline_timeline = ExportPipelineTimeline()
+        export_service = PPTExportService()
+        quality_service = PPTQualityService()
+        retry_service = PPTRetryService()
 
         with pipeline_timeline.stage(
             "prepare_input",
@@ -13131,9 +13097,7 @@ class PPTService:
             route_mode=route_policy.mode,
             route_policy_max=route_policy.max_retry_attempts,
         )
-        partial_retry_enabled = (
-            partial_retry_enabled and route_policy.partial_retry_enabled
-        )
+        partial_retry_enabled = False
         env_generator_mode = (
             str(os.getenv("PPT_GENERATOR_MODE", "official")).strip().lower()
         )
@@ -13146,9 +13110,9 @@ class PPTService:
         if dev_fast_fail:
             enable_legacy_fallback = False
 
-        retry_scope = _normalize_retry_scope(req.retry_scope)
-        target_slide_ids = list(req.target_slide_ids or [])
-        target_block_ids = list(req.target_block_ids or [])
+        retry_scope = "deck"
+        target_slide_ids: List[str] = []
+        target_block_ids: List[str] = []
         retry_hint = req.retry_hint
         deck_id = req.deck_id or _new_id()
         export_channel = _resolve_export_channel(req.export_channel)
@@ -13549,12 +13513,6 @@ class PPTService:
                     "changed_slide_ids": [],
                     "transitions": [],
                 }
-            target_set = {
-                str(item).strip()
-                for item in (scoped_slide_ids or [])
-                if str(item).strip()
-            }
-            use_target_filter = scope in {"slide", "block"} and bool(target_set)
             changed_slide_ids: List[str] = []
             transitions: List[str] = []
             for idx, slide in enumerate(seed_slides):
@@ -13563,20 +13521,11 @@ class PPTService:
                 slide_id = str(
                     slide.get("slide_id") or slide.get("id") or f"slide-{idx + 1}"
                 ).strip()
-                if use_target_filter and slide_id not in target_set:
-                    continue
-                current_path = (
-                    str(slide.get("render_path") or "pptxgenjs").strip().lower()
-                )
-                next_path = compute_render_path_downgrade(
-                    current_render_path=current_path,
-                    failure_code=failure_code,
-                )
-                if not next_path:
+                current_path = str(slide.get("render_path") or "svg").strip().lower()
+                next_path = "svg"
+                if current_path == next_path:
                     continue
                 slide["render_path"] = next_path
-                if next_path == "png_fallback":
-                    slide["svg_fallback_png"] = True
                 changed_slide_ids.append(slide_id)
                 transitions.append(f"{slide_id}:{current_path}->{next_path}")
             return {
@@ -13641,7 +13590,7 @@ class PPTService:
                 effective_visual_preset = (
                     str(req.visual_preset or "auto").strip() or "auto"
                 )
-                current_result = export_minimax_pptx(
+                current_result = export_service.export_once(
                     slides=slides_data,
                     title=req.title,
                     author=req.author,
@@ -13695,7 +13644,7 @@ class PPTService:
                 ):
                     # Partial retry may return a patch-like PPTX (subset of slides).
                     # Always consolidate to full deck before quality gates and delivery.
-                    current_result = export_minimax_pptx(
+                    current_result = export_service.export_once(
                         slides=slides_data,
                         title=req.title,
                         author=req.author,
@@ -13774,21 +13723,10 @@ class PPTService:
                     )
                     base_render_spec = current_result.get("render_spec") or {}
 
-                content_gate = validate_deck(
-                    (current_result.get("input_payload") or {}).get("slides")
-                    or slides_data,
-                    profile=quality_profile,
-                )
                 layout_gate_source: Dict[str, Any] = {
                     "slides": (current_result.get("input_payload") or {}).get("slides")
                     or slides_data
                 }
-                layout_gate = validate_layout_diversity(
-                    layout_gate_source,
-                    profile=quality_profile,
-                )
-                content_issues = list(content_gate.issues)
-                layout_issues = list(layout_gate.issues)
                 relaxed_codes = _relaxed_quality_issue_codes(
                     route_mode=route_policy.mode,
                     quality_profile=quality_profile,
@@ -13796,38 +13734,20 @@ class PPTService:
                     requested_execution_profile=requested_execution_profile,
                     include_template_switch_relaxation=False,
                 )
-                if relaxed_codes:
-                    content_issues = [
-                        issue
-                        for issue in content_issues
-                        if str(getattr(issue, "code", "")).strip() not in relaxed_codes
-                    ]
-                    layout_issues = [
-                        issue
-                        for issue in layout_issues
-                        if str(getattr(issue, "code", "")).strip() not in relaxed_codes
-                    ]
-                gate_issues = [*content_issues, *layout_issues]
-                score_result = score_deck_quality(
+                quality_eval = quality_service.evaluate_structural_quality(
                     slides=(current_result.get("input_payload") or {}).get("slides")
                     or slides_data,
                     render_spec=layout_gate_source,
                     profile=quality_profile,
-                    content_issues=content_issues,
-                    layout_issues=layout_issues,
+                    quality_threshold_offset=float(route_policy.quality_threshold_offset),
+                    relaxed_codes=relaxed_codes,
                 )
-                effective_threshold = max(
-                    1.0,
-                    min(
-                        100.0,
-                        float(score_result.threshold)
-                        + float(route_policy.quality_threshold_offset),
-                    ),
-                )
-                score_passed = (
-                    bool(score_result.passed)
-                    and float(score_result.score) >= effective_threshold
-                )
+                content_issues = list(quality_eval.content_issues)
+                layout_issues = list(quality_eval.layout_issues)
+                gate_issues = list(quality_eval.gate_issues)
+                score_result = quality_eval.score_result
+                effective_threshold = float(quality_eval.effective_threshold)
+                score_passed = bool(quality_eval.score_passed)
                 final_content_issues = list(content_issues)
                 final_layout_issues = list(layout_issues)
                 final_quality_score = score_result
@@ -13860,8 +13780,8 @@ class PPTService:
                                 or slides_data,
                                 render_spec=layout_gate_source,
                                 profile=quality_profile,
-                                content_issues=content_gate.issues,
-                                layout_issues=layout_gate.issues,
+                                content_issues=content_issues,
+                                layout_issues=layout_issues,
                                 visual_audit=visual_audit,
                             )
                             visual_gate = validate_visual_audit(
@@ -14067,8 +13987,8 @@ class PPTService:
                                         if str(item).strip()
                                     ]
                                     if repair_targets:
-                                        retry_scope = "slide"
-                                        target_slide_ids = repair_targets
+                                        retry_scope = "deck"
+                                        target_slide_ids = []
                                         target_block_ids = []
                                 retry_hint = (
                                     f"{str(retry_hint or '').strip()} | "
@@ -14080,8 +14000,8 @@ class PPTService:
                                 gate_issues
                             )
                             if issue_slide_targets:
-                                retry_scope = "slide"
-                                target_slide_ids = issue_slide_targets
+                                retry_scope = "deck"
+                                target_slide_ids = []
                                 target_block_ids = []
                         failure_code = "schema_invalid"
                         failure_detail = "; ".join(
@@ -14089,13 +14009,12 @@ class PPTService:
                             for issue in gate_issues[:10]
                         )
                         classification = classify_failure(failure_code)
-                        decision = make_retry_decision(
-                            code=classification.code,
+                        decision = retry_service.decide_from_classification(
                             attempt=attempt,
                             max_attempts=min(
                                 max_retry_attempts, classification.max_attempts
                             ),
-                            base_delay_ms=classification.base_delay_ms,
+                            classification=classification,
                         )
                         diagnostics.append(
                             {
@@ -14117,7 +14036,7 @@ class PPTService:
                                 "failure_code": classification.code,
                                 "failure_detail": failure_detail,
                                 "retry_scope": retry_scope,
-                                "retry_target_ids": target_block_ids
+                                "retry_target_ids": target_slide_ids
                                 if retry_scope == "block"
                                 else target_slide_ids,
                                 "attempt": attempt,
@@ -14174,14 +14093,12 @@ class PPTService:
                                     "transitions": downgrade_info["transitions"],
                                 }
                             )
-                        retry_hint = build_retry_hint(
+                        retry_hint = retry_service.build_hint(
                             failure_code=classification.code,
                             failure_detail=failure_detail,
                             attempt=attempt,
                             retry_scope=retry_scope,
-                            target_ids=target_block_ids
-                            if retry_scope == "block"
-                            else target_slide_ids,
+                            target_ids=target_slide_ids,
                         )
                         await asyncio.sleep(decision.delay_ms / 1000.0)
                         attempt += 1
@@ -14193,13 +14110,12 @@ class PPTService:
                         failure_code = "quality_score_low"
                         failure_detail = f"weighted_score={score_result.score:.1f} < threshold={effective_threshold:.1f}"
                         classification = classify_failure(failure_code)
-                        decision = make_retry_decision(
-                            code=classification.code,
+                        decision = retry_service.decide_from_classification(
                             attempt=attempt,
                             max_attempts=min(
                                 max_retry_attempts, classification.max_attempts
                             ),
-                            base_delay_ms=classification.base_delay_ms,
+                            classification=classification,
                         )
                         diagnostics.append(
                             {
@@ -14221,7 +14137,7 @@ class PPTService:
                                 "failure_code": classification.code,
                                 "failure_detail": failure_detail,
                                 "retry_scope": retry_scope,
-                                "retry_target_ids": target_block_ids
+                                "retry_target_ids": target_slide_ids
                                 if retry_scope == "block"
                                 else target_slide_ids,
                                 "attempt": attempt,
@@ -14278,14 +14194,12 @@ class PPTService:
                                     "transitions": downgrade_info["transitions"],
                                 }
                             )
-                        retry_hint = build_retry_hint(
+                        retry_hint = retry_service.build_hint(
                             failure_code=classification.code,
                             failure_detail=failure_detail,
                             attempt=attempt,
                             retry_scope=retry_scope,
-                            target_ids=target_block_ids
-                            if retry_scope == "block"
-                            else target_slide_ids,
+                            target_ids=target_slide_ids,
                         )
                         await asyncio.sleep(decision.delay_ms / 1000.0)
                         attempt += 1
@@ -14304,7 +14218,7 @@ class PPTService:
                             "quality_profile": quality_profile,
                             "score": float(score_result.score),
                             "score_threshold": effective_threshold,
-                            "retry_target_ids": target_block_ids
+                            "retry_target_ids": target_slide_ids
                             if retry_scope == "block"
                             else target_slide_ids,
                         }
@@ -14332,11 +14246,10 @@ class PPTService:
                     f"{issue.slide_id}:{issue.code}" for issue in gate_issues[:10]
                 )
                 classification = classify_failure(failure_code)
-                decision = make_retry_decision(
-                    code=classification.code,
+                decision = retry_service.decide_from_classification(
                     attempt=attempt,
                     max_attempts=min(max_retry_attempts, classification.max_attempts),
-                    base_delay_ms=classification.base_delay_ms,
+                    classification=classification,
                 )
                 diagnostics.append(
                     {
@@ -14359,7 +14272,7 @@ class PPTService:
                         "failure_code": classification.code,
                         "failure_detail": failure_detail,
                         "retry_scope": retry_scope,
-                        "retry_target_ids": target_block_ids
+                        "retry_target_ids": target_slide_ids
                         if retry_scope == "block"
                         else target_slide_ids,
                         "attempt": attempt,
@@ -14407,8 +14320,8 @@ class PPTService:
                         gate_issues
                     )
                     if issue_slide_targets:
-                        retry_scope = "slide"
-                        target_slide_ids = issue_slide_targets
+                        retry_scope = "deck"
+                        target_slide_ids = []
                         target_block_ids = []
 
                 seed_slides = (current_result.get("input_payload") or {}).get("slides")
@@ -14431,14 +14344,12 @@ class PPTService:
                             "transitions": downgrade_info["transitions"],
                         }
                     )
-                retry_hint = build_retry_hint(
+                retry_hint = retry_service.build_hint(
                     failure_code=classification.code,
                     failure_detail=failure_detail,
                     attempt=attempt,
                     retry_scope=retry_scope,
-                    target_ids=target_block_ids
-                    if retry_scope == "block"
-                    else target_slide_ids,
+                    target_ids=target_slide_ids,
                 )
                 await _reorchestrate_retry_slides(seed_slides)
                 await asyncio.sleep(decision.delay_ms / 1000.0)
@@ -14451,8 +14362,8 @@ class PPTService:
                         exc.detail, slides_data
                     )
                     if schema_targets:
-                        retry_scope = "slide"
-                        target_slide_ids = schema_targets
+                        retry_scope = "deck"
+                        target_slide_ids = []
                         target_block_ids = []
                         downgrade_info = _degrade_render_paths_for_retry(
                             seed_slides=slides_data,
@@ -14476,11 +14387,10 @@ class PPTService:
                             )
                         # Re-apply visual orchestration before retrying only failed pages.
                         await _reorchestrate_retry_slides(slides_data)
-                decision = make_retry_decision(
-                    code=classification.code,
+                decision = retry_service.decide_from_classification(
                     attempt=attempt,
                     max_attempts=min(max_retry_attempts, classification.max_attempts),
-                    base_delay_ms=classification.base_delay_ms,
+                    classification=classification,
                 )
                 diagnostics.append(
                     {
@@ -14500,7 +14410,7 @@ class PPTService:
                         "failure_code": classification.code,
                         "failure_detail": exc.detail[:1200],
                         "retry_scope": retry_scope,
-                        "retry_target_ids": target_block_ids
+                        "retry_target_ids": target_slide_ids
                         if retry_scope == "block"
                         else target_slide_ids,
                         "attempt": attempt,
@@ -14552,24 +14462,21 @@ class PPTService:
                                 "transitions": downgrade_info["transitions"],
                             }
                         )
-                retry_hint = build_retry_hint(
+                retry_hint = retry_service.build_hint(
                     failure_code=classification.code,
                     failure_detail=exc.detail,
                     attempt=attempt,
                     retry_scope=retry_scope,
-                    target_ids=target_block_ids
-                    if retry_scope == "block"
-                    else target_slide_ids,
+                    target_ids=target_slide_ids,
                 )
                 await asyncio.sleep(decision.delay_ms / 1000.0)
                 attempt += 1
             except Exception as exc:
                 classification = classify_failure(exc)
-                decision = make_retry_decision(
-                    code=classification.code,
+                decision = retry_service.decide_from_classification(
                     attempt=attempt,
                     max_attempts=min(max_retry_attempts, classification.max_attempts),
-                    base_delay_ms=classification.base_delay_ms,
+                    classification=classification,
                 )
                 failure_detail = str(exc)
                 diagnostics.append(
@@ -14590,7 +14497,7 @@ class PPTService:
                         "failure_code": classification.code,
                         "failure_detail": failure_detail[:1200],
                         "retry_scope": retry_scope,
-                        "retry_target_ids": target_block_ids
+                        "retry_target_ids": target_slide_ids
                         if retry_scope == "block"
                         else target_slide_ids,
                         "attempt": attempt,
@@ -14635,14 +14542,12 @@ class PPTService:
                             "transitions": downgrade_info["transitions"],
                         }
                     )
-                retry_hint = build_retry_hint(
+                retry_hint = retry_service.build_hint(
                     failure_code=classification.code,
                     failure_detail=failure_detail,
                     attempt=attempt,
                     retry_scope=retry_scope,
-                    target_ids=target_block_ids
-                    if retry_scope == "block"
-                    else target_slide_ids,
+                    target_ids=target_slide_ids,
                 )
                 await asyncio.sleep(decision.delay_ms / 1000.0)
                 attempt += 1
@@ -14668,33 +14573,10 @@ class PPTService:
         url = ""
         export_data: Dict[str, Any] = {"url": url, "skill": skill}
         project_id = _new_id()
-        if export_channel == "remote":
-            key = f"projects/{project_id}/pptx/presentation.pptx"
-            try:
-                url = await r2.upload_bytes_to_r2(
-                    export_result["pptx_bytes"],
-                    key,
-                    content_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
-                )
-                export_data["url"] = url
-                export_data["inline_delivery"] = "r2_url"
-            except Exception as exc:
-                if dev_fast_fail:
-                    raise RuntimeError(
-                        "export_pptx_remote_upload_failed:" + str(exc)[:220]
-                    ) from exc
-                logger.warning(
-                    "[ppt_service] export_pptx remote upload failed: %s", exc
-                )
-                export_data["pptx_base64"] = base64.b64encode(
-                    export_result["pptx_bytes"]
-                ).decode("ascii")
-                export_data["inline_delivery"] = "base64"
-        else:
-            export_data["pptx_base64"] = base64.b64encode(
-                export_result["pptx_bytes"]
-            ).decode("ascii")
-            export_data["inline_delivery"] = "base64"
+        export_data["pptx_base64"] = base64.b64encode(
+            export_result["pptx_bytes"]
+        ).decode("ascii")
+        export_data["inline_delivery"] = "base64"
         generator_meta = export_result.get("generator_meta") or {}
         if generator_meta:
             export_data["generator_meta"] = generator_meta
@@ -15120,7 +15002,7 @@ class PPTService:
                     "failure_code": "strict_quality_gate_failed",
                     "failure_detail": failure_detail,
                     "retry_scope": retry_scope,
-                    "retry_target_ids": target_block_ids
+                    "retry_target_ids": target_slide_ids
                     if retry_scope == "block"
                     else target_slide_ids,
                     "attempt": attempt,
@@ -15181,7 +15063,7 @@ class PPTService:
                 "failure_code": None,
                 "failure_detail": None,
                 "retry_scope": retry_scope,
-                "retry_target_ids": target_block_ids
+                "retry_target_ids": target_slide_ids
                 if retry_scope == "block"
                 else target_slide_ids,
                 "attempt": attempt,
@@ -15302,7 +15184,7 @@ class PPTService:
                         {"role": "system", "content": system_prompt},
                         {
                             "role": "user",
-                            "content": f"标题: {slide.title}\n\n讲解稿:\n{narration}",
+                            "content": f"标题: {slide.title}\n\n讲解?\n{narration}",
                         },
                     ],
                     temperature=0.5,
@@ -15555,3 +15437,5 @@ class PPTService:
             logger.warning("[ppt_service] presign failed, fallback direct URL: %s", exc)
 
         return {"job_id": job_id, "status": status, "output_url": output_url}
+
+

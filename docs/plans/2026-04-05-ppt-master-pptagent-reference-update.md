@@ -41,7 +41,7 @@
    - 通过 Eight Confirmations 先确定格式、页数、受众、颜色、字体、图像策略。
    - 页面执行阶段只消费已确认的全局设计规格。
 
-3. **SVG-first，而不是自由 PptxGenJS 拼装**
+3. **SVG-first，而不是自由 SVG-to-PPTX 拼装**
    - `ppt-master` 先产出 SVG 页面，再做后处理与 PPTX 导出。
    - 复杂页面依赖 SVG 保真，而不是在 PPTX 层临时自由几何拼装。
 
@@ -100,7 +100,7 @@
    - 模板执行层只负责布局与视觉，不负责“补写一段更像演讲的文案”。
 
 2. **复杂页与高保真页应走受控表达路径**
-   - 不是在 PptxGenJS 里任意拼 shape。
+   - 不是在 SVG-to-PPTX 里任意拼 shape。
    - 更适合：
      - text/chart-first 模板主干
      - 必要时走 SVG/受控图表路径

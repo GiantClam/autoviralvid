@@ -45,7 +45,7 @@ def test_relaxed_quality_issue_codes_export_mode_keeps_previous_scope():
 
 def test_requested_skills_for_slide_uses_deck_template_family_when_slide_missing():
     skills = ppt_service._requested_skills_for_slide(
-        {"slide_type": "content", "layout_grid": "split_2", "render_path": "pptxgenjs"},
+        {"slide_type": "content", "layout_grid": "split_2", "render_path": "svg"},
         1,
         5,
         deck_template_family="dashboard_dark",
@@ -55,7 +55,7 @@ def test_requested_skills_for_slide_uses_deck_template_family_when_slide_missing
 
 def test_requested_skills_for_slide_forces_ppt_master_in_dev_strict():
     skills = ppt_service._requested_skills_for_slide(
-        {"slide_type": "content", "layout_grid": "split_2", "render_path": "pptxgenjs"},
+        {"slide_type": "content", "layout_grid": "split_2", "render_path": "svg"},
         1,
         5,
         execution_profile="dev_strict",
@@ -131,6 +131,45 @@ def test_layer1_design_chain_requests_template_editing_skill_when_template_speci
     assert calls
     requested = calls[0].get("requested_skills") if isinstance(calls[0], dict) else []
     assert "ppt-editing-skill" in requested
+
+
+def test_layer1_design_chain_uses_first_slide_metadata_for_ppt_master_force(monkeypatch):
+    calls = []
+
+    def _fake_exec(payload: dict) -> dict:
+        calls.append(payload)
+        requested = payload.get("requested_skills") if isinstance(payload.get("requested_skills"), list) else []
+        return {
+            "version": 1,
+            "results": [
+                {"skill": str(skill), "status": "noop", "patch": {}, "note": "ok"}
+                for skill in requested
+            ],
+            "patch": {},
+            "context": {},
+        }
+
+    monkeypatch.setattr("src.installed_skill_executor.execute_installed_skill_request", _fake_exec)
+
+    out = ppt_service._run_layer1_design_skill_chain(
+        deck_title="立法课程导论",
+        slides=[
+            {
+                "slide_type": "cover",
+                "title": "课程导入",
+                "quality_profile": "training_deck",
+            }
+        ],
+        requested_style_variant="auto",
+        requested_palette_key="auto",
+        requested_template_family="auto",
+        requested_skill_profile="auto",
+    )
+    runtime = out.get("runtime") if isinstance(out, dict) else {}
+    requested = runtime.get("requested_skills") if isinstance(runtime, dict) else []
+    assert isinstance(requested, list)
+    assert "ppt-master" in requested
+    assert calls
 
 
 def test_layer1_design_chain_raises_when_skill_runtime_reports_error(monkeypatch):
@@ -241,7 +280,7 @@ def test_apply_skill_planning_propagates_page_level_skill_context_and_history(mo
             "patch": {
                 "slide_type": "content",
                 "layout_grid": "grid_3" if idx == 0 else "timeline",
-                "render_path": "pptxgenjs",
+                "render_path": "svg",
             },
             "context": {
                 "agent_type": "content-page-generator",
@@ -355,6 +394,7 @@ def test_apply_skill_planning_attaches_design_decision_v1(monkeypatch):
                 {"skill": "color-font-skill", "status": "applied", "patch": {"palette_key": "business_authority"}, "note": "ok"},
                 {"skill": "slide-making-skill", "status": "applied", "patch": {"layout_grid": "grid_3"}, "note": "ok"},
                 {"skill": "ppt-orchestra-skill", "status": "applied", "patch": {"layout_grid": "grid_3"}, "note": "ok"},
+                {"skill": "ppt-master", "status": "noop", "patch": {}, "note": "ok"},
             ],
             "patch": {
                 "style_variant": "sharp",
@@ -516,7 +556,7 @@ def test_visual_orchestration_prefers_explicit_deck_template_when_compatible():
                 "title": "议题",
                 "blocks": [
                     {"block_type": "title", "content": "议题"},
-                    {"block_type": "body", "content": "背景与影响"},
+                    {"block_type": "body", "content": "背景与影?"},
                 ],
             }
         ],
@@ -560,7 +600,7 @@ def test_visual_orchestration_repairs_incompatible_family_after_second_cohesion(
                 "title": "立法流程",
                 "blocks": [
                     {"block_type": "title", "content": "立法流程"},
-                    {"block_type": "body", "content": "理解流程与影响"},
+                    {"block_type": "body", "content": "理解流程与影?"},
                 ],
             },
         ],
@@ -656,8 +696,8 @@ def test_template_support_treats_toc_and_divider_as_cover_compatible():
 def test_topic_relevance_score_penalizes_irrelevant_search_hits():
     score = ppt_service._topic_relevance_score(
         topic="解码立法过程：理解其对国际关系的影响",
-        title="北京大学本科专业核心课程手册——文科卷",
-        snippet="课程名称：临床药物治疗学，教学对象：大三药学专业学生。",
+        title="北京大学本科专业核心课程手册—文科卷",
+        snippet="课程名称：临床药物治疗学，教学对象：大三药学专业学生?",
         domain_terms=["立法", "国际关系"],
         required_facts=["立法流程", "政策影响"],
     )
@@ -665,15 +705,16 @@ def test_topic_relevance_score_penalizes_irrelevant_search_hits():
 
 
 def test_mojibake_detector_flags_corrupted_utf8_text():
-    assert ppt_service._looks_mojibake("æ¬ä»åºçä¸»è¦è´¡ç®è")
+    assert ppt_service._looks_mojibake("\ufffd")
     assert not ppt_service._looks_mojibake("解码立法过程：理解其对国际关系的影响")
+
 
 
 def test_research_noise_filter_blocks_prompt_and_repo_pollution_for_non_software_topic():
     assert ppt_service._is_research_noise_hit(
         topic="解码立法过程：理解其对国际关系的影响",
         title="GitHub - icip-cas/PPTAgent",
-        snippet="Prompt: 请制作一份高中课堂展示课件，主题为“解码立法过程”",
+        snippet="Prompt: 请制作一份高中课堂展示课件，主题为解码立法过程?",
     )
     assert not ppt_service._is_research_noise_hit(
         topic="如何用Python构建多智能体系统",
@@ -683,15 +724,15 @@ def test_research_noise_filter_blocks_prompt_and_repo_pollution_for_non_software
 
 
 def test_normalize_research_topic_extracts_subject_from_instruction_prompt():
-    topic = "请制作一份高中课堂展示课件，主题为“解码立法过程：理解其对国际关系的影响”"
+    topic = "请制作一份高中课堂展示课件，主题为解码立法过程：理解其对国际关系的影响?"
     normalized = ppt_service._normalize_research_topic(topic, is_zh=True)
     assert normalized.startswith("解码立法过程")
-    assert "请制作" not in normalized
+    assert "请制" not in normalized
 
 
 def test_build_research_queries_does_not_duplicate_topic_when_gap_hint_contains_topic():
     req = SimpleNamespace(
-        topic="请制作一份高中课堂展示课件，主题为“解码立法过程：理解其对国际关系的影响”",
+        topic="请制作一份高中课堂展示课件，主题为解码立法过程：理解其对国际关系的影响?",
         required_facts=[],
         time_range="",
         geography="",
@@ -709,7 +750,7 @@ def test_build_research_queries_does_not_duplicate_topic_when_gap_hint_contains_
     queries = ppt_service._build_research_queries(req, is_zh=True, gaps=gaps)
     assert queries
     assert queries[0].count("解码立法过程") == 1
-    assert "请制作" not in queries[0]
+    assert "请制" not in queries[0]
 
 
 def test_build_fallback_topic_points_is_semantic_not_instruction_echo():
@@ -718,7 +759,7 @@ def test_build_fallback_topic_points_is_semantic_not_instruction_echo():
         is_zh=True,
     )
     assert len(points) >= 3
-    assert all("请制作" not in item for item in points)
+    assert all("请制" not in item for item in points)
 
 
 def test_build_fallback_topic_points_avoids_duplicated_impact_phrase():
@@ -769,10 +810,16 @@ def test_sanitize_placeholder_text_keeps_valid_unicode_without_transcoding():
     assert "?" not in cleaned
 
 
+def test_sanitize_placeholder_text_rejects_writing_instruction_phrases():
+    source = "先说?GDPR 的背景与定义"
+    cleaned = ppt_service._sanitize_placeholder_text(source, prefer_zh=True)
+    assert cleaned == ""
+
+
 def test_infer_visual_semantic_mode_prefers_process_over_weak_numeric_signal():
     mode = ppt_service._infer_visual_semantic_mode(
-        semantic_text="立法流程与阶段推进（2024-2026）",
-        keypoints=["立法流程", "阶段一", "阶段二", "阶段三"],
+        semantic_text="立法流程与阶段推进（2024-2026?",
+        keypoints=["立法流程", "阶段推进", "阶段一", "阶段二"],
         numeric_values=[2024.0, 2025.0, 2026.0],
     )
     assert mode == "process"
@@ -801,7 +848,7 @@ def test_visual_orchestration_repairs_kpi_block_for_process_template():
                 "blocks": [
                     {"block_type": "title", "content": "立法流程"},
                     {"block_type": "body", "content": "阶段推进和参与方"},
-                    {"block_type": "kpi", "content": "覆盖率 86%"},
+                    {"block_type": "kpi", "content": "覆盖?86%"},
                 ],
             },
             {
@@ -882,7 +929,7 @@ def test_layout_solver_underflow_adds_table_not_image_when_no_visual_anchor():
             "title": "课堂重点",
             "blocks": [
                 {"block_type": "title", "content": "课堂重点"},
-                {"block_type": "body", "content": "关键概念与案例"},
+                {"block_type": "body", "content": "关键概念与案?"},
             ],
         }
     ]
@@ -939,3 +986,4 @@ def test_ensure_content_contract_strict_raises_instead_of_autofill():
         assert False, "expected strict contract to fail"
     except ValueError as exc:
         assert "strict_content_contract_unmet" in str(exc)
+

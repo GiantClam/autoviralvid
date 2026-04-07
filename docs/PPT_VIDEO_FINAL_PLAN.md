@@ -58,7 +58,7 @@ Stage 1: 大纲生成 (LLM + JSON Schema)
 Stage 2: 内容生成 (并行 LLM)
     │  → SlideContent[] (元素/背景/讲解文本)
     ▼
-Stage 3: PPTX导出 (pptxgenjs)
+Stage 3: PPTX导出 (svg_to_pptx)
     │
     ▼
 上传R2 → 返回下载链接
@@ -279,7 +279,7 @@ agent/src/
 
 前端 (Next.js):
 src/lib/types/ppt.ts               # TypeScript类型
-src/lib/export/pptx-generator.ts   # PPTX导出 (pptxgenjs)
+src/lib/export/pptx-generator.ts   # PPTX导出 (svg_to_pptx)
 ```
 
 ### Feature B: PPT/PDF 视频生成
@@ -315,7 +315,7 @@ scripts/
 - PPT服务管理、API路由
 
 ### Phase 2: PPTX导出 (Feature A 完成)
-- pptxgenjs封装
+- svg_to_pptx封装
 - R2上传
 - 下载接口
 

@@ -160,10 +160,10 @@ Python层准备 → Node.js渲染 → PPTX生成
 
 **两种渲染模式**:
 
-1. **PptxGenJS模式**（默认）
+1. **SVG-to-PPTX模式**（默认）
    ```javascript
-   // 使用PptxGenJS库直接生成
-   const pptx = new PptxGenJS();
+   // 使用SVG-to-PPTX库直接生成
+   const pptx = new SVG-to-PPTX();
    pptx.addSlide();
    pptx.writeFile("output.pptx");
    ```
@@ -183,7 +183,7 @@ def choose_render_path(slide):
         return "svg"
     if "workflow" in slide.blocks:
         return "svg"
-    return "pptxgenjs"
+    return "svg"
 ```
 
 **关键函数**:
@@ -399,7 +399,7 @@ render_payload
   ↓
 [设计约束检查] ← 三色/字号/空白
   ↓
-[渲染生成] (PptxGenJS/SVG)
+[渲染生成] (SVG-to-PPTX/SVG)
   ↓
 generated.pptx
   ↓

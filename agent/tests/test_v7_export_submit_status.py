@@ -2,6 +2,7 @@ import time
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+import pytest
 
 import src.v7_routes as v7_routes
 
@@ -223,3 +224,51 @@ def test_v7_export_task_can_be_loaded_from_supabase_when_memory_miss(monkeypatch
     assert loaded is not None
     assert loaded["task_id"] == task_id
     assert loaded["status"] == "queued"
+
+
+@pytest.mark.asyncio
+async def test_v7_execute_export_forces_deck_scope_and_local_channel(monkeypatch):
+    import src.minimax_exporter as minimax_exporter
+    import src.pptx_rasterizer as pptx_rasterizer
+    import src.r2 as r2
+
+    calls = []
+
+    def _fake_export(**kwargs):
+        calls.append(dict(kwargs))
+        return {
+            "pptx_bytes": b"v7-pptx",
+            "generator_meta": {"render_slides": 1},
+            "render_spec": {
+                "mode": "minimax_presentation",
+                "slides": [{"slide_id": "s1", "slide_type": "cover"}],
+            },
+            "input_payload": {"slides": [{"slide_id": "s1"}]},
+        }
+
+    async def _fake_upload(_bytes, key, content_type):
+        return f"https://example.com/{key}"
+
+    monkeypatch.setattr(minimax_exporter, "export_minimax_pptx", _fake_export)
+    monkeypatch.setattr(r2, "upload_bytes_to_r2", _fake_upload)
+    monkeypatch.setattr(
+        pptx_rasterizer, "rasterize_pptx_bytes_to_png_bytes", lambda _pptx: []
+    )
+
+    body = _sample_export_request()
+    body.update(
+        {
+            "retry_scope": "slide",
+            "target_slide_ids": ["s1"],
+            "target_block_ids": ["b1"],
+        }
+    )
+    data = await v7_routes._execute_export(body)
+
+    assert data["run_id"]
+    assert data["slide_count"] == 1
+    assert calls
+    assert calls[0]["retry_scope"] == "deck"
+    assert calls[0]["target_slide_ids"] == []
+    assert calls[0]["target_block_ids"] == []
+    assert calls[0]["render_channel"] == "local"

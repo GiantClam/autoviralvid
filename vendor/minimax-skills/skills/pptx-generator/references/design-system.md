@@ -220,7 +220,7 @@ slide.addText("Body text here.", { bold: true, fontSize: 14 });
 
 The same design can be rendered in 4 distinct visual styles by adjusting corner radius (`rectRadius`) and spacing. Choose the style recipe that fits the presentation tone.
 
-> **Unit note**: PptxGenJS uses inches. Slide dimensions are 10" x 5.625" (LAYOUT_16x9).
+> **Unit note**: SVG-to-PPTX uses inches. Slide dimensions are 10" x 5.625" (LAYOUT_16x9).
 
 ### Style Overview
 
@@ -298,7 +298,7 @@ The same design can be rendered in 4 distinct visual styles by adjusting corner 
 | **Badge** | rectRadius: 0.02 | rectRadius: 0.05 | rectRadius: 0.08 | rectRadius: 0.15 |
 | **Avatar Frame** | rectRadius: 0 | rectRadius: 0.1 | rectRadius: 0.2 | rectRadius: 0.5 (circle) |
 
-#### PptxGenJS Corner Radius Examples
+#### SVG-to-PPTX Corner Radius Examples
 
 ```javascript
 // Sharp style card

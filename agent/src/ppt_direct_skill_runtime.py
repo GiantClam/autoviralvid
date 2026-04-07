@@ -780,7 +780,7 @@ def _resolve_template_plan(
 def _page_skill_directives(slide_type: str, layout_grid: str, render_path: str) -> List[str]:
     slide = _normalize_text(slide_type, "content").lower()
     layout = _normalize_text(layout_grid, "split_2").lower()
-    path = _normalize_text(render_path, "pptxgenjs").lower()
+    path = _normalize_text(render_path, "svg").lower()
     directives: List[str] = [
         "Only one title area is allowed at the top of the slide.",
         "Never emit prefixes like 'Supporting point:' or 'Extra note:'.",
@@ -812,7 +812,7 @@ def _page_skill_directives(slide_type: str, layout_grid: str, render_path: str) 
             directives.append("When using left-right layout, ensure text area is not overloaded.")
         if layout == "timeline":
             directives.append("Timeline slides should keep 3-5 milestones with balanced spacing.")
-    if path in {"svg", "png_fallback"}:
+    if path == "svg":
         directives.append("SVG visuals must remain semantic and avoid decorative noise.")
     return directives
 
@@ -915,10 +915,9 @@ def _infer_render_path(
     state: Dict[str, Any],
 ) -> str:
     current = _normalize_text(state.get("render_path") or slide.get("render_path"), "").lower()
-    if current in {"pptxgenjs", "svg", "png_fallback"}:
-        return current
-    # Keep svg/png as explicit opt-in; default path should remain editable and stable.
-    return "pptxgenjs"
+    if current == "svg":
+        return "svg"
+    return "svg"
 
 
 def _choose_palette(deck: Dict[str, Any], slide: Dict[str, Any], state: Dict[str, Any]) -> str:
@@ -1013,7 +1012,7 @@ def _recommended_skills(
         skills.append("ppt-editing-skill")
     if slide_type in {"cover", "toc", "summary", "divider"}:
         skills.append("color-font-skill")
-    if render_path in {"svg", "png_fallback"}:
+    if render_path == "svg":
         skills.append("pptx")
     skills.extend(requested_skills)
     return _dedupe_skills(skills)
@@ -1026,7 +1025,7 @@ def _build_skill_row(skill: str, state: Dict[str, Any], requested_skills: List[s
 
     slide_type = _normalize_text(state.get("slide_type"), "content").lower()
     layout_grid = _normalize_text(state.get("layout_grid"), "split_2").lower()
-    render_path = _normalize_text(state.get("render_path"), "pptxgenjs").lower()
+    render_path = _normalize_text(state.get("render_path"), "svg").lower()
     style_variant = _normalize_text(state.get("style_variant"), "soft").lower()
     palette_key = _normalize_text(state.get("palette_key"), "platinum_white_gold")
     template_family = _normalize_text(state.get("template_family"), "dashboard_dark")
@@ -1102,8 +1101,7 @@ def _build_skill_row(skill: str, state: Dict[str, Any], requested_skills: List[s
         outputs["template_edit_engine"] = "xml_with_python_pptx_fallback"
         outputs["placeholder_strategy"] = "markitdown+token-replace"
     elif skill == "pptx":
-        blob = _slide_text_blob(slide, deck)
-        if render_path == "pptxgenjs" and _TIMELINE_HINT_RE.search(blob):
+        if render_path != "svg":
             patch["render_path"] = "svg"
         outputs["qa_pipeline"] = "markitdown+ooxml"
     elif skill == "ppt-master":
@@ -1263,7 +1261,7 @@ def execute_direct_skill_runtime(payload: Dict[str, Any]) -> Dict[str, Any]:
     if not context["recommended_load_skills"]:
         context["recommended_load_skills"] = _recommended_skills(
             slide_type=_normalize_text(resolved_state.get("slide_type"), "content").lower(),
-            render_path=_normalize_text(resolved_state.get("render_path"), "pptxgenjs").lower(),
+            render_path=_normalize_text(resolved_state.get("render_path"), "svg").lower(),
             requested_skills=requested_skills,
             deck=deck,
             slide=slide,
@@ -1273,7 +1271,7 @@ def execute_direct_skill_runtime(payload: Dict[str, Any]) -> Dict[str, Any]:
         context["page_skill_directives"] = _page_skill_directives(
             _normalize_text(resolved_state.get("slide_type"), "content"),
             _normalize_text(resolved_state.get("layout_grid"), "split_2"),
-            _normalize_text(resolved_state.get("render_path"), "pptxgenjs"),
+            _normalize_text(resolved_state.get("render_path"), "svg"),
         )
     scene_context_directives = scene_prompt_directives(
         resolved_state.get("quality_profile"),

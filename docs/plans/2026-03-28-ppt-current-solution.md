@@ -29,7 +29,7 @@
 
 1. 应用视觉编排：补齐 content 页 contract（title + body/list + visual anchor）
 2. 图片资产注入：图库优先（Serper 搜索 + 数据 URI 注入）
-3. 调用 Node 渲染器（PptxGenJS）
+3. 调用 Node 渲染器（SVG-to-PPTX）
 4. 质量门禁失败则按 deck/slide/block 维度重试
 
 核心入口：
@@ -101,7 +101,7 @@ Node 侧统一入口：
 - `scripts/minimax/svg-slide.mjs`
 
 修复点：
-- `addImage({data})` 使用 `image/svg+xml;base64,...`（兼容 PptxGenJS）
+- `addImage({data})` 使用 `image/svg+xml;base64,...`（兼容 SVG-to-PPTX）
 - `svg_mode=on` 时先注入 SVG 底层，再叠加可编辑元素
 
 ## 5.3 卡片渲染与图表

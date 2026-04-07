@@ -6,7 +6,7 @@
 
 **Architecture:** 采用分层替换（Strangler）而不是全量重写。Node 侧承接官方 skill 能力（编排+生成），Python 服务层保留失败分类、定向重试、质量门禁、诊断落库。当前阶段不改视频链路，视频能力进入 Phase 2。
 
-**Tech Stack:** FastAPI, Node.js, PptxGenJS, Supabase, R2
+**Tech Stack:** FastAPI, Node.js, SVG-to-PPTX, Supabase, R2
 
 ---
 
@@ -346,7 +346,7 @@ git commit -m "chore: add ppt-only rollout and rollback controls"
    https://github.com/MiniMax-AI/skills/tree/main/plugins/pptx-plugin
 2. MiniMax 官方 `pptx-generator`  
    https://github.com/MiniMax-AI/skills/tree/main/skills/pptx-generator
-3. PptxGenJS 官方文档（OOXML 兼容与 API 约束）  
-   https://gitbrent.github.io/PptxGenJS/docs/introduction/
+3. SVG-to-PPTX 官方文档（OOXML 兼容与 API 约束）  
+   https://gitbrent.github.io/SVG-to-PPTX/docs/introduction/
 4. AWS Builders Library（transient 重试 + backoff + jitter）  
    https://aws.amazon.com/builders-library/timeouts-retries-and-backoff-with-jitter/

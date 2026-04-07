@@ -90,7 +90,7 @@ After all slide JS files are generated in `slides/`, create `slides/compile.js` 
 
 ```javascript
 // slides/compile.js
-const pptxgen = require('pptxgenjs');
+const pptxgen = require('svg_to_pptx');
 const pres = new pptxgen();
 pres.layout = 'LAYOUT_16x9';
 
@@ -152,4 +152,4 @@ If grep returns results, fix them before declaring success.
 ## Dependencies
 
 - `pip install "markitdown[pptx]"` - text extraction
-- `npm install -g pptxgenjs` - creating from scratch
+- `npm install -g svg_to_pptx` - creating from scratch

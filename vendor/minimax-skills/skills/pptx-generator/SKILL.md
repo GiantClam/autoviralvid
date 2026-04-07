@@ -1,12 +1,12 @@
 ---
 name: pptx-generator
-description: "Generate, edit, and read PowerPoint presentations. Create from scratch with PptxGenJS (cover, TOC, content, section divider, summary slides), edit existing PPTX via XML workflows, or extract text with markitdown. Triggers: PPT, PPTX, PowerPoint, presentation, slide, deck, slides."
+description: "Generate, edit, and read PowerPoint presentations. Create from scratch with SVG-to-PPTX (cover, TOC, content, section divider, summary slides), edit existing PPTX via XML workflows, or extract text with markitdown. Triggers: PPT, PPTX, PowerPoint, presentation, slide, deck, slides."
 license: MIT
 metadata:
   version: "1.0"
   category: productivity
   sources:
-    - https://gitbrent.github.io/PptxGenJS/
+    - https://gitbrent.github.io/SVG-to-PPTX/
     - https://github.com/microsoft/markitdown
 ---
 
@@ -14,7 +14,7 @@ metadata:
 
 ## Overview
 
-This skill handles all PowerPoint tasks: reading/analyzing existing presentations, editing template-based decks via XML manipulation, and creating presentations from scratch using PptxGenJS. It includes a complete design system (color palettes, fonts, style recipes) and detailed guidance for every slide type.
+This skill handles all PowerPoint tasks: reading/analyzing existing presentations, editing template-based decks via XML manipulation, and creating presentations from scratch using SVG-to-PPTX. It includes a complete design system (color palettes, fonts, style recipes) and detailed guidance for every slide type.
 
 ## Quick Reference
 
@@ -42,8 +42,8 @@ This skill handles all PowerPoint tasks: reading/analyzing existing presentation
 | [slide-types.md](references/slide-types.md) | 5 slide page types (Cover, TOC, Section Divider, Content, Summary) + additional layout patterns |
 | [design-system.md](references/design-system.md) | Color palettes, font reference, style recipes (Sharp/Soft/Rounded/Pill), typography & spacing |
 | [editing.md](references/editing.md) | Template-based editing workflow, XML manipulation, formatting rules, common pitfalls |
-| [pitfalls.md](references/pitfalls.md) | QA process, common mistakes, critical PptxGenJS pitfalls |
-| [pptxgenjs.md](references/pptxgenjs.md) | Complete PptxGenJS API reference |
+| [pitfalls.md](references/pitfalls.md) | QA process, common mistakes, critical SVG-to-PPTX pitfalls |
+| [svg_to_pptx.md](references/svg_to_pptx.md) | Complete SVG-to-PPTX API reference |
 
 ---
 
@@ -88,7 +88,7 @@ Create one JS file per slide in `slides/` directory. Each file must export a syn
 5. Fonts: Chinese = Microsoft YaHei, English = Arial (or approved alternative)
 6. Colors: 6-char hex without # (e.g. `"FF0000"`)
 7. Must use the theme object contract (see [Theme Object Contract](#theme-object-contract))
-8. Must follow the [PptxGenJS API reference](references/pptxgenjs.md)
+8. Must follow the [SVG-to-PPTX API reference](references/svg_to_pptx.md)
 
 ### Step 6: Compile into Final PPTX
 
@@ -96,7 +96,7 @@ Create `slides/compile.js` to combine all slide modules:
 
 ```javascript
 // slides/compile.js
-const pptxgen = require('pptxgenjs');
+const pptxgen = require('svg_to_pptx');
 const pres = new pptxgen();
 pres.layout = 'LAYOUT_16x9';
 
@@ -143,7 +143,7 @@ Each slide is a **complete, runnable JS file**:
 
 ```javascript
 // slide-01.js
-const pptxgen = require("pptxgenjs");
+const pptxgen = require("svg_to_pptx");
 
 const slideConfig = {
   type: 'cover',
@@ -245,5 +245,5 @@ slide.addText("03", {
 ## Dependencies
 
 - `pip install "markitdown[pptx]"` — text extraction
-- `npm install -g pptxgenjs` — creating from scratch
+- `npm install -g svg_to_pptx` — creating from scratch
 - `npm install -g react-icons react react-dom sharp` — icons (optional)

@@ -6,7 +6,7 @@
 
 **Architecture:** 采用 Gap-Driven Strangler 策略。保留已上线的官方生成主链路（official mode、局部重试、诊断落库、PPT-first 视频），仅新增当前缺失能力并通过特性开关渐进启用。执行方式遵循 TDD：先写失败测试，再最小实现，再回归验证。
 
-**Tech Stack:** FastAPI (Python), Node.js (PptxGenJS), Pydantic v2, pytest, Vitest
+**Tech Stack:** FastAPI (Python), Node.js (SVG-to-PPTX), Pydantic v2, pytest, Vitest
 
 ---
 

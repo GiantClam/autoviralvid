@@ -161,14 +161,14 @@ class ExportRequest(BaseModel):
     minimax_style_variant: Literal["auto", "sharp", "soft", "rounded", "pill"] = "auto"
     minimax_palette_key: str = Field(default="auto", max_length=64)
     verbatim_content: bool = False
-    retry_scope: Literal["deck", "slide", "block"] = "deck"
+    retry_scope: Literal["deck"] = "deck"
     retry_hint: str = Field(default="", max_length=2000)
     target_slide_ids: List[str] = Field(default_factory=list, max_length=50)
     target_block_ids: List[str] = Field(default_factory=list, max_length=500)
     idempotency_key: Optional[str] = Field(default=None, max_length=128)
     template_file_url: Optional[str] = Field(default=None, max_length=2048)
     route_mode: Literal["auto", "fast", "standard", "refine"] = "auto"
-    export_channel: Literal["auto", "local", "remote"] = "local"
+    export_channel: Literal["auto", "local"] = "local"
     generator_mode: Literal["auto", "official", "legacy"] = "official"
     original_style: bool = False
     disable_local_style_rewrite: bool = False
@@ -181,20 +181,7 @@ class ExportRequest(BaseModel):
     force_ppt_master: Optional[bool] = None
     constraint_hardness: Literal["minimal", "balanced", "strict"] = "minimal"
     svg_mode: Literal["off", "on"] = "on"
-    template_family: Literal[
-        "auto",
-        "hero_dark",
-        "hero_tech_cover",
-        "bento_2x2_dark",
-        "bento_mosaic_dark",
-        "split_media_dark",
-        "dashboard_dark",
-        "architecture_dark_panel",
-        "ecosystem_orange_dark",
-        "neural_blueprint_light",
-        "ops_lifecycle_light",
-        "consulting_warm_light",
-    ] = "auto"
+    template_family: str = Field(default="auto", max_length=128)
     skill_profile: str = Field(default="auto", max_length=64)
     hardness_profile: Literal["auto", "minimal", "balanced", "strict"] = "auto"
     schema_profile: str = Field(default="auto", max_length=128)
@@ -224,6 +211,12 @@ class ExportRequest(BaseModel):
         if not (text.startswith("http://") or text.startswith("https://")):
             raise ValueError("template_file_url must start with http:// or https://")
         return text
+
+    @field_validator("template_family")
+    @classmethod
+    def validate_template_family(cls, value: str) -> str:
+        text = str(value or "").strip().lower()
+        return text or "auto"
 
 
 class ParseRequest(BaseModel):

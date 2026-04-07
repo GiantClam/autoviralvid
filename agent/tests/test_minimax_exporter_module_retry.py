@@ -1,4 +1,6 @@
-from src.minimax_exporter import export_minimax_pptx
+import pytest
+
+from src.minimax_exporter import MiniMaxExportError, export_minimax_pptx
 
 
 def _sample_slide() -> dict:
@@ -32,26 +34,21 @@ def test_exporter_always_uses_drawingml_engine():
     assert result["is_full_deck"] is True
     assert result["generator_meta"].get("engine") == "drawingml_native"
     assert result["generator_meta"].get("render_slides") == 1
+    assert "svg_finalize_steps_run" in result["generator_meta"]
+    assert "svg_finalize_skipped_steps" in result["generator_meta"]
 
 
-def test_exporter_marks_remote_channel_as_local_fallback():
-    result = export_minimax_pptx(
-        slides=[_sample_slide()],
-        title="Deck",
-        author="AutoViralVid",
-        render_channel="remote",
-        generator_mode="official",
-        timeout=30,
-    )
-
-    meta = result.get("generator_meta") or {}
-    assert meta.get("channel_fallback_used") is True
-    assert "drawingml export currently runs in local mode" in str(
-        meta.get("channel_fallback_reason") or ""
-    )
-    payload = result.get("input_payload") or {}
-    assert payload.get("render_channel") == "local"
-    assert payload.get("requested_render_channel") == "remote"
+def test_exporter_remote_channel_fails_explicitly():
+    with pytest.raises(MiniMaxExportError) as exc_info:
+        export_minimax_pptx(
+            slides=[_sample_slide()],
+            title="Deck",
+            author="AutoViralVid",
+            render_channel="remote",
+            generator_mode="official",
+            timeout=30,
+        )
+    assert "remote render_channel is not supported" in str(exc_info.value)
 
 
 def test_exporter_reports_svg_source_stats():

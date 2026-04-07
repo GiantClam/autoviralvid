@@ -43,7 +43,7 @@ _FIX_CLUSTER_TO_MUTATIONS: Dict[str, List[str]] = {
     ],
     "geometry": [
         "prioritize_visual_similarity_repairs",
-        "route_complex_shapes_to_svg_or_custgeom",
+        "route_complex_shapes_to_svg_or_drawingml",
         "normalize_text_box_and_shape_coordinates",
     ],
     "harness": [
@@ -347,7 +347,7 @@ def _build_visual_critic_patch(
         if cluster_name == "geometry":
             return "svg"
         if cluster_name == "layout":
-            return "pptxgenjs"
+            return "svg"
         return ""
 
     def _build_slide_mutation(target: Dict[str, Any], cluster_name: str) -> Dict[str, Any]:

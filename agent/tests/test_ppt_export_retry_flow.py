@@ -7,6 +7,18 @@ from src.schemas.ppt import ExportRequest, SlideContent, SlideElement
 from src.ppt_service import PPTService
 
 
+@pytest.fixture(autouse=True)
+def _isolate_export_retry_flow_from_skill_runtime(monkeypatch):
+    monkeypatch.setenv("PPT_DIRECT_SKILL_RUNTIME_REQUIRE", "false")
+    monkeypatch.setenv("PPT_DIRECT_SKILL_RUNTIME_ENABLED", "false")
+    monkeypatch.setattr(ppt_service, "_run_layer1_design_skill_chain", lambda **_kwargs: {})
+    monkeypatch.setattr(
+        ppt_service,
+        "_apply_skill_planning_to_render_payload",
+        lambda payload, **_kwargs: payload,
+    )
+
+
 @pytest.mark.asyncio
 async def test_quality_gate_triggers_slide_retry_and_persists_diagnostics(monkeypatch):
     import src.minimax_exporter as minimax_exporter
@@ -110,10 +122,9 @@ async def test_quality_gate_triggers_slide_retry_and_persists_diagnostics(monkey
     assert result["attempts"] == 2
     assert result["retry_scope"] == "deck"
     assert result["route_mode"] == "standard"
-    assert len(export_calls) == 3
-    assert export_calls[1]["retry_scope"] == "slide"
-    assert export_calls[2]["retry_scope"] == "deck"
-    assert export_calls[2]["target_slide_ids"] == []
+    assert len(export_calls) == 2
+    assert export_calls[1]["retry_scope"] == "deck"
+    assert export_calls[1]["target_slide_ids"] == []
     assert export_calls[1]["route_mode"] == "standard"
     assert "failure_code" in str(export_calls[1]["retry_hint"])
     assert "quality_score" in result
@@ -220,7 +231,7 @@ async def test_partial_retry_full_deck_result_skips_finalize_call(monkeypatch):
     assert result["attempts"] == 2
     assert len(calls) == 2
     assert calls[0]["retry_scope"] == "deck"
-    assert calls[1]["retry_scope"] == "slide"
+    assert calls[1]["retry_scope"] == "deck"
 
 
 @pytest.mark.asyncio
@@ -820,15 +831,13 @@ async def test_schema_invalid_retries_failed_slide_only(monkeypatch):
     result = await PPTService().export_pptx(req)
 
     assert result["attempts"] == 2
-    assert len(calls) == 3
-    assert calls[1]["retry_scope"] == "slide"
-    assert calls[1]["target_slide_ids"] == ["s1"]
-    assert calls[2]["retry_scope"] == "deck"
-    assert calls[2]["target_slide_ids"] == []
+    assert len(calls) == 2
+    assert calls[1]["retry_scope"] == "deck"
+    assert calls[1]["target_slide_ids"] == []
 
 
 @pytest.mark.asyncio
-async def test_retry_flow_downgrades_render_path_until_png_fallback(monkeypatch):
+async def test_retry_flow_stays_deck_scoped_without_render_path_downgrade(monkeypatch):
     import src.minimax_exporter as minimax_exporter
     import src.ppt_quality_gate as quality_gate
     import src.ppt_visual_qa as ppt_visual_qa
@@ -920,16 +929,11 @@ async def test_retry_flow_downgrades_render_path_until_png_fallback(monkeypatch)
     result = await PPTService().export_pptx(req)
 
     assert result["attempts"] == 3
-    assert len(calls) == 4
-    assert calls[1]["retry_scope"] == "slide"
-    assert calls[2]["retry_scope"] == "slide"
-    assert calls[3]["retry_scope"] == "deck"
-
-    first_retry_slide = calls[1]["slides"][0]
-    second_retry_slide = calls[2]["slides"][0]
-    assert first_retry_slide["render_path"] == "svg"
-    assert second_retry_slide["render_path"] == "png_fallback"
-    assert second_retry_slide["svg_fallback_png"] is True
+    assert len(calls) == 3
+    assert calls[1]["retry_scope"] == "deck"
+    assert calls[2]["retry_scope"] == "deck"
+    assert calls[1]["target_slide_ids"] == []
+    assert calls[2]["target_slide_ids"] == []
 
 
 @pytest.mark.asyncio

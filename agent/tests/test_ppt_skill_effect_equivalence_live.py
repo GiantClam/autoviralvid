@@ -23,7 +23,7 @@ def _sample_task(load_skills: List[str]) -> Dict[str, Any]:
         "slide_id": "s-live-1",
         "slide_type": "content",
         "agent_type": "content-page-generator",
-        "render_path": "pptxgenjs",
+        "render_path": "svg",
         "layout_grid": "split_2",
         "load_skills": list(load_skills),
         "prompt": "Refine this slide for executive audience.",

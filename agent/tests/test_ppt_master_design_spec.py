@@ -43,7 +43,7 @@ def test_choose_render_path_uses_svg_for_data_visualization_semantics():
         "layout_grid": "split_2",
         "blocks": [],
     }
-    assert choose_render_path(slide, svg_mode="on") == "pptxgenjs"
+    assert choose_render_path(slide, svg_mode="on") == "svg"
 
 
 def test_choose_render_path_uses_svg_for_infographic_semantics():
@@ -53,7 +53,7 @@ def test_choose_render_path_uses_svg_for_infographic_semantics():
         "layout_grid": "split_2",
         "blocks": [],
     }
-    assert choose_render_path(slide, svg_mode="on") == "pptxgenjs"
+    assert choose_render_path(slide, svg_mode="on") == "svg"
 
 
 def test_choose_render_path_uses_svg_for_extended_chart_subtype():
@@ -71,19 +71,19 @@ def test_choose_render_path_uses_svg_for_extended_chart_subtype():
     assert choose_render_path(slide, svg_mode="on") == "svg"
 
 
-def test_choose_render_path_keeps_cover_summary_on_pptxgenjs():
+def test_choose_render_path_uses_svg_for_cover_summary():
     cover = {"slide_type": "cover", "layout_grid": "workflow", "blocks": []}
     summary = {"slide_type": "summary", "layout_grid": "timeline", "blocks": []}
-    assert choose_render_path(cover, svg_mode="on") == "pptxgenjs"
-    assert choose_render_path(summary, svg_mode="on") == "pptxgenjs"
+    assert choose_render_path(cover, svg_mode="on") == "svg"
+    assert choose_render_path(summary, svg_mode="on") == "svg"
 
 
-def test_choose_render_path_respects_svg_mode_off():
+def test_choose_render_path_ignores_svg_mode_off_in_svg_only_pipeline():
     slide = {"slide_type": "content", "layout_grid": "workflow", "blocks": []}
-    assert choose_render_path(slide, svg_mode="off") == "pptxgenjs"
+    assert choose_render_path(slide, svg_mode="off") == "svg"
 
 
-def test_choose_render_path_keeps_text_heavy_template_backed_pages_on_pptxgenjs():
+def test_choose_render_path_routes_text_heavy_template_backed_pages_to_svg():
     slide = {
         "slide_type": "content",
         "layout_grid": "split_2",
@@ -96,10 +96,10 @@ def test_choose_render_path_keeps_text_heavy_template_backed_pages_on_pptxgenjs(
             {"block_type": "chart", "data": {"chart_type": "bar"}},
         ],
     }
-    assert choose_render_path(slide, svg_mode="on") == "pptxgenjs"
+    assert choose_render_path(slide, svg_mode="on") == "svg"
 
 
-def test_choose_render_path_keeps_continuation_pages_on_pptxgenjs():
+def test_choose_render_path_routes_continuation_pages_to_svg():
     slide = {
         "slide_type": "content",
         "layout_grid": "timeline",
@@ -109,7 +109,7 @@ def test_choose_render_path_keeps_continuation_pages_on_pptxgenjs():
         "is_continuation": True,
         "blocks": [{"block_type": "workflow", "content": "A -> B -> C"}],
     }
-    assert choose_render_path(slide, svg_mode="on") == "pptxgenjs"
+    assert choose_render_path(slide, svg_mode="on") == "svg"
 
 
 def test_apply_render_paths_keeps_mixed_deck_template_consistency():
@@ -136,7 +136,7 @@ def test_apply_render_paths_keeps_mixed_deck_template_consistency():
 
     applied = apply_render_paths(slides, svg_mode="on")
 
-    assert [slide["render_path"] for slide in applied] == ["pptxgenjs", "pptxgenjs", "svg"]
+    assert [slide["render_path"] for slide in applied] == ["svg", "svg", "svg"]
 
 
 def test_apply_render_paths_preserves_mixed_deck_consistency():
@@ -159,7 +159,7 @@ def test_apply_render_paths_preserves_mixed_deck_consistency():
 
     out = apply_render_paths(slides, svg_mode="on")
 
-    assert [slide["render_path"] for slide in out] == ["pptxgenjs", "pptxgenjs", "svg"]
+    assert [slide["render_path"] for slide in out] == ["svg", "svg", "svg"]
 
 
 def test_build_design_spec_render_policy_keeps_storyline_as_weak_modifier():

@@ -16,7 +16,7 @@ def test_build_design_decision_v1_contains_deck_and_slide_rows():
         quality_profile="default",
         route_mode="standard",
         skill_profile="general-content",
-        slides=[{"slide_id": "s1", "layout_grid": "grid_3", "render_path": "pptxgenjs"}],
+        slides=[{"slide_id": "s1", "layout_grid": "grid_3", "render_path": "svg"}],
         decision_source="unit_test",
     )
     assert decision["version"] == "v1"
@@ -98,7 +98,7 @@ def test_freeze_retry_visual_identity_applies_slide_level_render_contract():
             "palette_key": "modern_wellness",
             "template_family": "hero_dark",
             "layout_grid": "split_2",
-            "render_path": "pptxgenjs",
+            "render_path": "svg",
         }
     ]
     decision = {

@@ -54,14 +54,14 @@ Check for missing content, placeholder text, missing page number badge.
 - **Don't forget text box padding** — when aligning lines or shapes with text edges, set `margin: 0` on the text box or offset the shape to account for padding
 - **Don't use low-contrast elements** — icons AND text need strong contrast against the background
 - **NEVER use accent lines under titles** — these are a hallmark of AI-generated slides; use whitespace or background color instead
-- **NEVER use "#" with hex colors** — causes file corruption in PptxGenJS
+- **NEVER use "#" with hex colors** — causes file corruption in SVG-to-PPTX
 - **NEVER encode opacity in hex strings** — use the `opacity` property instead
 - **NEVER use async/await in createSlide()** — compile.js won't await
-- **NEVER reuse option objects across PptxGenJS calls** — PptxGenJS mutates objects in-place
+- **NEVER reuse option objects across SVG-to-PPTX calls** — SVG-to-PPTX mutates objects in-place
 
 ---
 
-## Critical Pitfalls — PptxGenJS
+## Critical Pitfalls — SVG-to-PPTX
 
 ### NEVER use async/await in createSlide()
 

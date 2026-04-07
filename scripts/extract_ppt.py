@@ -385,7 +385,7 @@ for idx in range(total_pages):
         "layout": layout_grid,
         **template_info,
         "template_lock": False,
-        "render_path": "pptxgenjs",
+        "render_path": "svg",
         "bg_style": "light",
         "content_density": "sparse" if slide_type == "cover" else "balanced",
         "force_bento": False,

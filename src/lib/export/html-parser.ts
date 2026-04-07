@@ -1,10 +1,10 @@
-/**
- * HTML → PPTX 文本属性解析器
+﻿/**
+ * HTML 鈫?PPTX 鏂囨湰灞炴€цВ鏋愬櫒
  *
- * 将 HTML 富文本解析为 pptxgenjs TextProps[] 数组
- * 支持: <b>, <i>, <u>, <s>, <sup>, <sub>, <ul>/<ol>/<li>, <a>, <p>, <br>
+ * 灏?HTML 瀵屾枃鏈В鏋愪负 PPTX TextProps[] 鏁扮粍
+ * 鏀寔: <b>, <i>, <u>, <s>, <sup>, <sub>, <ul>/<ol>/<li>, <a>, <p>, <br>
  *
- * 提取自 OpenMAIC (THU-MAIC/OpenMAIC) lib/export/html-parser.ts
+ * 鎻愬彇鑷?OpenMAIC (THU-MAIC/OpenMAIC) lib/export/html-parser.ts
  */
 
 export interface AST {
@@ -38,8 +38,7 @@ interface TextSlice {
 }
 
 /**
- * 简易HTML→AST解析器
- */
+ * 绠€鏄揌TML鈫扐ST瑙ｆ瀽鍣? */
 export function toAST(html: string): AST[] {
   const ast: AST[] = [];
   let i = 0;
@@ -143,11 +142,10 @@ export function toAST(html: string): AST[] {
 }
 
 /**
- * 将HTML解析为pptxgenjs TextProps数组
+ * 灏咹TML瑙ｆ瀽涓簆ptxgenjs TextProps鏁扮粍
  *
- * @param html HTML富文本字符串
- * @param ratioPx2Pt 像素→点的比率
- * @param defaults 默认样式
+ * @param html HTML瀵屾枃鏈瓧绗︿覆
+ * @param ratioPx2Pt 鍍忕礌鈫掔偣鐨勬瘮鐜? * @param defaults 榛樿鏍峰紡
  */
 export function formatHTML(
   html: string,
@@ -250,3 +248,4 @@ export function formatHTML(
   parse(ast);
   return slices;
 }
+

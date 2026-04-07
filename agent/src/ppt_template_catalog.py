@@ -504,7 +504,8 @@ def template_capabilities(template_id: str) -> Dict[str, Any]:
     requested = str(template_id or "").strip().lower()
     if requested not in templates:
         requested = default_template_id()
-    raw = _as_dict(_as_dict(templates.get(requested)).get("capabilities"))
+    template_row = _as_dict(templates.get(requested))
+    raw = _as_dict(template_row.get("capabilities"))
     density_raw = _as_dict(raw.get("density_range"))
     supported_slide_types = raw.get("supported_slide_types")
     supported_layouts = raw.get("supported_layouts")
@@ -534,6 +535,7 @@ def template_capabilities(template_id: str) -> Dict[str, Any]:
         "visual_anchor_capacity": int(raw.get("visual_anchor_capacity") or 0),
         "data_block_capacity": int(raw.get("data_block_capacity") or 0),
         "requires_image_asset": bool(raw.get("requires_image_asset", False)),
+        "requires_keyword_match": bool(template_row.get("requires_keyword_match", False)),
     }
 
 
@@ -657,6 +659,9 @@ def resolve_template_for_slide(
             score += 1.5 if cap["data_block_capacity"] > 0 else -4.0
 
         kw_score = _keyword_score(template_id)
+        requires_keyword_match = bool(template_row.get("requires_keyword_match"))
+        if requires_keyword_match and kw_score <= 0:
+            continue
         score += min(3.0, float(kw_score))
         score += _template_archetype_bonus(
             template_row=template_row,

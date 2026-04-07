@@ -77,13 +77,9 @@ def _dedupe_skills(values: Any) -> List[str]:
 @tool("recommend_render_path")
 def recommend_render_path(slide_type: str, current_render_path: str) -> str:
     """Recommend render path by slide semantics."""
-    slide = _normalize_text(slide_type, "content").lower()
-    current = _normalize_text(current_render_path, "pptxgenjs").lower()
-    if slide in {"cover", "summary", "toc", "divider", "section"}:
-        return "pptxgenjs"
-    if current in {"pptxgenjs", "svg", "png_fallback"}:
-        return current
-    return "pptxgenjs"
+    _ = _normalize_text(slide_type, "content").lower()
+    _ = _normalize_text(current_render_path, "svg").lower()
+    return "svg"
 
 
 @tool("recommend_layout_grid")
@@ -225,7 +221,7 @@ def _build_page_guidance_text(payload: Dict[str, Any], runtime_context: Dict[str
     lines: List[str] = []
     slide_type = _normalize_text(payload.get("slide_type"), "content")
     layout_grid = _normalize_text(payload.get("layout_grid"), "split_2")
-    render_path = _normalize_text(payload.get("render_path"), "pptxgenjs")
+    render_path = _normalize_text(payload.get("render_path"), "svg")
     lines.append(f"Slide type: {slide_type}")
     lines.append(f"Layout grid: {layout_grid}")
     lines.append(f"Render path: {render_path}")
@@ -743,7 +739,7 @@ def build_subagent_graph(model_invoke: Optional[ModelInvoke] = None):
         payload = state.get("task_payload") or {}
         payload_view = _merge_slide_payload(payload, state.get("skill_runtime_patch") or {})
         slide_type = _normalize_text(payload_view.get("slide_type"), "content")
-        render_path = _normalize_text(payload_view.get("render_path"), "pptxgenjs")
+        render_path = _normalize_text(payload_view.get("render_path"), "svg")
         slide_data = payload_view.get("slide_data") if isinstance(payload_view.get("slide_data"), dict) else {}
         layout_grid = _normalize_text(
             payload_view.get("layout_grid") or slide_data.get("layout_grid"),
@@ -757,7 +753,9 @@ def build_subagent_graph(model_invoke: Optional[ModelInvoke] = None):
         )
         tool_patch: Dict[str, Any] = {}
         if _normalize_text(recommended_render_path, "").lower() != render_path.lower():
-            tool_patch["render_path"] = _normalize_text(recommended_render_path, "pptxgenjs").lower()
+            tool_patch["render_path"] = _normalize_text(
+                recommended_render_path, "svg"
+            ).lower()
         if recommended_layout and recommended_layout != layout_grid:
             tool_patch["layout_grid"] = recommended_layout
         skill_hints = list(state.get("skill_hints") or [])

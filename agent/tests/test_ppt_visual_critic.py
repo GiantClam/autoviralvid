@@ -1,4 +1,4 @@
-from src.ppt_quality_gate import QualityIssue
+﻿from src.ppt_quality_gate import QualityIssue
 from src.ppt_visual_critic import apply_visual_critic_patch, build_visual_critic_patch
 
 
@@ -43,7 +43,7 @@ def test_build_visual_critic_patch_collects_targets_and_actions():
     row2 = next(row for row in patch["targets"] if row["slide_id"] == "s2")
     assert row1["actions"]["layout_grid"] == "split_2"
     assert row2["actions"]["visual_patch"]["force_high_contrast"] is True
-    assert row2["actions"]["render_path"] == "pptxgenjs"
+    assert row2["actions"]["render_path"] == "svg"
 
 
 def test_apply_visual_critic_patch_mutates_slide_payload():
@@ -52,7 +52,7 @@ def test_apply_visual_critic_patch_mutates_slide_payload():
             "slide_id": "s1",
             "title": "Overview",
             "layout_grid": "grid_4",
-            "render_path": "pptxgenjs",
+            "render_path": "svg",
             "elements": [
                 {"type": "text", "content": "x" * 260},
                 {"type": "text", "content": "second"},
@@ -131,7 +131,7 @@ def test_build_visual_critic_patch_routes_structural_exception_slide_to_svg():
     assert row["actions"]["render_path"] == "svg"
 
 
-def test_build_visual_critic_patch_does_not_route_svg_from_storyline_intent_only():
+def test_build_visual_critic_patch_routes_svg_from_storyline_intent_only_in_svg_only_mode():
     slides = [
         {
             "slide_id": "s-story",
@@ -166,4 +166,5 @@ def test_build_visual_critic_patch_does_not_route_svg_from_storyline_intent_only
     )
 
     row = next(row for row in patch["targets"] if row["slide_id"] == "s-story")
-    assert row["actions"]["render_path"] != "svg"
+    assert row["actions"]["render_path"] == "svg"
+

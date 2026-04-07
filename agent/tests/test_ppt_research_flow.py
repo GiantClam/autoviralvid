@@ -56,7 +56,7 @@ async def test_research_outline_plan_flow_contract():
         title_block = next(block for block in slide.blocks if block.block_type == "title")
         assert title_block.content == slide.content_strategy.assertion
         assert slide.content_strategy.page_role in {"argument", "evidence", "transition", "summary"}
-        assert slide.content_strategy.render_path in {"pptxgenjs", "svg"}
+        assert slide.content_strategy.render_path == "svg"
 
 
 def test_content_block_rejects_placeholder_content():

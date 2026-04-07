@@ -69,6 +69,7 @@ agent.log
 
 # temp and cache
 .tmp-*
+.tmp_*
 .cache/
 .playwright-mcp/
 tmp-codex-last.txt
