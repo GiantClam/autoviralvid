@@ -1,4 +1,4 @@
-﻿"""PPT API routes: Feature A (PPT generation) + Feature B (PPT/PDF video render)."""
+"""PPT API routes: Feature A (PPT generation) + Feature B (PPT/PDF video render)."""
 
 from __future__ import annotations
 
@@ -27,6 +27,10 @@ from src.schemas.ppt_outline import OutlinePlanRequest
 from src.schemas.ppt_pipeline import PPTPipelineRequest
 from src.schemas.ppt_plan import PresentationPlanRequest
 from src.schemas.ppt_research import ResearchRequest
+from src.schemas.ppt_ai_prompt import (
+    AIPromptPPTRequest,
+    AIPromptPPTResult,
+)
 
 logger = logging.getLogger("ppt_routes")
 
@@ -119,7 +123,9 @@ async def generate_research_context(
     """Generate research context before outline planning."""
     rid = _request_id(request)
     try:
-        logger.info(f"[ppt_routes:{rid}] research gen user={user.id} topic={req.topic[:80]}")
+        logger.info(
+            f"[ppt_routes:{rid}] research gen user={user.id} topic={req.topic[:80]}"
+        )
         svc = _get_service()
         result = await svc.generate_research_context(req)
         return ApiResponse(success=True, data=result.model_dump())
@@ -205,7 +211,9 @@ async def run_pipeline(
         from src.minimax_exporter import MiniMaxExportError
 
         if isinstance(e, MiniMaxExportError):
-            logger.error(f"[ppt_routes:{rid}] pipeline failed classified: {e}", exc_info=True)
+            logger.error(
+                f"[ppt_routes:{rid}] pipeline failed classified: {e}", exc_info=True
+            )
             detail = e.to_dict()
             return ApiResponse(
                 success=False,
@@ -235,7 +243,9 @@ async def export_pptx(
         from src.minimax_exporter import MiniMaxExportError
 
         if isinstance(e, MiniMaxExportError):
-            logger.error(f"[ppt_routes:{rid}] export failed classified: {e}", exc_info=True)
+            logger.error(
+                f"[ppt_routes:{rid}] export failed classified: {e}", exc_info=True
+            )
             detail = e.to_dict()
             return ApiResponse(
                 success=False,
@@ -268,7 +278,9 @@ async def synthesize_tts(
         # 鏂囨湰闀垮害鏍￠獙
         for i, text in enumerate(req.texts):
             if len(text) > 5000:
-                raise HTTPException(status_code=400, detail=f"texts[{i}] exceeds 5000 chars")
+                raise HTTPException(
+                    status_code=400, detail=f"texts[{i}] exceeds 5000 chars"
+                )
 
         logger.info(
             f"[ppt_routes:{rid}] tts batch user={user.id} count={len(req.texts)}"
@@ -448,4 +460,74 @@ async def get_download_url(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Feature C: AI Prompt-based PPT Generation (ppt-master integration)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
+@router.post("/generate-from-prompt", response_model=ApiResponse)
+async def generate_ppt_from_prompt(
+    req: AIPromptPPTRequest,
+    request: Request,
+    user: AuthUser = Depends(get_current_user),
+):
+    """Generate PPT from AI prompt using ppt-master workflow"""
+    rid = _request_id(request)
+    try:
+        logger.info(
+            f"[ppt_routes:{rid}] ai_prompt_gen user={user.id} prompt={req.prompt[:80]} pages={req.total_pages}"
+        )
+
+        from src.ppt_master_service import PPTMasterService
+
+        service = PPTMasterService()
+        result = await service.generate_from_prompt(
+            prompt=req.prompt,
+            total_pages=req.total_pages,
+            style=req.style,
+            color_scheme=req.color_scheme,
+            language=req.language,
+            template_family=req.template_family,
+            include_images=req.include_images,
+        )
+
+        if result.get("success"):
+            return ApiResponse(success=True, data=result)
+        else:
+            return ApiResponse(
+                success=False, error=result.get("error", "Unknown error"), data=result
+            )
+    except Exception as e:
+        logger.error(f"[ppt_routes:{rid}] ai_prompt_gen failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/templates", response_model=ApiResponse)
+async def list_templates(
+    user: AuthUser = Depends(get_current_user),
+):
+    """List available ppt-master templates"""
+    try:
+        from src.ppt_master_service import PPTMasterService
+
+        service = PPTMasterService()
+        templates = service.list_available_templates()
+
+        return ApiResponse(success=True, data={"templates": templates})
+    except Exception as e:
+        logger.error(f"[ppt_routes] list_templates failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+    if not re.match(r"^[a-zA-Z0-9_-]+$", job_id):
+        raise HTTPException(status_code=400, detail="invalid job_id format")
+    try:
+        svc = _get_service()
+        download = await svc.get_download_url(job_id)
+        return ApiResponse(success=True, data=download)
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except Exception as e:
+        logger.error(f"[ppt_routes] download failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
