@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """Compare Codex CLI + SKILL.md planning vs project main-path planning."""
 
 from __future__ import annotations
@@ -18,7 +18,7 @@ AGENT_ROOT = REPO_ROOT / "agent"
 if str(AGENT_ROOT) not in sys.path:
     sys.path.insert(0, str(AGENT_ROOT))
 
-from src import ppt_service  # type: ignore  # noqa: E402
+from src import ppt_service_v2 as ppt_service  # type: ignore  # noqa: E402
 from src.minimax_exporter import export_minimax_pptx  # type: ignore  # noqa: E402
 from src.ppt_codex_skill_bridge import (  # type: ignore  # noqa: E402
     build_skill_specs_block,
@@ -528,3 +528,5 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
+

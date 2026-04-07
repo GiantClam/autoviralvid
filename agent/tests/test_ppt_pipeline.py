@@ -1,6 +1,6 @@
-import pytest
+﻿import pytest
 
-from src.ppt_service import (
+from src.ppt_service_v2 import (
     PPTService,
     _pipeline_export_timeout_sec,
     _resolve_quality_profile_id,
@@ -123,7 +123,7 @@ async def test_run_ppt_pipeline_research_timeout(monkeypatch):
     svc = PPTService()
 
     monkeypatch.setattr(
-        "src.ppt_service._pipeline_stage_timeout_sec",
+        "src.ppt_service_v2._pipeline_stage_timeout_sec",
         lambda stage, default: 1 if str(stage).lower() == "research" else default,
     )
 
@@ -144,3 +144,5 @@ async def test_run_ppt_pipeline_research_timeout(monkeypatch):
                 save_artifacts=False,
             )
         )
+
+

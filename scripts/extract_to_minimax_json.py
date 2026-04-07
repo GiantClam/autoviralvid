@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
 Extract PPT information to minimax JSON format for comparison.
 """
@@ -147,6 +147,96 @@ IMAGE_EXTENSIONS = {
     ".svg",
 }
 
+_EXTRA_TEMPLATE_KEYWORDS: Dict[str, List[str]] = {
+    "pm_government_blue_light": [
+        "government",
+        "government affairs",
+        "policy",
+        "international",
+        "diplomacy",
+        "security",
+        "strategy",
+        "government_blue",
+        "鏀垮姟",
+        "鏀垮簻",
+        "鏀跨瓥",
+        "鍥介檯鍏崇郴",
+        "澶栦氦",
+        "鍗辨満",
+        "娴峰场",
+        "鍦扮紭",
+        "瀹夊叏",
+        "鎴樼暐",
+    ],
+    "pm_government_red_light": [
+        "government",
+        "party building",
+        "authoritative",
+        "government_red",
+        "鍏氬缓",
+        "鍏氭斂",
+        "鏀跨瓥",
+        "鏀垮姟",
+    ],
+    "pm_academic_defense_light": [
+        "academic",
+        "defense",
+        "research",
+        "thesis",
+        "璇惧爞",
+        "鏁欏",
+        "瀛︽湳",
+        "璁烘枃",
+        "绛旇京",
+    ],
+    "pm_chongqing_university_light": [
+        "university",
+        "academic",
+        "defense",
+        "楂樻牎",
+        "澶у",
+        "鐮旂┒",
+        "瀛︽湳",
+    ],
+    "pm_mckinsey_light": [
+        "consulting",
+        "strategy",
+        "structured",
+        "executive presentation",
+        "鍜ㄨ",
+        "鎴樼暐",
+        "鍒嗘瀽",
+    ],
+}
+
+
+def _parse_hex_rgb(color: str) -> Optional[Tuple[int, int, int]]:
+    raw = str(color or "").strip().lstrip("#")
+    if not re.fullmatch(r"[0-9a-fA-F]{6}", raw):
+        return None
+    return int(raw[0:2], 16), int(raw[2:4], 16), int(raw[4:6], 16)
+
+
+def _is_dark_hex(color: str) -> bool:
+    rgb = _parse_hex_rgb(color)
+    if not rgb:
+        return False
+    r, g, b = rgb
+    # Relative luminance approximation on sRGB.
+    luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b
+    return luminance < 128
+
+
+def _should_count_keyword(token: str) -> bool:
+    t = str(token or "").strip().lower()
+    if not t:
+        return False
+    if re.fullmatch(r"[a-z0-9]+", t):
+        return len(t) >= 4
+    if re.search(r"[\u4e00-\u9fff]", t):
+        return len(t) >= 2
+    return len(t) >= 3
+
 
 def parse_hex_color(value: str) -> str:
     """Parse hex color value."""
@@ -191,7 +281,7 @@ def _pick_emphasis_tokens(text: str, fallback: str = "primary") -> List[str]:
         return numeric_hits[:2]
 
     words = [
-        w.strip() for w in re.split(r"[\s,，。；;:：()（）/]+", source) if w.strip()
+        w.strip() for w in re.split(r"[\s,锛屻€傦紱;:锛?)锛堬級/]+", source) if w.strip()
     ]
     for word in words:
         if len(word) >= 2:
@@ -225,6 +315,7 @@ class PPTXMinimaxExtractor:
         # Determine slide types based on content
         for slide in slides:
             self._infer_slide_type(slide)
+        template_profile = self._infer_template_profile(slides=slides, theme=theme)
 
         return {
             "title": self._extract_title_from_first_slide(slides),
@@ -235,9 +326,9 @@ class PPTXMinimaxExtractor:
             "theme_manifest": theme_manifest,
             "master_layout_manifest": master_layout_manifest,
             "media_manifest": media_manifest,
-            "template_family": "auto",
-            "template_id": "auto",
-            "skill_profile": "auto",
+            "template_family": template_profile["template_family"],
+            "template_id": template_profile["template_id"],
+            "skill_profile": template_profile["skill_profile"],
             "hardness_profile": "balanced",
             "schema_profile": "auto",
             "contract_profile": "default",
@@ -268,6 +359,121 @@ class PPTXMinimaxExtractor:
             },
             "fonts": list(fonts),
             "slides": [asdict(s) for s in slides],
+        }
+
+    def _infer_template_profile(
+        self,
+        *,
+        slides: List[Slide],
+        theme: Theme,
+    ) -> Dict[str, str]:
+        """Infer template hints from extracted deck content."""
+        fallback = {
+            "template_family": "auto",
+            "template_id": "auto",
+            "skill_profile": "auto",
+        }
+        catalog_path = (
+            Path(__file__).resolve().parents[1]
+            / "agent"
+            / "src"
+            / "ppt_specs"
+            / "template-catalog.json"
+        )
+        try:
+            catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
+        except Exception:
+            return fallback
+
+        templates = (
+            catalog.get("templates") if isinstance(catalog.get("templates"), dict) else {}
+        )
+        keyword_rules = (
+            catalog.get("keyword_rules") if isinstance(catalog.get("keyword_rules"), list) else []
+        )
+        if not templates:
+            return fallback
+
+        keywords_by_template: Dict[str, List[str]] = {}
+        for row in keyword_rules:
+            if not isinstance(row, dict):
+                continue
+            template_id = str(row.get("template") or "").strip().lower()
+            keywords = row.get("keywords")
+            if not template_id or not isinstance(keywords, list):
+                continue
+            words = keywords_by_template.setdefault(template_id, [])
+            for kw in keywords:
+                token = str(kw or "").strip()
+                if token:
+                    words.append(token)
+
+        blob_parts: List[str] = []
+        blob_parts.append(str(Path(self.pptx_path).stem or ""))
+        blob_parts.append(str(Path(self.pptx_path).name or ""))
+        blob_parts.append(self._extract_title_from_first_slide(slides))
+        for slide in slides:
+            blob_parts.extend(
+                [
+                    str(slide.title or ""),
+                    str(slide.slide_layout_name or ""),
+                    str(slide.slide_layout_path or ""),
+                    str(slide.slide_master_path or ""),
+                    str(slide.slide_theme_path or ""),
+                ]
+            )
+            for block in slide.blocks or []:
+                blob_parts.append(str(block.content or ""))
+                blob_parts.append(str(block.label or ""))
+                for emphasis in block.emphasis or []:
+                    blob_parts.append(str(emphasis or ""))
+            for element in slide.elements or []:
+                blob_parts.append(str(element.content or ""))
+        blob = " ".join(part.strip().lower() for part in blob_parts if str(part).strip())
+
+        prefers_dark = _is_dark_hex(theme.bg) and _is_dark_hex(theme.primary)
+        best_template = ""
+        best_score = 0.0
+        for template_id, template_row_raw in templates.items():
+            template = str(template_id or "").strip().lower()
+            if not template:
+                continue
+            template_row = template_row_raw if isinstance(template_row_raw, dict) else {}
+            words = list(keywords_by_template.get(template, []))
+            words.extend(_EXTRA_TEMPLATE_KEYWORDS.get(template, []))
+            score = 0.0
+            matched = 0
+            seen: set[str] = set()
+            for kw in words:
+                token = str(kw or "").strip().lower()
+                if not _should_count_keyword(token):
+                    continue
+                if token in seen:
+                    continue
+                seen.add(token)
+                if token in blob:
+                    matched += 1
+            score += float(matched)
+            tone = str(template_row.get("tone") or "").strip().lower()
+            if tone in {"light", "dark"}:
+                if prefers_dark and tone == "dark":
+                    score += 0.25
+                elif (not prefers_dark) and tone == "light":
+                    score += 0.25
+            if str(template_row.get("source_pack") or "").strip().lower() == "ppt-master":
+                score += 0.1
+            if score > best_score:
+                best_score = score
+                best_template = template
+
+        if not best_template or best_score < 1.0:
+            return fallback
+
+        chosen = templates.get(best_template) if isinstance(templates.get(best_template), dict) else {}
+        return {
+            "template_family": best_template,
+            "template_id": best_template,
+            "skill_profile": str(chosen.get("skill_profile") or "general-content"),
         }
 
     def _get_dimensions(self) -> Tuple[int, int]:
@@ -368,9 +574,9 @@ class PPTXMinimaxExtractor:
                         if "bg2" not in self.theme_color_map and "lt2" in self.theme_color_map:
                             self.theme_color_map["bg2"] = self.theme_color_map["lt2"]
 
-                        print(f"  使用主题文件: {theme_file}")
-                        print(f"  识别的主色(红色): #{theme.primary}")
-                        print(f"  识别的背景(白色): #{theme.bg}")
+                        print(f"  浣跨敤涓婚鏂囦欢: {theme_file}")
+                        print(f"  璇嗗埆鐨勪富鑹?绾㈣壊): #{theme.primary}")
+                        print(f"  璇嗗埆鐨勮儗鏅?鐧借壊): #{theme.bg}")
 
                         # If we found valid colors, use this theme
                         if theme.primary and theme.secondary:
@@ -1191,7 +1397,7 @@ class PPTXMinimaxExtractor:
         for text in unique_other_texts:
             if "%" in text or (text.isdigit() and len(text) <= 3):
                 kpi_texts.append(text)
-            elif len(text) < 30 and not any(c in text for c in "。，；："):
+            elif len(text) < 30 and not any(c in text for c in "銆傦紝锛涳細"):
                 subtitle_texts.append(text)
             else:
                 body_texts.append(text)
@@ -1265,7 +1471,7 @@ class PPTXMinimaxExtractor:
         for text in texts[1:] if len(texts) > 1 else []:
             if "%" in text or text.isdigit():
                 kpi_texts.append(text)
-            elif len(text) < 30 and not any(c in text for c in "。，；："):
+            elif len(text) < 30 and not any(c in text for c in "銆傦紝锛涳細"):
                 subtitle_texts.append(text)
             else:
                 body_texts.append(text)
@@ -1331,7 +1537,7 @@ class PPTXMinimaxExtractor:
             slide.slide_type = "toc"
         elif "总结" in title or "结束" in title or "thanks" in title.lower():
             slide.slide_type = "summary"
-        elif "part" in title or "第一" in title or "第二" in title:
+        elif "part" in title or "绗竴" in title or "绗簩" in title:
             slide.slide_type = "divider"
         else:
             slide.slide_type = "content"
@@ -1383,7 +1589,7 @@ def compare_minimax_json(ref_json: Dict, gen_json: Dict) -> Dict:
     results["details"]["ref_title"] = ref_title
     results["details"]["gen_title"] = gen_title
 
-    # 2. Slide count match (allow ±2 difference)
+    # 2. Slide count match (allow 卤2 difference)
     ref_slides = len(ref_json.get("slides", []))
     gen_slides = len(gen_json.get("slides", []))
     slide_diff = abs(ref_slides - gen_slides)
@@ -1475,23 +1681,23 @@ def main():
     import argparse
 
     parser = argparse.ArgumentParser(
-        description="从参考PPT提取信息并可选与目标JSON对比"
+        description="浠庡弬鑰働PT鎻愬彇淇℃伅骞跺彲閫変笌鐩爣JSON瀵规瘮"
     )
-    parser.add_argument("--input", "-i", default="", help="参考PPT文件路径 (必填)")
+    parser.add_argument("--input", "-i", default="", help="鍙傝€働PT鏂囦欢璺緞 (蹇呭～)")
     parser.add_argument(
         "--output",
         "-o",
         default="extracted.json",
-        help="输出JSON文件路径 (默认: extracted.json)",
+        help="杈撳嚭JSON鏂囦欢璺緞 (榛樿: extracted.json)",
     )
     parser.add_argument(
-        "--target", "-t", default="", help="对比目标JSON文件路径 (可选)"
+        "--target", "-t", default="", help="瀵规瘮鐩爣JSON鏂囦欢璺緞 (鍙€?"
     )
     parser.add_argument(
-        "--no-compare", action="store_true", help="跳过与目标JSON的对比"
+        "--no-compare", action="store_true", help="skip comparison with target JSON"
     )
     parser.add_argument(
-        "--pages", default=None, help="提取的页码范围，如 '1-10' 或 '1,3,5'"
+        "--pages", default=None, help="鎻愬彇鐨勯〉鐮佽寖鍥达紝濡?'1-10' 鎴?'1,3,5'"
     )
 
     args = parser.parse_args()
@@ -1501,8 +1707,8 @@ def main():
     if not ref_path:
         parser.error("--input is required")
 
-    print("=== 从参考PPT提取信息 ===")
-    print(f"输入文件: {ref_path}")
+    print("=== 浠庡弬鑰働PT鎻愬彇淇℃伅 ===")
+    print(f"杈撳叆鏂囦欢: {ref_path}")
     extractor = PPTXMinimaxExtractor(ref_path)
     ref_json = extractor.extract_all()
     extractor.close()
@@ -1519,7 +1725,7 @@ def main():
             else:
                 filtered_slides.append(slides[int(r) - 1])
         ref_json["slides"] = filtered_slides
-        print(f"  (已过滤页码: {args.pages})")
+        print(f"  (宸茶繃婊ら〉鐮? {args.pages})")
 
     # Save extracted JSON
     output_path = Path(args.output)
@@ -1527,10 +1733,10 @@ def main():
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(ref_json, f, ensure_ascii=False, indent=2)
 
-    print(f"已保存提取结果到: {output_path}")
-    print(f"  标题: {ref_json['title']}")
-    print(f"  幻灯片数: {len(ref_json['slides'])}")
-    print(f"  主题颜色:")
+    print(f"宸蹭繚瀛樻彁鍙栫粨鏋滃埌: {output_path}")
+    print(f"  鏍囬: {ref_json['title']}")
+    print(f"  骞荤伅鐗囨暟: {len(ref_json['slides'])}")
+    print(f"  涓婚棰滆壊:")
     print(f"    primary: #{ref_json['theme']['primary']}")
     print(f"    secondary: #{ref_json['theme']['secondary']}")
     print(f"    accent: #{ref_json['theme']['accent']}")
@@ -1539,43 +1745,48 @@ def main():
 
     # Load target JSON for comparison (unless --no-compare is set)
     if args.no_compare:
-        print("=== 对比已跳过 (--no-compare) ===")
+        print("=== 瀵规瘮宸茶烦杩?(--no-compare) ===")
         return
 
     if not str(args.target or "").strip():
-        print("=== 未提供对比目标，跳过对比 ===")
+        print("=== 鏈彁渚涘姣旂洰鏍囷紝璺宠繃瀵规瘮 ===")
         return
 
     target_path = Path(args.target)
     if not target_path.exists():
-        print(f"=== 对比目标文件不存在，跳过对比 ===")
-        print(f"  目标路径: {target_path}")
+        print(f"=== 瀵规瘮鐩爣鏂囦欢涓嶅瓨鍦紝璺宠繃瀵规瘮 ===")
+        print(f"  鐩爣璺緞: {target_path}")
         return
 
     with open(target_path, "r", encoding="utf-8") as f:
         target_json = json.load(f)
 
-    print("=== 与目标JSON对比 ===")
+    print("=== 涓庣洰鏍嘕SON瀵规瘮 ===")
     comparison = compare_minimax_json(target_json, ref_json)
 
-    print(f"总体分数: {comparison['overall_score']:.1f}%")
-    print(f"  标题匹配: {'是' if comparison['title_match'] else '否'}")
-    print(f"    参考标题: {comparison['details'].get('ref_title', '?')}")
-    print(f"    目标标题: {comparison['details'].get('gen_title', '?')}")
+    print(f"鎬讳綋鍒嗘暟: {comparison['overall_score']:.1f}%")
+    print(f"  title match: {'yes' if comparison['title_match'] else 'no'}")
+    print(f"    鍙傝€冩爣棰? {comparison['details'].get('ref_title', '?')}")
+    print(f"    鐩爣鏍囬: {comparison['details'].get('gen_title', '?')}")
     print(
-        f"  幻灯片数匹配: {'是' if comparison['slide_count_match'] else '否'} (允许±2)"
+        f"  slide count match: {'yes' if comparison['slide_count_match'] else 'no'} (allowed ±2)"
     )
-    print(f"    参考: {comparison['details'].get('ref_slide_count', '?')}")
-    print(f"    目标: {comparison['details'].get('gen_slide_count', '?')}")
-    print(f"  主题颜色匹配: {comparison['theme_colors_match']:.1f}%")
+    print(f"    鍙傝€? {comparison['details'].get('ref_slide_count', '?')}")
+    print(f"    鐩爣: {comparison['details'].get('gen_slide_count', '?')}")
+    print(f"  涓婚棰滆壊鍖归厤: {comparison['theme_colors_match']:.1f}%")
     for c in comparison["details"].get("color_comparison", []):
-        print(f"    {c['key']}: {c['ref']} vs {c['gen']} (相似度: {c['similarity']}%)")
-    print(f"  内容匹配: {comparison['content_match']:.1f}%")
-    print(f"    匹配标题数: {comparison['details'].get('title_matches', 0)}")
+        print(f"    {c['key']}: {c['ref']} vs {c['gen']} (鐩镐技搴? {c['similarity']}%)")
+    print(f"  content_match: {comparison['content_match']:.1f}%")
+    print(f"    鍖归厤鏍囬鏁? {comparison['details'].get('title_matches', 0)}")
     print()
-    print("参考PPT标题:", comparison["details"].get("ref_titles", [])[:5])
-    print("目标JSON标题:", comparison["details"].get("gen_titles", [])[:5])
+    print("鍙傝€働PT鏍囬:", comparison["details"].get("ref_titles", [])[:5])
+    print("鐩爣JSON鏍囬:", comparison["details"].get("gen_titles", [])[:5])
 
 
 if __name__ == "__main__":
     main()
+
+
+
+
+

@@ -1,4 +1,4 @@
-import src.ppt_service as ppt_service
+﻿import src.ppt_service_v2 as ppt_service
 
 
 def test_collect_visual_owner_conflicts_detects_mismatch():
@@ -30,3 +30,5 @@ def test_collect_visual_owner_conflicts_ignores_auto_values():
     }
     conflicts = ppt_service._collect_visual_owner_conflicts(slides, decision)
     assert conflicts == []
+
+

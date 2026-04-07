@@ -1,4 +1,4 @@
-"""PPT service: generation, export, enhancement and render lifecycle."""
+﻿"""PPT service: generation, export, enhancement and render lifecycle."""
 
 from __future__ import annotations
 
@@ -97,10 +97,8 @@ from src.ppt_palette_catalog import canonicalize_palette_key
 from src.ppt_reference_contract import audit_reference_contract
 from src.ppt_content_layout_profiles import build_content_layout_plan
 from src.ppt_storyline_planning import (
-    build_instructional_topic_points,
     build_research_storyline_notes,
     expand_semantic_support_points,
-    is_instructional_context,
 )
 from src.ppt_visual_identity import (
     canonicalize_theme_recipe,
@@ -166,13 +164,13 @@ def _derive_deck_archetype_profile(
                 "lesson",
                 "education",
                 "training",
-                "课堂",
-                "教学",
-                "教育",
-                "课程",
-                "培训",
-                "高中",
-                "学生",
+                "璇惧爞",
+                "鏁欏",
+                "鏁欒偛",
+                "璇剧▼",
+                "鍩硅",
+                "楂樹腑",
+                "瀛︾敓",
             )
         )
     ):
@@ -182,11 +180,11 @@ def _derive_deck_archetype_profile(
         for token in (
             "investor",
             "pitch",
-            "融资",
-            "路演",
+            "铻嶈祫",
+            "璺紨",
             "marketing",
             "campaign",
-            "品牌",
+            "鍝佺墝",
         )
     ):
         return "consulting_argument"
@@ -195,8 +193,8 @@ def _derive_deck_archetype_profile(
         for token in (
             "architecture",
             "engineering",
-            "技术评审",
-            "架构评审",
+            "tech_assessment",
+            "鏋舵瀯璇勫",
             "technical review",
         )
     ):
@@ -430,7 +428,10 @@ def _assert_skill_runtime_success(
 
 
 def _resolve_export_channel(requested: str | None) -> str:
-    configured = str(_env_value("PPT_EXPORT_CHANNEL", "local")).strip().lower()
+    configured_raw = str(_env_value("PPT_EXPORT_CHANNEL", "local")).strip().lower()
+    if configured_raw == "remote":
+        raise ValueError("remote channel is disabled")
+    configured = configured_raw
     if configured not in {"local", "auto"}:
         configured = "local"
     channel = str(requested or "auto").strip().lower()
@@ -439,9 +440,7 @@ def _resolve_export_channel(requested: str | None) -> str:
     if channel == "auto":
         channel = "local" if configured == "auto" else configured
     if channel == "remote":
-        raise ValueError(
-            "remote export_channel is not supported in drawingml-only export flow"
-        )
+        raise ValueError("remote channel is disabled")
     if channel != "local":
         return "local"
     return channel
@@ -646,7 +645,7 @@ def _resolve_quality_profile_id(
     if any(
         token in text
         for token in (
-            "抢术?",
+            "技术",
             "架构评审",
             "tech review",
             "architecture review",
@@ -659,7 +658,7 @@ def _resolve_quality_profile_id(
         for token in (
             "营销",
             "品牌",
-            "发布?",
+            "发布",
             "marketing",
             "campaign",
             "launch",
@@ -2180,7 +2179,7 @@ def _normalize_reference_slide_type(
         return "summary"
     if any(token in title for token in ("目录", "contents", "content")):
         return "toc"
-    if any(token in title for token in ("part", "section", "章节", "部分")):
+    if any(token in title for token in ("part", "section", "绔犺妭", "閮ㄥ垎")):
         return "divider"
     return "content"
 
@@ -2352,50 +2351,76 @@ def _build_render_payload_from_reference_desc(
                 },
             ]
         normalized_blocks = _assign_layout_card_ids(layout_grid, normalized_blocks)
+        slide_template_family = str(
+            raw.get("template_family") or raw.get("template_id") or ""
+        ).strip().lower()
+        if slide_template_family in {"", "auto"}:
+            slide_template_family = ""
+        slide_skill_profile = str(raw.get("skill_profile") or "").strip()
+        template_whitelist = [
+            str(item or "").strip().lower()
+            for item in (
+                raw.get("template_family_whitelist")
+                if isinstance(raw.get("template_family_whitelist"), list)
+                else []
+            )
+            if str(item or "").strip()
+        ]
+        if not template_whitelist and slide_template_family:
+            template_whitelist = [slide_template_family]
 
-        payload_slides.append(
-            {
-                "id": slide_id,
-                "slide_id": slide_id,
-                "page_number": int(raw.get("page_number") or (idx + 1)),
-                "slide_type": normalized_slide_type,
-                "page_type": page_type,
-                "subtype": (
-                    "section"
-                    if normalized_slide_type == "divider"
-                    else str(raw.get("subtype") or page_type or "content")
-                ),
-                "layout_grid": layout_grid,
-                "bg_style": str(raw.get("bg_style") or "light"),
-                "title": title,
-                "narration": str(
-                    raw.get("notes_for_designer") or raw.get("narration") or ""
-                ),
-                "image_keywords": [title] if title else [],
-                "blocks": normalized_blocks,
-                "elements": normalized_elements,
-                "shapes": raw.get("shapes")
-                if isinstance(raw.get("shapes"), list)
-                else [],
-                "visual": raw.get("visual")
-                if isinstance(raw.get("visual"), dict)
-                else {},
-                "render_path": str(raw.get("render_path") or "svg"),
-                "slide_layout_path": str(raw.get("slide_layout_path") or ""),
-                "slide_layout_name": str(raw.get("slide_layout_name") or ""),
-                "slide_master_path": str(raw.get("slide_master_path") or ""),
-                "slide_theme_path": str(raw.get("slide_theme_path") or ""),
-                "media_refs": raw.get("media_refs")
-                if isinstance(raw.get("media_refs"), list)
-                else [],
-            }
-        )
+        payload_slide: Dict[str, Any] = {
+            "id": slide_id,
+            "slide_id": slide_id,
+            "page_number": int(raw.get("page_number") or (idx + 1)),
+            "slide_type": normalized_slide_type,
+            "page_type": page_type,
+            "subtype": (
+                "section"
+                if normalized_slide_type == "divider"
+                else str(raw.get("subtype") or page_type or "content")
+            ),
+            "layout_grid": layout_grid,
+            "bg_style": str(raw.get("bg_style") or "light"),
+            "title": title,
+            "narration": str(raw.get("notes_for_designer") or raw.get("narration") or ""),
+            "image_keywords": [title] if title else [],
+            "blocks": normalized_blocks,
+            "elements": normalized_elements,
+            "shapes": raw.get("shapes") if isinstance(raw.get("shapes"), list) else [],
+            "visual": raw.get("visual") if isinstance(raw.get("visual"), dict) else {},
+            "render_path": str(raw.get("render_path") or "svg"),
+            "slide_layout_path": str(raw.get("slide_layout_path") or ""),
+            "slide_layout_name": str(raw.get("slide_layout_name") or ""),
+            "slide_master_path": str(raw.get("slide_master_path") or ""),
+            "slide_theme_path": str(raw.get("slide_theme_path") or ""),
+            "media_refs": raw.get("media_refs")
+            if isinstance(raw.get("media_refs"), list)
+            else [],
+        }
+        if slide_template_family:
+            payload_slide["template_family"] = slide_template_family
+            payload_slide["template_id"] = slide_template_family
+            payload_slide["template_lock"] = True
+        if slide_skill_profile:
+            payload_slide["skill_profile"] = slide_skill_profile
+        if template_whitelist:
+            payload_slide["template_family_whitelist"] = template_whitelist
+            payload_slide["template_candidates"] = template_whitelist
+        payload_slides.append(payload_slide)
 
     theme = (
         reference_desc.get("theme")
         if isinstance(reference_desc.get("theme"), dict)
         else {}
     )
+    deck_template_family = str(
+        reference_desc.get("template_family") or reference_desc.get("template_id") or ""
+    ).strip().lower()
+    if deck_template_family in {"", "auto"}:
+        deck_template_family = ""
+    deck_skill_profile = str(reference_desc.get("skill_profile") or "").strip()
+
     out: Dict[str, Any] = {
         "title": str(reference_desc.get("title") or fallback_title or "Reference Deck"),
         "theme": {
@@ -2447,6 +2472,11 @@ def _build_render_payload_from_reference_desc(
         else [],
         "source_pptx_path": str(reference_desc.get("source_pptx_path") or ""),
     }
+    if deck_template_family:
+        out["template_family"] = deck_template_family
+        out["template_id"] = deck_template_family
+    if deck_skill_profile:
+        out["skill_profile"] = deck_skill_profile
     return out
 
 
@@ -2462,7 +2492,7 @@ def _export_reference_reconstruct_locally(
             f"reference reconstruct script not found: {generator_script}"
         )
 
-    use_source_aligned = _env_flag("PPT_REFERENCE_RECONSTRUCT_SOURCE_ALIGNED", "false")
+    use_source_aligned = _env_flag("PPT_REFERENCE_RECONSTRUCT_SOURCE_ALIGNED", "true")
     with tempfile.TemporaryDirectory(prefix="ppt-ref-reconstruct-") as temp_dir:
         temp_path = Path(temp_dir)
         input_json_path = temp_path / "reference_desc.json"
@@ -2632,15 +2662,15 @@ _ABSTRACT_IMAGE_INTENT_TOKENS = {
     "capability",
     "concept",
     "roadmap",
-    "策略",
-    "框架",
-    "流程",
-    "架构",
-    "模型",
-    "机制",
-    "能力",
-    "平台",
-    "路线?",
+    "绛栫暐",
+    "妗嗘灦",
+    "娴佺▼",
+    "鏋舵瀯",
+    "妯″瀷",
+    "鏈哄埗",
+    "鑳藉姏",
+    "骞冲彴",
+    "璺嚎?",
 }
 
 _ICON_BG_TOKEN_MAP: Dict[str, str] = {
@@ -2655,11 +2685,11 @@ _ICON_BG_TOKEN_MAP: Dict[str, str] = {
     "workflow": "?",
     "strategy": "?",
     "roadmap": "?",
-    "数据": "?",
-    "增长": "?",
-    "流程": "?",
-    "架构": "?",
-    "安全": "S",
+    "鏁版嵁": "?",
+    "澧為暱": "?",
+    "娴佺▼": "?",
+    "鏋舵瀯": "?",
+    "瀹夊叏": "S",
 }
 
 
@@ -2741,7 +2771,7 @@ def _build_image_search_query(
         if len(parts) >= 4:
             break
     if hl == "zh-cn":
-        return " ".join(parts) if parts else "科技 商务 场景 ?"
+        return " ".join(parts) if parts else "绉戞妧 鍟嗗姟 鍦烘櫙 ?"
     return " ".join(parts) if parts else "technology business scene image"
 
 
@@ -3442,7 +3472,7 @@ def _apply_layout_solution_actions(
     }
 
 
-_SPLIT_TEXT_RE = re.compile(r"[;?\n?!?]+")
+_SPLIT_TEXT_RE = re.compile(r"[;；。！？?!\n\r]+")
 _TEXTUAL_BLOCK_TYPES = {
     "title",
     "subtitle",
@@ -3468,8 +3498,8 @@ _PLACEHOLDER_TEXT_PATTERNS: List[re.Pattern[str]] = [
         r"\b(?:table of contents|monitoring view|thank you)\b", flags=re.IGNORECASE
     ),
     re.compile(r"^\[(?:xls|xlsx|pdf|doc|docx|ppt|pptx)\]\s*", flags=re.IGNORECASE),
-    re.compile(r"(?:已编辑汇总|编辑稿?\s*\d+\s*次?)"),
-    re.compile(r"待补充|请填写|占位词?"),
+    re.compile(r"(?:编辑记录|修订记录)\s*\d+\s*次?"),
+    re.compile(r"(?:待补充|请补充|占位文本)"),
 ]
 _PLACEHOLDER_LONE_TOKENS = {
     "slide",
@@ -3482,6 +3512,8 @@ _PLACEHOLDER_LONE_TOKENS = {
     "thank you",
     "table of contents",
     "monitoring view",
+    "待补充",
+    "占位",
 }
 
 
@@ -3494,15 +3526,15 @@ def _normalize_text_key(text: str) -> str:
 def _split_topic_focus(topic: str, *, prefer_zh: bool) -> tuple[str, str]:
     text = re.sub(r"\s+", " ", str(topic or "").strip())
     if not text:
-        return ("slide" if not prefer_zh else "主题", "")
+        return ("slide" if not prefer_zh else "涓婚", "")
     if prefer_zh:
         parts = re.split(r"[?]", text, maxsplit=1)
         subject = str(parts[0] if parts else text).strip()
         focus = str(parts[1] if len(parts) > 1 else "").strip()
         subject = (
-            re.sub(r"^(解码|理解|认识|解析|探究)\s*", "", subject).strip() or subject
+            re.sub(r"^(瑙ｇ爜|鐞嗚В|璁よ瘑|瑙ｆ瀽|鎺㈢┒)\s*", "", subject).strip() or subject
         )
-        subject = subject[:28] if subject else "主题"
+        subject = subject[:28] if subject else "涓婚"
         focus = focus[:40]
         return subject, focus
     parts = re.split(r"[:|-]", text, maxsplit=1)
@@ -3515,7 +3547,7 @@ def _collapse_redundant_text(text: str) -> str:
     cleaned = str(text or "").strip()
     if not cleaned:
         return ""
-    cleaned = re.sub(r"([\u4e00-\u9fff]{4,})(?:[?。；;\s]+\1)+", r"\1", cleaned)
+    cleaned = re.sub(r"([\u4e00-\u9fff]{4,})(?:[?銆傦紱;\s]+\1)+", r"\1", cleaned)
     cleaned = re.sub(
         r"\b([A-Za-z]+(?:\s+[A-Za-z]+){1,4})\s+\1\b",
         r"\1",
@@ -3691,16 +3723,16 @@ def _sanitize_placeholder_text(text: str, *, prefer_zh: bool) -> str:
             ),
             "",
         ),
-        (re.compile(r"待补充|请填写|占位词?"), ""),
+        (re.compile(r"(?:待补充|请补充|占位文本)"), ""),
     ]
     for pattern, target in replacements:
         cleaned = pattern.sub(target, cleaned)
     if re.match(
-        r"^\s*(?:·|•|\-|—|–)\s+",
+        r"^\s*(?:[-*•·]|\d+[.)])\s+",
         cleaned,
     ):
         return ""
-    if re.search(r"(?:已编辑汇总|编辑稿?\s*\d+\s*次?)", cleaned):
+    if re.search(r"(?:编辑记录|修订记录)\s*\d+\s*次?", cleaned):
         return ""
     if re.fullmatch(r"\d{6,}", cleaned):
         return ""
@@ -3709,7 +3741,7 @@ def _sanitize_placeholder_text(text: str, *, prefer_zh: bool) -> str:
         cjk_count = len(re.findall(r"[\u4e00-\u9fff]", cleaned))
         if cjk_count > 0 and cjk_count <= max(4, int(latin_count * 0.18)):
             cleaned = re.sub(r"[\u4e00-\u9fff]+", " ", cleaned)
-    cleaned = re.sub(r"\s{2,}", " ", cleaned).strip(" -:;,.，；")
+    cleaned = re.sub(r"\s{2,}", " ", cleaned).strip(" -:;,.锛岋紱")
     cleaned = _collapse_redundant_text(cleaned)
     if _looks_mojibake(cleaned, allow_repair=False):
         return ""
@@ -3725,7 +3757,7 @@ def _visual_units_of_text(text: str) -> float:
             units += 1.7
         elif ch.isspace():
             units += 0.45
-        elif ch in ",.;:!?，；：！？":
+        elif ch in ",.;:!?":
             units += 0.55
         else:
             units += 1.0
@@ -3743,7 +3775,7 @@ def _clip_text_by_visual_units(text: str, *, max_units: float, suffix: str) -> s
             step = 1.7
         elif ch.isspace():
             step = 0.45
-        elif ch in ",.;:!?，；：！？":
+        elif ch in ",.;:!?":
             step = 0.55
         else:
             step = 1.0
@@ -3751,7 +3783,7 @@ def _clip_text_by_visual_units(text: str, *, max_units: float, suffix: str) -> s
             break
         out_chars.append(ch)
         used += step
-    clipped = "".join(out_chars).rstrip(" ,，；;?!?！？")
+    clipped = "".join(out_chars).rstrip(" ,锛岋紱;?!?锛侊紵")
     return f"{clipped}{suffix}" if clipped else suffix
 
 
@@ -3770,11 +3802,8 @@ def _clip_text_for_visual_budget(
     if normalized_role == "title":
         limit = 34 if prefer_zh else 72
         if normalized_slide_type in {"cover", "summary", "toc", "divider", "hero_1"}:
-            limit = 42 if prefer_zh else 90
-        # Remove repeated segments in long titles to prevent clipping/crowding.
-        title_parts = [
-            part.strip() for part in re.split(r"[?|-]", cleaned) if part.strip()
-        ]
+            limit += 4
+        title_parts = [part.strip() for part in re.split(r"[：:|-]", cleaned) if part.strip()]
         if len(title_parts) >= 2:
             deduped_parts: List[str] = []
             seen_keys: set[str] = set()
@@ -3785,9 +3814,7 @@ def _clip_text_for_visual_budget(
                 seen_keys.add(key)
                 deduped_parts.append(part)
             if deduped_parts:
-                cleaned = (
-                    "；".join(deduped_parts) if prefer_zh else ": ".join(deduped_parts)
-                )
+                cleaned = ": ".join(deduped_parts)
     elif normalized_role == "subtitle":
         limit = 40 if prefer_zh else 116
     else:
@@ -3796,14 +3823,14 @@ def _clip_text_for_visual_budget(
         return cleaned
     parts = [
         str(part or "").strip()
-        for part in re.split(r"[??!?！？\n]+", cleaned)
+        for part in re.split(r"[。！？!?;\n]+", cleaned)
         if str(part or "").strip()
     ]
     candidate = parts[0] if parts else cleaned
     if len(parts) >= 2 and _visual_units_of_text(candidate) < float(limit) * 0.62:
-        joiner = "，" if prefer_zh else ", "
+        joiner = ", "
         candidate = f"{candidate}{joiner}{parts[1]}"
-    suffix = "…" if prefer_zh else "..."
+    suffix = "..."
     return _clip_text_by_visual_units(candidate, max_units=float(limit), suffix=suffix)
 
 
@@ -3969,12 +3996,12 @@ def _pick_input_derived_point(
         )
     seq = max(1, int(index) + 1)
     if prefer_zh:
-        suffixes = ["关键?", "机制", "案例", "影响", "结论", "行动建议"]
+        suffixes = ["鍏抽敭?", "鏈哄埗", "妗堜緥", "褰卞搷", "缁撹", "琛屽姩寤鸿"]
         synthetic_candidates = [
             f"{base}{suffixes[(seq - 1 + off) % len(suffixes)]}"
             for off in range(len(suffixes))
         ]
-        synthetic_candidates.extend([f"{base}要点", f"{base}启示"])
+        synthetic_candidates.extend([f"{base}瑕佺偣", f"{base}鍚ず"])
     else:
         suffixes = [
             "Key Point",
@@ -4013,7 +4040,7 @@ def _chart_data_from_keypoints(
         if len(labels) >= 4:
             break
     if len(labels) < 3:
-        base_label = labels[0] if labels else ("指标" if prefer_zh else "Item")
+        base_label = labels[0] if labels else ("鎸囨爣" if prefer_zh else "Item")
         while len(labels) < 3:
             idx = len(labels) + 1
             candidate = f"{base_label}{idx}" if prefer_zh else f"{base_label} {idx}"
@@ -4037,7 +4064,7 @@ def _chart_data_from_keypoints(
         "labels": labels,
         "datasets": [
             {
-                "label": "关键指标" if prefer_zh else "Key metric",
+                "label": "鍏抽敭鎸囨爣" if prefer_zh else "Key metric",
                 "data": points[: len(labels)],
             }
         ],
@@ -4049,7 +4076,7 @@ def _table_data_from_keypoints(
     *,
     prefer_zh: bool,
 ) -> List[List[str]]:
-    rows: List[List[str]] = [["序号", "要点"] if prefer_zh else ["No.", "Point"]]
+    rows: List[List[str]] = [["搴忓彿", "瑕佺偣"] if prefer_zh else ["No.", "Point"]]
     seen = set()
     for idx, item in enumerate(keypoints):
         text = str(item or "").strip()
@@ -4061,7 +4088,7 @@ def _table_data_from_keypoints(
         if len(rows) >= 5:
             break
     if len(rows) == 1:
-        rows.append(["1", "核心信息" if prefer_zh else "Key idea"])
+        rows.append(["1", "鏍稿績淇℃伅" if prefer_zh else "Key idea"])
     return rows
 
 
@@ -4230,7 +4257,7 @@ def _make_visual_contract_block(
         if str(item or "").strip()
     ]
     requested_set = set(requested)
-    label = keypoints[0] if keypoints else ("核心指标" if prefer_zh else "Key metric")
+    label = keypoints[0] if keypoints else ("鏍稿績鎸囨爣" if prefer_zh else "Key metric")
     education_like = any(
         token in str(semantic_text or "").lower()
         for token in (
@@ -4278,7 +4305,7 @@ def _make_visual_contract_block(
 
     if target_type == "image":
         image_title = (
-            label[:48] if label else ("核心视觉" if prefer_zh else "Visual Focus")
+            label[:48] if label else ("鏍稿績瑙嗚" if prefer_zh else "Visual Focus")
         )
         image_keywords = [
             item[:24] for item in keypoints[:4] if str(item or "").strip()
@@ -4348,7 +4375,7 @@ def _make_visual_contract_block(
         }
     if target_type == "image":
         image_title = (
-            label[:48] if label else ("核心视觉" if prefer_zh else "Visual Focus")
+            label[:48] if label else ("鏍稿績瑙嗚" if prefer_zh else "Visual Focus")
         )
         image_keywords = [
             item[:24] for item in keypoints[:4] if str(item or "").strip()
@@ -4376,8 +4403,8 @@ def _make_visual_contract_block(
             seed_steps = _dedup_strings([*steps, label], limit=4)
             while len(seed_steps) < 3:
                 idx = len(seed_steps) + 1
-                seed = str(label or ("步骤" if prefer_zh else "Step")).strip() or (
-                    "步骤" if prefer_zh else "Step"
+                seed = str(label or ("姝ラ" if prefer_zh else "Step")).strip() or (
+                    "姝ラ" if prefer_zh else "Step"
                 )
                 seed_steps.append(f"{seed}{idx}" if prefer_zh else f"{seed} {idx}")
             steps = seed_steps[:4]
@@ -4594,7 +4621,11 @@ def _collect_strict_contract_issues(
         if isinstance(slide.get("template_family_whitelist"), list)
         else []
     )
-    resolved_template = ""
+    resolved_template = str(
+        slide.get("template_family") or slide.get("template_id") or ""
+    ).strip().lower()
+    if resolved_template in {"", "auto"}:
+        resolved_template = ""
     slide_type_hint = (
         str(slide.get("slide_type") or "content").strip().lower() or "content"
     )
@@ -4604,12 +4635,19 @@ def _collect_strict_contract_issues(
         .lower()
         or "split_2"
     )
-    for candidate in whitelist:
-        if _template_family_supports_slide(
-            candidate, slide_type=slide_type_hint, layout_grid=layout_hint
-        ):
-            resolved_template = candidate
-            break
+    if resolved_template and not _template_family_supports_slide(
+        resolved_template,
+        slide_type=slide_type_hint,
+        layout_grid=layout_hint,
+    ):
+        resolved_template = ""
+    if not resolved_template:
+        for candidate in whitelist:
+            if _template_family_supports_slide(
+                candidate, slide_type=slide_type_hint, layout_grid=layout_hint
+            ):
+                resolved_template = candidate
+                break
     if not resolved_template:
         resolved_template = _resolve_template_family({**slide, "blocks": blocks})
     profiles = _template_profiles(resolved_template)
@@ -5390,6 +5428,7 @@ def _ensure_content_contract(
         block
         for block in fixed
         if _as_block_type(block) == "title"
+        or _as_block_type(block) in _VISUAL_BLOCK_TYPES
         or _normalize_text_key(_extract_block_text(block)) != title_key
     ]
     if (not strict_contract) and (not terminal_slide):
@@ -5678,6 +5717,10 @@ def _ensure_content_contract(
                 if quality_key:
                     seen_quality_keys.add(quality_key)
                 continue
+            if btype in _VISUAL_BLOCK_TYPES:
+                # Keep visual anchors even when textual labels repeat.
+                rewritten.append(block)
+                continue
             # Duplicate non-title text: rewrite textual blocks first, drop only if
             # no unique replacement is available.
             if btype in _TEXTUAL_BLOCK_TYPES:
@@ -5710,6 +5753,33 @@ def _ensure_content_contract(
                     continue
             continue
         fixed = _dedupe_blocks(rewritten)
+
+    if (not strict_contract) and (not terminal_slide):
+        required_chart_like = (
+            ("chart" in set(contract_visual_types) or "kpi" in set(contract_visual_types))
+            or any(
+                ("chart" in set(group) or "kpi" in set(group))
+                for group in (required_groups or [])
+                if isinstance(group, list)
+            )
+        )
+        if required_chart_like:
+            has_chart_or_kpi = any(
+                _as_block_type(block) in {"chart", "kpi"} for block in fixed
+            )
+            if not has_chart_or_kpi:
+                fixed.append(
+                    _make_visual_contract_block(
+                        preferred_types=["chart", "kpi"],
+                        keypoints=keypoints,
+                        numeric_values=numeric_values,
+                        prefer_zh=prefer_zh,
+                        semantic_text=semantic_text,
+                        card_id="contract_visual_enforce_1",
+                        position="right",
+                    )
+                )
+                fixed = _dedupe_blocks(fixed)
 
     for idx, block in enumerate(fixed):
         block["block_type"] = _as_block_type(block) or "text"
@@ -5842,15 +5912,15 @@ def _apply_visual_orchestration(render_payload: Dict[str, Any]) -> Dict[str, Any
                 "school",
                 "student",
                 "curriculum",
-                "课堂",
-                "教学",
-                "课程",
-                "教育",
-                "培训",
-                "高中",
-                "学生",
-                "教师",
-                "学科",
+                "璇惧爞",
+                "鏁欏",
+                "璇剧▼",
+                "鏁欒偛",
+                "鍩硅",
+                "楂樹腑",
+                "瀛︾敓",
+                "鏁欏笀",
+                "瀛︾",
             )
         )
 
@@ -5997,15 +6067,36 @@ def _apply_visual_orchestration(render_payload: Dict[str, Any]) -> Dict[str, Any
                     require_image_anchor=require_image_anchor,
                     strict_contract=False,
                 )
-                normalized = _ensure_content_contract(
-                    normalized,
-                    min_content_blocks=min_content_blocks,
-                    blank_area_max_ratio=float(
-                        quality_cfg.get("blank_area_max_ratio") or 0.45
-                    ),
-                    require_image_anchor=require_image_anchor,
-                    strict_contract=True,
-                )
+                try:
+                    normalized = _ensure_content_contract(
+                        normalized,
+                        min_content_blocks=min_content_blocks,
+                        blank_area_max_ratio=float(
+                            quality_cfg.get("blank_area_max_ratio") or 0.45
+                        ),
+                        require_image_anchor=require_image_anchor,
+                        strict_contract=True,
+                    )
+                except ValueError as strict_exc:
+                    strict_detail = str(strict_exc or "").strip().lower()
+                    still_recoverable = "strict_content_contract_unmet" in strict_detail and (
+                        "missing_required_group" in strict_detail
+                        or "insufficient_visual_blocks" in strict_detail
+                        or "missing_visual_anchor_block" in strict_detail
+                    )
+                    if not still_recoverable:
+                        raise
+                    # Keep deterministic non-strict repaired output instead of
+                    # failing the whole pipeline on template-group mismatch.
+                    normalized = _ensure_content_contract(
+                        normalized,
+                        min_content_blocks=min_content_blocks,
+                        blank_area_max_ratio=float(
+                            quality_cfg.get("blank_area_max_ratio") or 0.45
+                        ),
+                        require_image_anchor=require_image_anchor,
+                        strict_contract=False,
+                    )
         return normalized
 
     family_convergence_enabled = bool(family_cfg.get("enabled", False))
@@ -6280,12 +6371,12 @@ def _apply_visual_orchestration(render_payload: Dict[str, Any]) -> Dict[str, Any
             while len(text_non_title) < 2:
                 idx_hint = len(text_non_title) + 1
                 filler = (
-                    f"{seed_text}要点{idx_hint}"
+                    f"{seed_text}瑕佺偣{idx_hint}"
                     if prefer_zh
                     else f"{seed_text} key point {idx_hint}"
                 ).strip()
                 if not filler:
-                    filler = "核心要点" if prefer_zh else "Key point"
+                    filler = "鏍稿績瑕佺偣" if prefer_zh else "Key point"
                 mutable_blocks.append(
                     {
                         "block_type": "body",
@@ -6310,7 +6401,8 @@ def _apply_visual_orchestration(render_payload: Dict[str, Any]) -> Dict[str, Any
                 str(slide_obj.get("layout_grid") or "split_2"),
                 _dedupe_blocks(mutable_blocks),
             )
-            slide_obj["template_lock"] = False
+            if not str(slide_obj.get("template_family") or "").strip():
+                slide_obj["template_lock"] = False
 
     _rebalance_utility_slides()
 
@@ -7203,12 +7295,12 @@ def _apply_visual_orchestration(render_payload: Dict[str, Any]) -> Dict[str, Any
                     "education",
                     "lesson",
                     "training",
-                    "课堂",
-                    "教学",
-                    "课程",
-                    "教育",
-                    "高中",
-                    "学生",
+                    "璇惧爞",
+                    "鏁欏",
+                    "璇剧▼",
+                    "鏁欒偛",
+                    "楂樹腑",
+                    "瀛︾敓",
                 )
             )
 
@@ -8604,9 +8696,9 @@ async def _search_serper_web(
     )
 
 
-_GENERIC_AUDIENCE = {"general", "all", "public", "everyone", "大众", "通用", "全部人群"}
-_GENERIC_PURPOSE = {"presentation", "general", "汇报", "演示", "展示"}
-_GENERIC_STYLE = {"professional", "default", "normal", "商务", "专业", "常规"}
+_GENERIC_AUDIENCE = {"general", "all", "public", "everyone", "澶т紬", "閫氱敤", "鍏ㄩ儴浜虹兢"}
+_GENERIC_PURPOSE = {"presentation", "general", "姹囨姤", "婕旂ず", "灞曠ず"}
+_GENERIC_STYLE = {"professional", "default", "normal", "鍟嗗姟", "涓撲笟", "甯歌"}
 
 
 def _is_generic_slot(value: str, generic: set[str]) -> bool:
@@ -8680,10 +8772,10 @@ def _build_research_gaps(req: ResearchRequest, *, is_zh: bool) -> List[ResearchG
             ResearchGap(
                 code="audience",
                 severity="high",
-                message="受众描述过于泛化，缺少明确角色与决策层级?"
+                message="鍙椾紬鎻忚堪杩囦簬娉涘寲锛岀己灏戞槑纭鑹蹭笌鍐崇瓥灞傜骇?"
                 if is_zh
                 else "Audience definition is too generic; role and decision level are missing.",
-                query_hint="目标受众 分层" if is_zh else "target audience segmentation",
+                query_hint="鐩爣鍙椾紬 鍒嗗眰" if is_zh else "target audience segmentation",
             )
         )
     if _is_generic_slot(req.purpose, _GENERIC_PURPOSE):
@@ -8691,10 +8783,10 @@ def _build_research_gaps(req: ResearchRequest, *, is_zh: bool) -> List[ResearchG
             ResearchGap(
                 code="purpose",
                 severity="medium",
-                message="演示目标不够明确，难以确定叙事重?"
+                message="婕旂ず鐩爣涓嶅鏄庣‘锛岄毦浠ョ‘瀹氬彊浜嬮噸?"
                 if is_zh
                 else "Presentation objective is not specific enough for clear narrative focus.",
-                query_hint="商业目标 KPI" if is_zh else "business objective KPI",
+                query_hint="鍟嗕笟鐩爣 KPI" if is_zh else "business objective KPI",
             )
         )
     if _is_generic_slot(req.style_preference, _GENERIC_STYLE):
@@ -8702,10 +8794,10 @@ def _build_research_gaps(req: ResearchRequest, *, is_zh: bool) -> List[ResearchG
             ResearchGap(
                 code="style",
                 severity="low",
-                message="视觉风格偏好不明确，建议补充调或品牌约束?"
+                message="瑙嗚椋庢牸鍋忓ソ涓嶆槑纭紝寤鸿琛ュ厖璋冩垨鍝佺墝绾︽潫?"
                 if is_zh
                 else "Visual style preference is vague; add tone or brand constraints.",
-                query_hint="品牌视觉 风格" if is_zh else "brand visual style",
+                query_hint="鍝佺墝瑙嗚 椋庢牸" if is_zh else "brand visual style",
             )
         )
     if not req.required_facts:
@@ -8713,10 +8805,10 @@ def _build_research_gaps(req: ResearchRequest, *, is_zh: bool) -> List[ResearchG
             ResearchGap(
                 code="required_facts",
                 severity="high",
-                message="缺少必须展示的数据点，图表型依据不足?"
+                message="缂哄皯蹇呴』灞曠ず鐨勬暟鎹偣锛屽浘琛ㄥ瀷渚濇嵁涓嶈冻?"
                 if is_zh
                 else "Missing must-have facts, limiting chart and evidence selection.",
-                query_hint="核心指标 数据" if is_zh else "core metrics data",
+                query_hint="鏍稿績鎸囨爣 鏁版嵁" if is_zh else "core metrics data",
             )
         )
     if not str(req.time_range or "").strip():
@@ -8724,10 +8816,10 @@ def _build_research_gaps(req: ResearchRequest, *, is_zh: bool) -> List[ResearchG
             ResearchGap(
                 code="time_range",
                 severity="medium",
-                message="缺少时间范围，趋势数据无法限定口?"
+                message="缂哄皯鏃堕棿鑼冨洿锛岃秼鍔挎暟鎹棤娉曢檺瀹氬彛?"
                 if is_zh
                 else "Time range is missing, making trend framing ambiguous.",
-                query_hint="??趋势" if is_zh else "last 3 years trend",
+                query_hint="??瓒嬪娍" if is_zh else "last 3 years trend",
             )
         )
     if not str(req.geography or "").strip():
@@ -8735,10 +8827,10 @@ def _build_research_gaps(req: ResearchRequest, *, is_zh: bool) -> List[ResearchG
             ResearchGap(
                 code="geography",
                 severity="low",
-                message="缺少地域范围，市场数据可能口径不丢致?"
+                message="缂哄皯鍦板煙鑼冨洿锛屽競鍦烘暟鎹彲鑳藉彛寰勪笉涓㈣嚧?"
                 if is_zh
                 else "Geographic scope is missing; market figures may be inconsistent.",
-                query_hint="中国 市场" if is_zh else "regional market",
+                query_hint="涓浗 甯傚満" if is_zh else "regional market",
             )
         )
     return gaps
@@ -8756,11 +8848,11 @@ def _normalize_research_topic(topic: str, *, is_zh: bool) -> str:
         .strip()
     )
     if is_zh:
-        for marker in ("主题为", "主题是", "主题:", "主题：", "关于", "围绕"): 
+        for marker in ("主题是", "主题为", "主题:", "主题：", "关于", "围绕"):
             if marker not in text:
                 continue
             candidate = text.split(marker, 1)[1].strip().strip("\"' ")
-            candidate = re.split(r"[。！？?]", candidate)[0].strip()
+            candidate = re.split(r"[。！？!?]", candidate)[0].strip()
             if candidate:
                 return candidate[:120]
     quoted = re.findall(r"[\"']([^\"']{3,160})[\"']", text)
@@ -8769,7 +8861,7 @@ def _normalize_research_topic(topic: str, *, is_zh: bool) -> str:
         if candidate:
             return candidate[:120]
     text = re.sub(
-        r"^(请|帮我)?\s*(制作|生成|创建|撰写|做)\s*(一份|一个|一套)?",
+        r"^(请帮我)?\s*(制作|生成|创建|撰写|做)\s*(一份|一个|一套)?",
         "",
         text,
         flags=re.IGNORECASE,
@@ -8777,30 +8869,24 @@ def _normalize_research_topic(topic: str, *, is_zh: bool) -> str:
     text = re.sub(
         r"(课堂展示)?课件|演示课件|演示文稿|ppt", "", text, flags=re.IGNORECASE
     ).strip()
-    text = re.sub(r"\s+", " ", text).strip("：:，,。！？!?")
+    text = re.sub(r"\s+", " ", text).strip(" ，。！？!?")
     return text[:120] if text else raw[:120]
 
 
-def _build_fallback_topic_points(
-    topic: str, *, is_zh: bool, instructional_context: bool = False
-) -> List[str]:
+def _build_fallback_topic_points(topic: str, *, is_zh: bool) -> List[str]:
     seed = str(topic or "").strip()
     if not seed:
         return []
     subject, focus = _split_topic_focus(seed, prefer_zh=is_zh)
-    if instructional_context:
-        scaffold = build_instructional_topic_points(seed, prefer_zh=is_zh)
-        if scaffold:
-            return _dedup_strings(scaffold, limit=8)
     if is_zh:
-        impact = focus or f"{subject}的核心议?"
+        impact = focus or f"{subject}的核心议题"
         return _dedup_strings(
             [
                 f"{subject}的背景与定义",
                 f"{subject}的关键机制与结构",
-                f"{subject}的主要参与方与职?",
+                f"{subject}的主要参与方与角色",
                 f"{subject}的流程步骤与关键节点",
-                f"{subject}在国际关系中的影响路?",
+                f"{subject}在国际关系中的影响路径",
                 f"{subject}的代表案例与数据证据",
                 f"{subject}面临的争议风险与约束",
                 f"{impact}的案例与启示",
@@ -8863,9 +8949,9 @@ def _build_research_queries(
     if not queries:
         default_queries = (
             [
-                f"{topic_seed} 背景 定义",
-                f"{topic_seed} 关键机制 流程",
-                f"{topic_seed} 数据 案例 证据",
+                f"{topic_seed} 鑳屾櫙 瀹氫箟",
+                f"{topic_seed} 鍏抽敭鏈哄埗 娴佺▼",
+                f"{topic_seed} 鏁版嵁 妗堜緥 璇佹嵁",
             ]
             if is_zh
             else [
@@ -8885,7 +8971,6 @@ def _build_fallback_research_evidence(
     key_points: List[str],
     references: List[Dict[str, str]],
     is_zh: bool,
-    instructional_context: bool,
 ) -> List[ResearchEvidence]:
     fallback_url = "https://www.google.com/search?q=" + url_quote(
         str(topic or "").strip() or "topic"
@@ -8893,7 +8978,7 @@ def _build_fallback_research_evidence(
     source_title = (
         str((references[0] or {}).get("title") or "").strip()
         if references and isinstance(references[0], dict)
-        else ("Fallback topic synthesis" if not is_zh else "主题推导补充")
+        else ("Fallback topic synthesis" if not is_zh else "涓婚鎺ㄥ琛ュ厖")
     )
     source_url = (
         str((references[0] or {}).get("url") or "").strip()
@@ -8908,7 +8993,6 @@ def _build_fallback_research_evidence(
         expanded = expand_semantic_support_points(
             core_message=point,
             related_points=related,
-            instructional_context=instructional_context,
         )
         if not expanded:
             continue
@@ -8930,7 +9014,7 @@ def _build_fallback_research_evidence(
             ResearchEvidence(
                 claim=claim,
                 source_title=source_title[:300]
-                or ("Fallback synthesis" if not is_zh else "补充推导"),
+                or ("Fallback synthesis" if not is_zh else "琛ュ厖鎺ㄥ"),
                 source_url=source_url,
                 snippet=snippet[:800],
                 confidence=0.46,
@@ -8969,17 +9053,17 @@ _RELEVANCE_EN_STOPWORDS = {
     "slides",
 }
 _RELEVANCE_ZH_NOISE = {
-    "我们",
-    "你们",
-    "他们",
-    "这个",
-    "那个",
-    "相关",
+    "鎴戜滑",
+    "浣犱滑",
+    "浠栦滑",
+    "杩欎釜",
+    "閭ｄ釜",
+    "鐩稿叧",
     "内容",
-    "主题",
-    "问题",
+    "涓婚",
+    "闂",
 }
-_MOJIBAKE_MARKERS = ("Ã", "Â", "â?", "ï¼", "æ", "ç", "è", "é", "ð")
+_MOJIBAKE_MARKERS = ("脙", "脗", "芒?", "茂录", "忙", "莽", "猫", "茅", "冒")
 _MOJIBAKE_CJK_MARKERS = (
     "?",
     "?",
@@ -8990,36 +9074,36 @@ _MOJIBAKE_CJK_MARKERS = (
     "?",
     "?",
     "?",
-    "涓€",
+    "娑撯偓",
 )
 _MOJIBAKE_CJK_TOKENS = (
-    "忙聹",
-    "盲禄",
-    "聯氓",
-    "潞聯",
-    "莽職",
-    "盲赂",
-    "猫娄",
-    "猫麓",
-    "聙聟",
-    "澶ф暟",
-    "鍏虫?",
+    "蹇欒伖",
+    "鐩茬",
+    "鑱皳",
+    "娼炶伅",
+    "鑾借伔",
+    "鐩茶祩",
+    "鐚▌",
+    "鐚簱",
+    "鑱欒仧",
+    "婢堆勬殶",
+    "閸忚櫕?",
     "?0?",
-    "鍥介?",
-    "绔嬫?",
-    "鐮旂?",
+    "閸ヤ粙?",
+    "缁斿?",
+    "閻梻?",
 )
-_MOJIBAKE_CJK_CHARS = set("聹禄聯潞莽職聞赂娄聛麓聦庐聙聟鍙鐨銆锛闄鏁璇鎹澶涓鏄?")
-_COMMON_ZH_FUNCTION_CHARS = "的一是在不了和对与其将由及中而可?"
-_TOPIC_ZH_HINT_CHARS = "背景目标策略机制流程案例数据趋势方法实践应用教育商业抢术?"
+_MOJIBAKE_CJK_CHARS = set("鑱圭鑱綖鑾借伔鑱炶祩濞勮仜楹撹仸搴愯仚鑱熼崣閻ㄩ妴閿涢梽閺佺拠閹规径娑撻弰?")
+_COMMON_ZH_FUNCTION_CHARS = "鐨勪竴鏄湪涓嶄簡鍜屽涓庡叾灏嗙敱鍙婁腑鑰屽彲?"
+_TOPIC_ZH_HINT_CHARS = "鑳屾櫙鐩爣绛栫暐鏈哄埗娴佺▼妗堜緥鏁版嵁瓒嬪娍鏂规硶瀹炶返搴旂敤鏁欒偛鍟嗕笟鎶㈡湳?"
 _SOFTWARE_TOPIC_HINTS = {
     "ai",
     "github",
     "?",
-    "代码",
-    "编程",
-    "软件",
-    "框架",
+    "浠ｇ爜",
+    "缂栫▼",
+    "杞欢",
+    "妗嗘灦",
     "python",
     "agent",
 }
@@ -9030,9 +9114,9 @@ _RESEARCH_NOISE_TERMS = {
     "pptagent",
     "pypi",
     "?",
-    "仓库",
-    "贡献?",
-    "速收?",
+    "浠撳簱",
+    "璐＄尞?",
+    "閫熸敹?",
 }
 
 
@@ -9045,7 +9129,7 @@ def _text_naturalness_score(text: str, *, prefer_zh: bool) -> float:
         cjk_len = float(max(1, len(cjk_chars)))
         common_hits = sum(value.count(ch) for ch in _COMMON_ZH_FUNCTION_CHARS)
         topic_hits = sum(value.count(ch) for ch in _TOPIC_ZH_HINT_CHARS)
-        punct_hits = sum(value.count(ch) for ch in "，；：！？（?")
+        punct_hits = sum(value.count(ch) for ch in "锛岋紱锛氾紒锛燂紙?")
         marker_hits = sum(value.count(marker) for marker in _MOJIBAKE_MARKERS)
         token_hits = sum(1 for token in _MOJIBAKE_CJK_TOKENS if token in value)
         return (
@@ -9161,7 +9245,7 @@ def _looks_mojibake(text: str, *, allow_repair: bool = True) -> bool:
         return True
     if len(cjk_chars) >= 8:
         cjk_marker_hits = sum(1 for ch in cjk_chars if ch in _MOJIBAKE_CJK_CHARS)
-        common_zh_hits = sum(value.count(ch) for ch in "的了是在和对与及为中")
+        common_zh_hits = sum(value.count(ch) for ch in "鐨勪簡鏄湪鍜屽涓庡強涓轰腑")
         if (
             cjk_marker_hits / float(len(cjk_chars)) >= 0.18
             and common_zh_hits / float(len(cjk_chars)) <= 0.06
@@ -9550,29 +9634,29 @@ def _search_builtin_stock_gallery(
     tokens = _tokenize_semantic_terms(query)
     query_blob = str(query or "").strip().lower()
     semantic_alias = {
-        "工业": "industrial",
+        "宸ヤ笟": "industrial",
         "制造": "manufacturing",
-        "产线": "production",
-        "机床": "machine",
-        "设备": "equipment",
-        "工厂": "factory",
-        "数据": "data",
-        "图表": "chart",
-        "分析": "analytics",
-        "营销": "marketing",
-        "品牌": "brand",
-        "教育": "education",
-        "学习": "learning",
-        "医疗": "medical",
-        "健康": "healthcare",
-        "物流": "logistics",
+        "浜х嚎": "production",
+        "鏈哄簥": "machine",
+        "璁惧": "equipment",
+        "宸ュ巶": "factory",
+        "鏁版嵁": "data",
+        "鍥捐〃": "chart",
+        "鍒嗘瀽": "analytics",
+        "钀ラ攢": "marketing",
+        "鍝佺墝": "brand",
+        "鏁欒偛": "education",
+        "瀛︿範": "learning",
+        "鍖荤枟": "medical",
+        "鍋ュ悍": "healthcare",
+        "鐗╂祦": "logistics",
         "供应链": "supply",
         "工作流": "workflow",
-        "流程": "process",
+        "娴佺▼": "process",
         "自动化": "automation",
-        "城市": "city",
-        "金融": "finance",
-        "团队": "team",
+        "鍩庡競": "city",
+        "閲戣瀺": "finance",
+        "鍥㈤槦": "team",
     }
     for key, alias in semantic_alias.items():
         if key in query_blob and alias not in tokens:
@@ -9583,7 +9667,7 @@ def _search_builtin_stock_gallery(
         tags = [str(t).strip().lower() for t in item.get("tags", []) if str(t).strip()]
         blob = " ".join([str(item.get("title") or "").lower(), *tags])
         score = 0.0
-        for token in tokens[:16]:
+        for token in tokens:
             if token in tags:
                 score += 2.0
             elif token in blob:
@@ -9660,11 +9744,11 @@ def _infer_image_context(
     positive: List[str] = []
     negative: List[str] = []
     industrial_tokens = [
-        "数控",
-        "机床",
-        "加工",
+        "鏁版帶",
+        "鏈哄簥",
+        "鍔犲伐",
         "?",
-        "工业",
+        "宸ヤ笟",
         "factory",
         "manufacturing",
         "machine",
@@ -9692,7 +9776,7 @@ def _infer_image_context(
             ]
         )
     if (
-        "案例" in blob or "case" in blob or "客户" in blob or "application" in blob
+        "妗堜緥" in blob or "case" in blob or "瀹㈡埛" in blob or "application" in blob
     ) and "factory" not in positive:
         positive.extend(["factory", "production", "workshop", "equipment"])
     return {
@@ -9785,7 +9869,7 @@ def _extract_image_keywords(
         "diagram": "clean vector process diagram",
     }
 
-    split_re = re.compile(r"[;?\n\r?!?、|]+")
+    split_re = re.compile(r"[;?\n\r?!?銆亅]+")
     expanded: List[str] = []
     for item in raw_terms:
         text = str(item or "").strip()
@@ -9995,9 +10079,9 @@ async def _hydrate_image_assets(render_payload: Dict[str, Any]) -> Dict[str, Any
     deck_blob = " ".join(token for token in deck_tokens if token).strip()
     fallback_stock_terms = (
         [
-            f"{deck_blob} 场景 ?",
-            f"{deck_blob} 商业 插画",
-            "科技 商务 数据 可视?",
+            f"{deck_blob} 鍦烘櫙 ?",
+            f"{deck_blob} 鍟嗕笟 鎻掔敾",
+            "绉戞妧 鍟嗗姟 鏁版嵁 鍙?",
         ]
         if hl == "zh-cn"
         else [
@@ -10667,29 +10751,29 @@ class PPTService:
         if is_zh:
             questions = [
                 ResearchQuestion(
-                    question="这份PPT的核心受众是谁？",
+                    question="杩欎唤PPT鐨勬牳蹇冨彈浼楁槸璋侊紵",
                     category="audience",
-                    why="受众决定表达深度、叙事方式和术语密度?",
+                    why="鍙椾紬鍐冲畾琛ㄨ揪娣卞害銆佸彊浜嬫柟寮忓拰鏈瀵嗗害?",
                 ),
                 ResearchQuestion(
-                    question="这次演示朢核心的目标是仢么？",
+                    question="杩欐婕旂ず鏈㈡牳蹇冪殑鐩爣鏄虎涔堬紵",
                     category="purpose",
-                    why="目标会影响结构是偏说服汇报还是教?",
+                    why="鐩爣浼氬奖鍝嶇粨鏋勬槸鍋忚鏈嶆眹鎶ヨ繕鏄暀?",
                 ),
                 ResearchQuestion(
-                    question="希望呈现怎样的视觉风格和语气?",
+                    question="甯屾湜鍛堢幇鎬庢牱鐨勮瑙夐鏍煎拰璇皵?",
                     category="style",
-                    why="风格偏好会直接影响配色排版和内容密度?",
+                    why="椋庢牸鍋忓ソ浼氱洿鎺ュ奖鍝嶉厤鑹叉帓鐗堝拰内容瀵嗗害?",
                 ),
                 ResearchQuestion(
-                    question="必须展示的关键数据有哪些?",
+                    question="蹇呴』灞曠ず鐨勫叧閿暟鎹湁鍝簺?",
                     category="data",
-                    why="关键数据决定图表、KPI和证据链是否完整?",
+                    why="鍏抽敭鏁版嵁鍐冲畾鍥捐〃銆並PI鍜岃瘉鎹摼鏄惁瀹屾暣?",
                 ),
                 ResearchQuestion(
-                    question="页数、时长和重点章节有哪些限制？",
+                    question="椤垫暟銆佹椂闀垮拰閲嶇偣绔犺妭鏈夊摢浜涢檺鍒讹紵",
                     category="scope",
-                    why="范围约束决定每页信息量和取舍策略?",
+                    why="鑼冨洿绾︽潫鍐冲畾姣忛〉淇℃伅閲忓拰鍙栬垗绛栫暐?",
                 ),
             ]
             fallback_key_data_points = _dedup_strings(
@@ -10700,16 +10784,6 @@ class PPTService:
                     *_build_fallback_topic_points(
                         topic,
                         is_zh=True,
-                        instructional_context=is_instructional_context(
-                            " ".join(
-                                [
-                                    str(req.topic or ""),
-                                    str(req.audience or ""),
-                                    str(req.purpose or ""),
-                                    str(req.style_preference or ""),
-                                ]
-                            )
-                        ),
                     ),
                 ],
                 limit=8,
@@ -10750,16 +10824,6 @@ class PPTService:
                     *_build_fallback_topic_points(
                         topic,
                         is_zh=False,
-                        instructional_context=is_instructional_context(
-                            " ".join(
-                                [
-                                    str(req.topic or ""),
-                                    str(req.audience or ""),
-                                    str(req.purpose or ""),
-                                    str(req.style_preference or ""),
-                                ]
-                            )
-                        ),
                     ),
                 ],
                 limit=8,
@@ -10916,7 +10980,7 @@ class PPTService:
                 dedup_refs.append(
                     {
                         "title": (
-                            f"待核验检索入口：{query}"
+                            f"寰呮牳楠屾绱㈠叆鍙ｏ細{query}"
                             if is_zh
                             else f"Search entry to verify: {query}"
                         )[:300],
@@ -10933,7 +10997,7 @@ class PPTService:
                     code="citations",
                     severity="high",
                     message=(
-                        f"可用参来源不足（{len(dedup_refs)}/{req.desired_citations}?"
+                        f"鍙敤鍙傛潵婧愪笉瓒筹紙{len(dedup_refs)}/{req.desired_citations}?"
                         if is_zh
                         else f"Insufficient references ({len(dedup_refs)}/{req.desired_citations})"
                     ),
@@ -10958,7 +11022,7 @@ class PPTService:
                         code="required_facts",
                         severity="medium",
                         message=(
-                            f"关键数据点未被覆盖：{fact}"
+                            f"鍏抽敭鏁版嵁鐐规湭琚鐩栵細{fact}"
                             if is_zh
                             else f"Required fact not covered: {fact}"
                         ),
@@ -10981,16 +11045,6 @@ class PPTService:
                 key_points=dedup_points,
                 references=dedup_refs,
                 is_zh=is_zh,
-                instructional_context=is_instructional_context(
-                    " ".join(
-                        [
-                            str(topic or ""),
-                            str(req.audience or ""),
-                            str(req.purpose or ""),
-                            str(req.style_preference or ""),
-                        ]
-                    ).lower()
-                ),
             )
             for row in fallback_rows:
                 key = f"{row.claim.strip().lower()}|{row.source_url.strip().lower()}"
@@ -11045,15 +11099,6 @@ class PPTService:
         is_zh = _prefer_zh(
             req.research.topic, req.research.audience, req.research.purpose
         )
-        context_blob = " ".join(
-            [
-                str(req.research.topic or ""),
-                str(req.research.audience or ""),
-                str(req.research.purpose or ""),
-                str(req.research.style_preference or ""),
-            ]
-        ).lower()
-        instructional_context = is_instructional_context(context_blob)
 
         def _parse_anchor_entry(text: str) -> tuple[int, str] | None:
             raw = str(text or "").strip()
@@ -11066,9 +11111,9 @@ class PPTService:
                 title = str(m.group(2) or "").strip()
                 if page_no >= 1 and title:
                     return page_no, title[:120]
-            # Format: ?页必须体现：标题 / ?页主题锚点：标题
+            # Format: 第3页标题：xxx / 第3页必体现：xxx
             m = re.search(
-                r"第\s*([1-9]\d*)\s*页[^?]{0,20}[?]\s*(.+)$",
+                r"^第\s*([1-9]\d*)\s*页[^:：]{0,20}[：:]\s*(.+)$",
                 raw,
                 flags=re.IGNORECASE,
             )
@@ -11105,7 +11150,6 @@ class PPTService:
             total_pages=total_pages,
             data_points=data_points,
             page_anchors=page_anchors,
-            instructional_context=instructional_context,
         )
         fixed_layouts = enforce_layout_diversity([note.layout_hint for note in notes])
         fixed_layouts = enforce_density_rhythm(fixed_layouts)
@@ -11127,51 +11171,14 @@ class PPTService:
             )
             for idx, note in enumerate(notes)
         ]
-        if instructional_context:
-            classroom_cycle = [
-                "split_2",
-                "asymmetric_2",
-                "grid_3",
-                "timeline",
-                "grid_4",
-                "split_2",
-            ]
-            classroom_cursor = 0
-            adjusted_notes = []
-            for idx, note in enumerate(notes):
-                current_layout = str(note.layout_hint or "").strip().lower()
-                if 0 < idx < max(0, total_pages - 1) and current_layout not in {
-                    "toc",
-                    "summary",
-                    "cover",
-                    "divider",
-                }:
-                    current_layout = classroom_cycle[
-                        classroom_cursor % len(classroom_cycle)
-                    ]
-                    classroom_cursor += 1
-                adjusted_notes.append(
-                    note.model_copy(update={"layout_hint": current_layout})
-                )
-            notes = adjusted_notes
-            fixed_layouts = enforce_layout_diversity(
-                [note.layout_hint for note in notes]
-            )
-            notes = [
-                note.model_copy(update={"layout_hint": fixed_layouts[idx]})
-                for idx, note in enumerate(notes)
-            ]
-
         return OutlinePlan(
             title=req.research.topic,
             total_pages=total_pages,
-            theme_suggestion="education_charts"
-            if instructional_context
-            else "business_authority",
-            style_suggestion="rounded" if instructional_context else "soft",
+            theme_suggestion="business_authority",
+            style_suggestion="soft",
             notes=notes,
             logic_flow=(
-                "先建立内容导航，再依次展弢关键问题证据与结论?"
+                "鍏堝缓绔嬪唴瀹瑰鑸紝鍐嶄緷娆″睍寮㈠叧閿棶棰樿瘉鎹笌缁撹?"
                 if is_zh
                 else "Open with navigation, then build key issues, evidence, and conclusions."
             ),
@@ -11184,15 +11191,6 @@ class PPTService:
             req.outline.title, req.research.topic if req.research else ""
         )
         total_outline_pages = len(req.outline.notes)
-        plan_context_blob = " ".join(
-            [
-                str(req.outline.title or ""),
-                str(req.research.topic if req.research else ""),
-                str(req.research.audience if req.research else ""),
-                str(req.research.purpose if req.research else ""),
-            ]
-        ).lower()
-        classroom_context = is_instructional_context(plan_context_blob)
 
         def _kpi_seed(page_number: int) -> int:
             return 80 + ((page_number * 17) % 65)
@@ -11249,7 +11247,7 @@ class PPTService:
                 ):
                     overlap_like += 1
                 if len(item) <= (18 if is_zh else 32) and not re.search(
-                    r"[，；;,.!??]", item
+                    r"[,:;.!?，。；：！？]", item
                 ):
                     short_heading_like += 1
             if len(meaningful) >= 3 and overlap_like < len(meaningful):
@@ -11259,19 +11257,13 @@ class PPTService:
             ) or short_heading_like == len(meaningful)
 
         placeholder_patterns = (
-            r"[?？]{2,}",
+            r"\?{2,}",
             r"\bxxxx\b",
             r"\btodo\b",
             r"\btbd\b",
             r"lorem ipsum",
             r"\bplaceholder\b",
             r"\bitem\s*\d+\b",
-            r"指标[a-eA-E]",
-            r"待补?",
-            r"占位文案",
-            r"默认文案",
-            r"示例文案",
-            r"请替?",
             r"to be filled",
             r"replace me",
             r"default copy",
@@ -11300,7 +11292,9 @@ class PPTService:
             )
             if topic_seed:
                 default_fallback = (
-                    f"{topic_seed}要点" if is_zh else f"Key point: {topic_seed}"
+                    f"{topic_seed} 核心观点"
+                    if is_zh
+                    else f"Key point: {topic_seed}"
                 )
             else:
                 default_fallback = "核心观点" if is_zh else "Key insight"
@@ -11309,12 +11303,12 @@ class PPTService:
                 normalized = re.sub(r"\s+", " ", str(value or "").strip())
                 normalized = normalized.replace("\ufffd", " ")
                 normalized = re.sub(
-                    r"^(?:核心问题|课堂提示|关键主体|角色分工|互动关系|起点|推进|转折点|传导起点|外部影响|反馈效应|案例背景|关键证据|课堂结论|争议焦点|现实约束|延伸思|核心信息|逻辑关系|结论提示)\s*[:?]\s*",
+                    r"^(?:核心观点|要点|关键信息|Key point|Insight)\s*[:：-]\s*",
                     "",
                     normalized,
                     flags=re.IGNORECASE,
                 )
-                normalized = re.sub(r"[?？]{2,}", " ", normalized)
+                normalized = re.sub(r"\?{2,}", " ", normalized)
                 normalized = re.sub(
                     r"\b(?:xxxx|todo|tbd|placeholder)\b",
                     " ",
@@ -11322,7 +11316,7 @@ class PPTService:
                     flags=re.IGNORECASE,
                 )
                 normalized = re.sub(
-                    r"(待补充|占位文案|默认文案|示例文案|请替换|to be filled|replace me|default copy)",
+                    r"(to be filled|replace me|default copy)",
                     " ",
                     normalized,
                     flags=re.IGNORECASE,
@@ -11330,8 +11324,7 @@ class PPTService:
                 normalized = re.sub(
                     r"\bitem\s*\d+\b", " ", normalized, flags=re.IGNORECASE
                 )
-                normalized = re.sub(r"指标[a-eA-E]", "指标", normalized)
-                normalized = re.sub(r"\s{2,}", " ", normalized).strip(" -:;,.，；")
+                normalized = re.sub(r"\s{2,}", " ", normalized).strip(" -:;,.，。；：！？")
                 return normalized
 
             safe_fallback = _normalize_candidate(fallback)
@@ -11357,16 +11350,6 @@ class PPTService:
                 req.research if isinstance(req.research, ResearchContext) else None
             )
             if research:
-                audience_blob = str(research.audience or "").strip().lower()
-                if classroom_context:
-                    if is_zh and any(
-                        token in audience_blob for token in {"high school", "高中"}
-                    ):
-                        candidates.append("高中课堂 · 展示课件")
-                    elif is_zh:
-                        candidates.append("课堂展示课件")
-                    else:
-                        candidates.append("Classroom presentation")
                 audience = (
                     _sanitize_block_text(
                         str(research.audience or ""),
@@ -11424,26 +11407,6 @@ class PPTService:
                 return candidate[:72]
             return ""
 
-        def _build_learning_goal_note(points: List[str], title_text: str) -> str:
-            normalized = [
-                str(item or "").strip() for item in points if str(item or "").strip()
-            ]
-            primary = (
-                normalized[0]
-                if normalized
-                else (title_text[:20] or ("核心概念" if is_zh else "core concept"))
-            )
-            secondary = (
-                normalized[1]
-                if len(normalized) > 1
-                else (title_text[:20] or ("关键问题" if is_zh else "key issue"))
-            )
-            if is_zh:
-                return f"学习目标：你将能够识别{primary}，并分析{secondary}。"[:96]
-            return f"Learning goal: you will be able to identify {primary} and analyze {secondary}."[
-                :120
-            ]
-
         def _split_points_for_two_columns(
             points: List[str],
         ) -> tuple[List[str], List[str]]:
@@ -11488,8 +11451,7 @@ class PPTService:
             ):
                 return "toc"
             if (
-                (not classroom_context)
-                and total_outline_pages >= 12
+                total_outline_pages >= 12
                 and ("section" in elements or "transition" in elements)
             ):
                 return "divider"
@@ -11533,13 +11495,7 @@ class PPTService:
                 fallback=title_text,
                 max_chars=220,
             )
-            if note_slide_type == "cover" and outline_title:
-                title_text = outline_title
-            elif (
-                (not classroom_context)
-                and note_slide_type in {"toc", "summary"}
-                and outline_title
-            ):
+            if note_slide_type in {"cover", "toc", "summary"} and outline_title:
                 title_text = outline_title
             elif (
                 (not is_zh)
@@ -11585,7 +11541,6 @@ class PPTService:
                         *(strategy.evidence or []),
                         *(note.key_points or []),
                     ],
-                    instructional_context=classroom_context,
                 )
             compact_points = [
                 _sanitize_block_text(
@@ -11602,28 +11557,6 @@ class PPTService:
                 for point in compact_points
                 if _normalize_text_key(point) not in {"", outline_title_key, title_key}
             ] or compact_points
-            if classroom_context and note_slide_type not in {"cover", "toc", "summary"}:
-                expanded_points = expand_semantic_support_points(
-                    core_message=title_text,
-                    related_points=[
-                        *compact_points,
-                        *(strategy.evidence or []),
-                        *(note.key_points or []),
-                    ],
-                    instructional_context=True,
-                )
-                merged_points = _compact_points(
-                    [*expanded_points, *compact_points],
-                    max_points=4,
-                    max_chars=96,
-                )
-                compact_points = [
-                    point
-                    for point in merged_points
-                    if _normalize_text_key(point)
-                    not in {"", outline_title_key, title_key}
-                    and not _is_low_signal_point_text(point)
-                ] or compact_points
             layout_plan = build_content_layout_plan(
                 title=title_text,
                 evidence=compact_points,
@@ -11671,21 +11604,6 @@ class PPTService:
                         emphasis=["value"],
                     )
                 )
-            elif classroom_context and note_slide_type == "toc":
-                blocks.append(
-                    ContentBlock(
-                        block_type="subtitle",
-                        position="top_right",
-                        content=_sanitize_block_text(
-                            _build_learning_goal_note(compact_points, title_text),
-                            fallback=(
-                                title_text[:24] or str(req.outline.title or "")[:24]
-                            ),
-                            max_chars=160,
-                        ),
-                        emphasis=["学习目标"] if is_zh else ["learning goal"],
-                    )
-                )
             elif note.layout_hint == "summary":
                 blocks.append(
                     ContentBlock(
@@ -11698,7 +11616,7 @@ class PPTService:
                         ),
                         emphasis=["conclusion", "action"]
                         if not is_zh
-                        else ["结论", "行动"],
+                        else ["缁撹", "琛屽姩"],
                     )
                 )
             else:
@@ -11734,96 +11652,6 @@ class PPTService:
                         )
                         if fallback_seed:
                             right_points = [fallback_seed]
-                classroom_anchor = str(note.visual_anchor or "").strip().lower()
-                if classroom_context and note_slide_type == "content":
-                    if classroom_anchor == "roles":
-                        blocks.append(
-                            ContentBlock(
-                                block_type="comparison",
-                                position="center",
-                                content={
-                                    "left_title": "关键角色" if is_zh else "Key actors",
-                                    "left_items": left_points[:3],
-                                    "right_title": "核心职能"
-                                    if is_zh
-                                    else "Core functions",
-                                    "right_items": right_points[:3],
-                                    "summary": compact_points[-1]
-                                    if compact_points
-                                    else title_text,
-                                },
-                                emphasis=["角色"] if is_zh else ["actors"],
-                            )
-                        )
-                        need_chart = need_kpi = need_image = False
-                        need_comparison = False
-                        use_dual_text = False
-                    elif classroom_anchor == "impact":
-                        blocks.append(
-                            ContentBlock(
-                                block_type="comparison",
-                                position="center",
-                                content={
-                                    "left_title": "内部变化"
-                                    if is_zh
-                                    else "Internal change",
-                                    "left_items": left_points[:3],
-                                    "right_title": "外部影响"
-                                    if is_zh
-                                    else "External impact",
-                                    "right_items": right_points[:3],
-                                    "summary": compact_points[-1]
-                                    if compact_points
-                                    else title_text,
-                                },
-                                emphasis=["影响"] if is_zh else ["impact"],
-                            )
-                        )
-                        need_chart = need_kpi = need_image = False
-                        need_comparison = False
-                        use_dual_text = False
-                    elif classroom_anchor == "process":
-                        blocks.append(
-                            ContentBlock(
-                                block_type="workflow",
-                                position="center",
-                                content=" -> ".join(
-                                    (compact_points[:4] or [title_text])[:4]
-                                ),
-                                emphasis=compact_points[:2] or [title_text[:16]],
-                            )
-                        )
-                        need_chart = need_kpi = need_image = False
-                        need_comparison = False
-                        use_dual_text = False
-                    elif classroom_anchor == "case":
-                        blocks.append(
-                            ContentBlock(
-                                block_type="quote",
-                                position="right",
-                                content=right_points[0]
-                                if right_points
-                                else (
-                                    compact_points[-1] if compact_points else title_text
-                                ),
-                                emphasis=["案例"] if is_zh else ["case"],
-                            )
-                        )
-                        need_chart = need_kpi = need_image = False
-                    elif classroom_anchor == "trend":
-                        blocks.append(
-                            ContentBlock(
-                                block_type="quote",
-                                position="right",
-                                content=right_points[0]
-                                if right_points
-                                else (
-                                    compact_points[-1] if compact_points else title_text
-                                ),
-                                emphasis=["趋势"] if is_zh else ["trend"],
-                            )
-                        )
-                        need_chart = need_kpi = need_image = False
                 if need_kpi:
                     kpi_value = _kpi_seed(note.page_number)
                     blocks.append(
@@ -11835,15 +11663,15 @@ class PPTService:
                                 "number": kpi_value,
                                 "unit": "%"
                                 if (
-                                    "占比" in title_text
-                                    or "增长" in title_text
+                                    "鍗犳瘮" in title_text
+                                    or "澧為暱" in title_text
                                     or not is_zh
                                 )
                                 else "?",
                                 "trend": 6 + (note.page_number % 12),
                                 "label": title_text[:24],
                             },
-                            emphasis=["growth"] if not is_zh else ["增长"],
+                            emphasis=["growth"] if not is_zh else ["澧為暱"],
                         )
                     )
                 if need_chart:
@@ -11858,12 +11686,12 @@ class PPTService:
                                 "labels": _labels(),
                                 "datasets": [
                                     {
-                                        "label": "关键指标" if is_zh else "Key metric",
+                                        "label": "鍏抽敭鎸囨爣" if is_zh else "Key metric",
                                         "data": _chart_series(base),
                                     }
                                 ],
                             },
-                            emphasis=["trend"] if not is_zh else ["趋势"],
+                            emphasis=["trend"] if not is_zh else ["瓒嬪娍"],
                         )
                     )
                 if need_image:
@@ -11887,14 +11715,14 @@ class PPTService:
                     left_title = _sanitize_block_text(
                         left_points[0]
                         if left_points
-                        else ("当前方案" if is_zh else "Current model"),
+                        else ("褰撳墠鏂规" if is_zh else "Current model"),
                         fallback=(title_text[:24] or str(req.outline.title or "")[:24]),
                         max_chars=40,
                     )
                     right_title = _sanitize_block_text(
                         right_points[0]
                         if right_points
-                        else ("目标方案" if is_zh else "Target model"),
+                        else ("鐩爣鏂规" if is_zh else "Target model"),
                         fallback=(title_text[:24] or str(req.outline.title or "")[:24]),
                         max_chars=40,
                     )
@@ -11932,7 +11760,7 @@ class PPTService:
                                 "right_items": right_items,
                                 "summary": summary_text,
                             },
-                            emphasis=["contrast"] if not is_zh else ["对比"],
+                            emphasis=["contrast"] if not is_zh else ["瀵规瘮"],
                         )
                     )
                     blocks.append(
@@ -11940,7 +11768,7 @@ class PPTService:
                             block_type="body",
                             position="bottom",
                             content=summary_text,
-                            emphasis=["focus"] if not is_zh else ["重点"],
+                            emphasis=["focus"] if not is_zh else ["閲嶇偣"],
                         )
                     )
                 else:
@@ -11955,7 +11783,7 @@ class PPTService:
                                 ),
                                 max_chars=320,
                             ),
-                            emphasis=["focus"] if not is_zh else ["重点"],
+                            emphasis=["focus"] if not is_zh else ["閲嶇偣"],
                         )
                     )
                 if (not need_comparison) and (
@@ -11972,7 +11800,7 @@ class PPTService:
                                 ),
                                 max_chars=320,
                             ),
-                            emphasis=["evidence"] if not is_zh else ["证据"],
+                            emphasis=["evidence"] if not is_zh else ["璇佹嵁"],
                         )
                     )
 
@@ -12001,15 +11829,7 @@ class PPTService:
                     notes_for_designer=(
                         _build_cover_support_note(title_text)
                         if note_slide_type == "cover"
-                        else (
-                            (
-                                "先看整体结构，再进入核心概念、机制案例与总结?"
-                                if is_zh
-                                else "Start with the full lesson map, then move into concepts, mechanisms, cases, and summary."
-                            )
-                            if note_slide_type == "toc" and classroom_context
-                            else str(note.speaker_notes or title_text[:80])
-                        )
+                        else str(note.speaker_notes or title_text[:80])
                     ),
                 )
             )
@@ -12027,7 +11847,7 @@ class PPTService:
             global_notes=str(req.outline.logic_flow or req.outline.title),
         )
 
-    async def run_ppt_pipeline(self, req: PPTPipelineRequest) -> PPTPipelineResult:
+    async def _run_ppt_pipeline_v1(self, req: PPTPipelineRequest) -> PPTPipelineResult:
         from src.ppt_export_service import PPTExportService
         from src.ppt_quality_gate import (
             score_deck_quality,
@@ -12236,10 +12056,12 @@ class PPTService:
 
         def _apply_pipeline_template_hints(payload: Dict[str, Any]) -> Dict[str, Any]:
             out = dict(payload or {})
-            if requested_template_family not in {"", "auto"}:
+            explicit_template_family = requested_template_family not in {"", "auto"}
+            explicit_skill_profile = requested_skill_profile not in {"", "auto"}
+            if explicit_template_family:
                 out["template_family"] = requested_template_family
                 out["template_id"] = requested_template_family
-            if requested_skill_profile not in {"", "auto"}:
+            if explicit_skill_profile:
                 out["skill_profile"] = requested_skill_profile
             if requested_theme_recipe not in {"", "auto"}:
                 out["theme_recipe"] = requested_theme_recipe
@@ -12252,6 +12074,28 @@ class PPTService:
                 if requested_tone in {"light", "dark"}:
                     theme_obj["tone"] = requested_tone
                 out["theme"] = theme_obj
+            slides_raw = out.get("slides")
+            if isinstance(slides_raw, list) and (
+                explicit_template_family or explicit_skill_profile
+            ):
+                patched_slides: List[Any] = []
+                for slide in slides_raw:
+                    if not isinstance(slide, dict):
+                        patched_slides.append(slide)
+                        continue
+                    slide_out = dict(slide)
+                    if explicit_template_family:
+                        slide_out["template_family"] = requested_template_family
+                        slide_out["template_id"] = requested_template_family
+                        slide_out["template_lock"] = True
+                        slide_out["template_family_whitelist"] = [
+                            requested_template_family
+                        ]
+                        slide_out["template_candidates"] = [requested_template_family]
+                    if explicit_skill_profile:
+                        slide_out["skill_profile"] = requested_skill_profile
+                    patched_slides.append(slide_out)
+                out["slides"] = patched_slides
             if requested_template_file_url:
                 out["template_file_url"] = requested_template_file_url
             return out
@@ -12838,6 +12682,20 @@ class PPTService:
             ),
             export=export_data,
         )
+
+    async def run_ppt_pipeline(self, req: PPTPipelineRequest) -> PPTPipelineResult:
+        """Thin facade for v1/v2 pipeline routing.
+
+        V2 is enabled by env flag `PPT_PIPELINE_V2_ENABLED=true`.
+        """
+        use_v2 = _env_flag("PPT_PIPELINE_V2_ENABLED", "false")
+        if not use_v2:
+            return await self._run_ppt_pipeline_v1(req)
+
+        from src.ppt_v2_pipeline import PPTV2Pipeline
+
+        pipeline = PPTV2Pipeline(v1_runner=self._run_ppt_pipeline_v1)
+        return await pipeline.run(req)
 
     async def export_pptx(self, req: ExportRequest) -> Dict[str, Any]:
         import asyncio
@@ -15184,7 +15042,7 @@ class PPTService:
                         {"role": "system", "content": system_prompt},
                         {
                             "role": "user",
-                            "content": f"标题: {slide.title}\n\n讲解?\n{narration}",
+                            "content": f"鏍囬: {slide.title}\n\n璁茶В?\n{narration}",
                         },
                     ],
                     temperature=0.5,
@@ -15437,5 +15295,8 @@ class PPTService:
             logger.warning("[ppt_service] presign failed, fallback direct URL: %s", exc)
 
         return {"job_id": job_id, "status": status, "output_url": output_url}
+
+
+
 
 

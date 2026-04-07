@@ -1,8 +1,8 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from types import SimpleNamespace
 
-from src import ppt_service
+from src import ppt_service_v2 as ppt_service
 
 
 def test_relaxed_quality_issue_codes_keep_accuracy_hard_fails_strict():
@@ -152,11 +152,11 @@ def test_layer1_design_chain_uses_first_slide_metadata_for_ppt_master_force(monk
     monkeypatch.setattr("src.installed_skill_executor.execute_installed_skill_request", _fake_exec)
 
     out = ppt_service._run_layer1_design_skill_chain(
-        deck_title="立法课程导论",
+        deck_title="绔嬫硶璇剧▼瀵艰",
         slides=[
             {
                 "slide_type": "cover",
-                "title": "课程导入",
+                "title": "璇剧▼瀵煎叆",
                 "quality_profile": "training_deck",
             }
         ],
@@ -527,10 +527,10 @@ def test_visual_orchestration_repairs_incompatible_cover_template_on_content_sli
                 "layout_grid": "split_2",
                 "template_family": "hero_tech_cover",
                 "template_lock": True,
-                "title": "立法流程",
+                "title": "绔嬫硶娴佺▼",
                 "blocks": [
-                    {"block_type": "title", "content": "立法流程"},
-                    {"block_type": "body", "content": "解释流程影响"},
+                    {"block_type": "title", "content": "绔嬫硶娴佺▼"},
+                    {"block_type": "body", "content": "瑙ｉ噴娴佺▼褰卞搷"},
                 ],
             },
         ],
@@ -553,10 +553,10 @@ def test_visual_orchestration_prefers_explicit_deck_template_when_compatible():
                 "slide_id": "s1",
                 "slide_type": "content",
                 "layout_grid": "split_2",
-                "title": "议题",
+                "title": "璁",
                 "blocks": [
-                    {"block_type": "title", "content": "议题"},
-                    {"block_type": "body", "content": "背景与影?"},
+                    {"block_type": "title", "content": "璁"},
+                    {"block_type": "body", "content": "鑳屾櫙涓庡奖?"},
                 ],
             }
         ],
@@ -597,10 +597,10 @@ def test_visual_orchestration_repairs_incompatible_family_after_second_cohesion(
                 "slide_type": "content",
                 "layout_grid": "split_2",
                 "template_family": "dashboard_dark",
-                "title": "立法流程",
+                "title": "绔嬫硶娴佺▼",
                 "blocks": [
-                    {"block_type": "title", "content": "立法流程"},
-                    {"block_type": "body", "content": "理解流程与影?"},
+                    {"block_type": "title", "content": "绔嬫硶娴佺▼"},
+                    {"block_type": "body", "content": "鐞嗚В娴佺▼涓庡奖?"},
                 ],
             },
         ],
@@ -662,7 +662,7 @@ def test_visual_orchestration_adds_visual_anchor_for_text_only_split_content():
 
 
 def test_ensure_content_contract_clips_overlong_visible_text():
-    long_title = "高中课堂展示课件主题" * 20
+    long_title = "楂樹腑璇惧爞灞曠ず璇句欢涓婚" * 20
     slide = {
         "slide_type": "cover",
         "layout_grid": "hero_1",
@@ -695,18 +695,18 @@ def test_template_support_treats_toc_and_divider_as_cover_compatible():
 
 def test_topic_relevance_score_penalizes_irrelevant_search_hits():
     score = ppt_service._topic_relevance_score(
-        topic="解码立法过程：理解其对国际关系的影响",
-        title="北京大学本科专业核心课程手册—文科卷",
-        snippet="课程名称：临床药物治疗学，教学对象：大三药学专业学生?",
-        domain_terms=["立法", "国际关系"],
-        required_facts=["立法流程", "政策影响"],
+        topic="瑙ｇ爜绔嬫硶杩囩▼锛氱悊瑙ｅ叾瀵瑰浗闄呭叧绯荤殑褰卞搷",
+        title="鍖椾含澶у鏈涓撲笟鏍稿績璇剧▼鎵嬪唽鈥旀枃绉戝嵎",
+        snippet="璇剧▼鍚嶇О锛氫复搴婅嵂鐗╂不鐤楀锛屾暀瀛﹀璞★細澶т笁鑽涓撲笟瀛︾敓?",
+        domain_terms=["绔嬫硶", "鍥介檯鍏崇郴"],
+        required_facts=["绔嬫硶娴佺▼", "鏀跨瓥褰卞搷"],
     )
     assert score < 0.18
 
 
 def test_mojibake_detector_flags_corrupted_utf8_text():
     assert ppt_service._looks_mojibake("\ufffd")
-    assert not ppt_service._looks_mojibake("解码立法过程：理解其对国际关系的影响")
+    assert not ppt_service._looks_mojibake("瑙ｇ爜绔嬫硶杩囩▼锛氱悊瑙ｅ叾瀵瑰浗闄呭叧绯荤殑褰卞搷")
 
 
 
@@ -714,7 +714,7 @@ def test_research_noise_filter_blocks_prompt_and_repo_pollution_for_non_software
     assert ppt_service._is_research_noise_hit(
         topic="解码立法过程：理解其对国际关系的影响",
         title="GitHub - icip-cas/PPTAgent",
-        snippet="Prompt: 请制作一份高中课堂展示课件，主题为解码立法过程?",
+        snippet="Prompt: 请制作一份高中课堂展示课件，主题为解码立法过程",
     )
     assert not ppt_service._is_research_noise_hit(
         topic="如何用Python构建多智能体系统",
@@ -724,15 +724,15 @@ def test_research_noise_filter_blocks_prompt_and_repo_pollution_for_non_software
 
 
 def test_normalize_research_topic_extracts_subject_from_instruction_prompt():
-    topic = "请制作一份高中课堂展示课件，主题为解码立法过程：理解其对国际关系的影响?"
+    topic = "请制作一份高中课堂展示课件，主题为解码立法过程：理解其对国际关系的影响"
     normalized = ppt_service._normalize_research_topic(topic, is_zh=True)
     assert normalized.startswith("解码立法过程")
-    assert "请制" not in normalized
+    assert "请制作" not in normalized
 
 
 def test_build_research_queries_does_not_duplicate_topic_when_gap_hint_contains_topic():
     req = SimpleNamespace(
-        topic="请制作一份高中课堂展示课件，主题为解码立法过程：理解其对国际关系的影响?",
+        topic="请制作一份高中课堂展示课件，主题为解码立法过程：理解其对国际关系的影响",
         required_facts=[],
         time_range="",
         geography="",
@@ -750,25 +750,25 @@ def test_build_research_queries_does_not_duplicate_topic_when_gap_hint_contains_
     queries = ppt_service._build_research_queries(req, is_zh=True, gaps=gaps)
     assert queries
     assert queries[0].count("解码立法过程") == 1
-    assert "请制" not in queries[0]
+    assert "请制作" not in queries[0]
 
 
 def test_build_fallback_topic_points_is_semantic_not_instruction_echo():
     points = ppt_service._build_fallback_topic_points(
-        "解码立法过程：理解其对国际关系的影响",
+        "瑙ｇ爜绔嬫硶杩囩▼锛氱悊瑙ｅ叾瀵瑰浗闄呭叧绯荤殑褰卞搷",
         is_zh=True,
     )
     assert len(points) >= 3
-    assert all("请制" not in item for item in points)
+    assert all("璇峰埗" not in item for item in points)
 
 
 def test_build_fallback_topic_points_avoids_duplicated_impact_phrase():
     points = ppt_service._build_fallback_topic_points(
-        "解码立法过程：理解其对国际关系的影响",
+        "瑙ｇ爜绔嬫硶杩囩▼锛氱悊瑙ｅ叾瀵瑰浗闄呭叧绯荤殑褰卞搷",
         is_zh=True,
     )
     assert len(points) >= 3
-    assert points[2].count("对国际关系的影响") <= 1
+    assert points[2].count("瀵瑰浗闄呭叧绯荤殑褰卞搷") <= 1
 
 
 def test_pick_input_derived_point_prefers_unused_source_phrase():
@@ -811,14 +811,14 @@ def test_sanitize_placeholder_text_keeps_valid_unicode_without_transcoding():
 
 
 def test_sanitize_placeholder_text_rejects_writing_instruction_phrases():
-    source = "先说?GDPR 的背景与定义"
+    source = "鍏堣?GDPR 鐨勮儗鏅笌瀹氫箟"
     cleaned = ppt_service._sanitize_placeholder_text(source, prefer_zh=True)
     assert cleaned == ""
 
 
 def test_infer_visual_semantic_mode_prefers_process_over_weak_numeric_signal():
     mode = ppt_service._infer_visual_semantic_mode(
-        semantic_text="立法流程与阶段推进（2024-2026?",
+        semantic_text="绔嬫硶娴佺▼涓庨樁娈垫帹杩涳紙2024-2026?",
         keypoints=["立法流程", "阶段推进", "阶段一", "阶段二"],
         numeric_values=[2024.0, 2025.0, 2026.0],
     )
@@ -827,7 +827,7 @@ def test_infer_visual_semantic_mode_prefers_process_over_weak_numeric_signal():
 
 def test_visual_orchestration_repairs_kpi_block_for_process_template():
     payload = {
-        "title": "立法流程课件",
+        "title": "绔嬫硶娴佺▼璇句欢",
         "quality_profile": "default",
         "template_family": "auto",
         "slides": [
@@ -844,11 +844,11 @@ def test_visual_orchestration_repairs_kpi_block_for_process_template():
                 "layout_grid": "timeline",
                 "template_family": "process_flow_dark",
                 "template_lock": True,
-                "title": "立法流程",
+                "title": "绔嬫硶娴佺▼",
                 "blocks": [
-                    {"block_type": "title", "content": "立法流程"},
-                    {"block_type": "body", "content": "阶段推进和参与方"},
-                    {"block_type": "kpi", "content": "覆盖?86%"},
+                    {"block_type": "title", "content": "绔嬫硶娴佺▼"},
+                    {"block_type": "body", "content": "闃舵鎺ㄨ繘鍜屽弬涓庢柟"},
+                    {"block_type": "kpi", "content": "瑕嗙洊?86%"},
                 ],
             },
             {
@@ -911,7 +911,7 @@ def test_visual_contract_block_uses_table_for_education_without_numeric_values()
         keypoints=["国际关系的交汇点", "制度接口的主要类型", "课堂案例与证据"],
         numeric_values=[],
         prefer_zh=True,
-        semantic_text="高中课堂 教学 课程 国际关系 制度 案例",
+        semantic_text="楂樹腑璇惧爞 鏁欏 璇剧▼ 鍥介檯鍏崇郴 鍒跺害 妗堜緥",
         card_id="visual_anchor",
         position="right",
     )
@@ -929,7 +929,7 @@ def test_layout_solver_underflow_adds_table_not_image_when_no_visual_anchor():
             "title": "课堂重点",
             "blocks": [
                 {"block_type": "title", "content": "课堂重点"},
-                {"block_type": "body", "content": "关键概念与案?"},
+                {"block_type": "body", "content": "关键概念与案例"},
             ],
         }
     ]
@@ -986,4 +986,8 @@ def test_ensure_content_contract_strict_raises_instead_of_autofill():
         assert False, "expected strict contract to fail"
     except ValueError as exc:
         assert "strict_content_contract_unmet" in str(exc)
+
+
+
+
 

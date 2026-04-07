@@ -1,8 +1,8 @@
-import pytest
+﻿import pytest
 from pydantic import ValidationError
 
 from src.ppt_quality_gate import QualityResult, QualityScoreResult
-from src.ppt_service import PPTService
+from src.ppt_service_v2 import PPTService
 from src.schemas.ppt import ExportRequest, SlideContent, SlideElement
 from src.schemas.ppt_pipeline import PPTPipelineRequest
 
@@ -39,7 +39,7 @@ def test_pipeline_request_rejects_remote_export_channel():
 async def test_export_pptx_normalizes_retry_scope_to_deck(monkeypatch):
     import src.minimax_exporter as minimax_exporter
     import src.ppt_quality_gate as quality_gate
-    import src.ppt_service as ppt_service
+    import src.ppt_service_v2 as ppt_service
     import src.ppt_visual_qa as ppt_visual_qa
     import src.pptx_rasterizer as pptx_rasterizer
     import src.r2 as r2
@@ -137,3 +137,5 @@ async def test_export_pptx_normalizes_retry_scope_to_deck(monkeypatch):
     assert calls[0]["target_block_ids"] == []
     assert result["retry_scope"] == "deck"
     assert result.get("retry_target_ids", []) == []
+
+

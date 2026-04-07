@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 from __future__ import annotations
 
 import argparse
@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Tuple
 
 sys.path.append(str(Path("agent")))
 
-from src.ppt_service import (  # type: ignore
+from src.ppt_service_v2 import (  # type: ignore
     _clip_text_for_visual_budget,
     _extract_block_text,
     _looks_mojibake,
@@ -239,3 +239,5 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+

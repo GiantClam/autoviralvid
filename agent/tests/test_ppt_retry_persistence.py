@@ -1,4 +1,4 @@
-from src import ppt_service
+﻿from src import ppt_service_v2 as ppt_service
 
 
 class _FakeTable:
@@ -33,4 +33,6 @@ def test_persist_failure_code_and_scope(monkeypatch):
     assert fake.table_name == "autoviralvid_ppt_retry_diagnostics"
     assert fake.table_obj.inserted["failure_code"] == "timeout"
     assert fake.table_obj.inserted["retry_scope"] == "slide"
+
+
 

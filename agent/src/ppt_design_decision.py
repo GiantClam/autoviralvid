@@ -1,4 +1,4 @@
-"""Unified design decision helpers for PPT export pipeline.
+﻿"""Unified design decision helpers for PPT export pipeline.
 
 This module centralizes visual decision fields so Python orchestration and
 Node rendering consume the same source of truth (`design_decision_v1`).
@@ -10,7 +10,7 @@ from copy import deepcopy
 from typing import Any, Dict, List, Mapping
 
 CANONICAL_DECISION_TRACE_OWNER = "agent/src/ppt_design_decision.py"
-FINAL_OWNER_ASSERTION_OWNER = "agent/src/ppt_service.py"
+FINAL_OWNER_ASSERTION_OWNER = "agent/src/ppt_service_v2.py"
 
 _DECK_FIELDS = (
     "style_variant",
@@ -303,3 +303,5 @@ def freeze_retry_visual_identity(
             slide["skill_profile"] = skill_profile
         out.append(slide)
     return out
+
+

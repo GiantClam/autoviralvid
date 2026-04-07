@@ -1,4 +1,4 @@
-"""PPT API路由 — Feature A (PPT生成) + Feature B (PPT/PDF视频生成)"""
+﻿"""PPT API routes: Feature A (PPT generation) + Feature B (PPT/PDF video render)."""
 
 from __future__ import annotations
 
@@ -32,7 +32,7 @@ logger = logging.getLogger("ppt_routes")
 
 router = APIRouter(prefix="/api/v1/ppt", tags=["PPT"])
 
-# ── 懒加载服务 ──────────────────────────────────────────────────────
+# 鈹€鈹€ 鎳掑姞杞芥湇鍔?鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 _ppt_service = None
 
@@ -40,21 +40,21 @@ _ppt_service = None
 def _get_service():
     global _ppt_service
     if _ppt_service is None:
-        from src.ppt_service import PPTService
+        from src.ppt_service_v2 import PPTService
 
         _ppt_service = PPTService()
     return _ppt_service
 
 
 def _request_id(request: Request) -> str:
-    """获取或生成请求ID用于日志追踪"""
+    """鑾峰彇鎴栫敓鎴愯姹侷D鐢ㄤ簬鏃ュ織杩借釜"""
     rid = request.headers.get("x-request-id") or uuid.uuid4().hex[:12]
     return rid
 
 
-# ════════════════════════════════════════════════════════════════════
-# Feature A: PPT 生成
-# ════════════════════════════════════════════════════════════════════
+# 鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲
+# Feature A: PPT 鐢熸垚
+# 鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲
 
 
 @router.post("/outline", response_model=ApiResponse, status_code=200)
@@ -63,7 +63,7 @@ async def generate_outline(
     request: Request,
     user: AuthUser = Depends(get_current_user),
 ):
-    """生成PPT大纲 (Stage 1)"""
+    """鐢熸垚PPT澶х翰 (Stage 1)"""
     rid = _request_id(request)
     try:
         logger.info(
@@ -82,7 +82,7 @@ async def update_outline(
     req: PresentationOutline,
     user: AuthUser = Depends(get_current_user),
 ):
-    """编辑/更新大纲 (用户确认前修改)"""
+    """缂栬緫/鏇存柊澶х翰 (鐢ㄦ埛纭鍓嶄慨鏀?"""
     try:
         req.total_duration = sum(s.estimated_duration for s in req.slides)
         return ApiResponse(success=True, data=req.model_dump())
@@ -96,7 +96,7 @@ async def generate_content(
     request: Request,
     user: AuthUser = Depends(get_current_user),
 ):
-    """填充幻灯片内容 (Stage 2, 并行生成)"""
+    """濉厖骞荤伅鐗囧唴瀹?(Stage 2, 骞惰鐢熸垚)"""
     rid = _request_id(request)
     try:
         logger.info(
@@ -222,7 +222,7 @@ async def export_pptx(
     request: Request,
     user: AuthUser = Depends(get_current_user),
 ):
-    """导出PPTX文件 (Stage 3)"""
+    """瀵煎嚭PPTX鏂囦欢 (Stage 3)"""
     rid = _request_id(request)
     try:
         logger.info(
@@ -246,11 +246,11 @@ async def export_pptx(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# ── TTS 合成 ────────────────────────────────────────────────────────
+# 鈹€鈹€ TTS 鍚堟垚 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 
 class TTSRequest(BaseModel):
-    """TTS合成请求"""
+    """TTS鍚堟垚璇锋眰"""
 
     texts: List[str] = Field(default_factory=list, max_length=50)
     voice_style: str = "zh-CN-female"
@@ -262,15 +262,13 @@ async def synthesize_tts(
     request: Request,
     user: AuthUser = Depends(get_current_user),
 ):
-    """批量TTS合成 → R2音频URL列表"""
+    """鎵归噺TTS鍚堟垚 鈫?R2闊抽URL鍒楄〃"""
     rid = _request_id(request)
     try:
-        # 文本长度校验
+        # 鏂囨湰闀垮害鏍￠獙
         for i, text in enumerate(req.texts):
             if len(text) > 5000:
-                raise HTTPException(
-                    status_code=400, detail=f"texts[{i}] 超过5000字限制"
-                )
+                raise HTTPException(status_code=400, detail=f"texts[{i}] exceeds 5000 chars")
 
         logger.info(
             f"[ppt_routes:{rid}] tts batch user={user.id} count={len(req.texts)}"
@@ -291,9 +289,9 @@ async def synthesize_tts(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# ════════════════════════════════════════════════════════════════════
-# Feature B: PPT/PDF 视频生成
-# ════════════════════════════════════════════════════════════════════
+# 鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲
+# Feature B: PPT/PDF 瑙嗛鐢熸垚
+# 鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲
 
 
 @router.post("/parse", response_model=ApiResponse)
@@ -302,7 +300,7 @@ async def parse_document(
     request: Request,
     user: AuthUser = Depends(get_current_user),
 ):
-    """解析PPT/PDF文件 → SlideContent[]"""
+    """瑙ｆ瀽PPT/PDF鏂囦欢 鈫?SlideContent[]"""
     rid = _request_id(request)
     try:
         logger.info(
@@ -318,11 +316,11 @@ async def parse_document(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# ── 内容增强 ─────────────────────────────────────────────────────────
+# 鈹€鈹€ 鍐呭澧炲己 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 
 class EnhanceRequest(BaseModel):
-    """讲解文本增强请求"""
+    """璁茶В鏂囨湰澧炲己璇锋眰"""
 
     slides: List[SlideContent] = Field(..., max_length=50)
     language: str = "zh-CN"
@@ -337,7 +335,7 @@ async def enhance_content(
     request: Request,
     user: AuthUser = Depends(get_current_user),
 ):
-    """增强讲解内容: LLM优化 + TTS合成"""
+    """澧炲己璁茶В鍐呭: LLM浼樺寲 + TTS鍚堟垚"""
     rid = _request_id(request)
     try:
         logger.info(
@@ -357,9 +355,9 @@ async def enhance_content(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# ── 渲染 ─────────────────────────────────────────────────────────────
+# 鈹€鈹€ 娓叉煋 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
-# 幂等性键存储 (内存级, 生产应用Redis)
+# 骞傜瓑鎬ч敭瀛樺偍 (鍐呭瓨绾? 鐢熶骇搴旂敤Redis)
 _idempotency_cache: dict = {}
 
 
@@ -369,10 +367,10 @@ async def start_render(
     request: Request,
     user: AuthUser = Depends(get_current_user),
 ):
-    """启动Remotion Lambda视频渲染"""
+    """鍚姩Remotion Lambda瑙嗛娓叉煋"""
     rid = _request_id(request)
 
-    # 幂等性检查
+    # Idempotency check
     if req.idempotency_key:
         cached = _idempotency_cache.get(req.idempotency_key)
         if cached and cached.get("user_id") == user.id:
@@ -389,7 +387,7 @@ async def start_render(
         job = await svc.start_video_render(req.slides, req.config)
         result = job.model_dump()
 
-        # 缓存幂等性结果
+        # Cache idempotent result
         if req.idempotency_key:
             _idempotency_cache[req.idempotency_key] = {
                 "user_id": user.id,
@@ -407,16 +405,16 @@ async def get_render_status(
     job_id: str,
     user: AuthUser = Depends(get_current_user),
 ):
-    """查询渲染状态"""
+    """Query render job status."""
     import re
 
     if not re.match(r"^[a-zA-Z0-9_-]+$", job_id):
-        raise HTTPException(status_code=400, detail="无效的任务ID格式")
+        raise HTTPException(status_code=400, detail="invalid job_id format")
     try:
         svc = _get_service()
         status = await svc.get_render_status(job_id)
         if status.get("status") == "not_found":
-            raise HTTPException(status_code=404, detail=f"任务不存在: {job_id}")
+            raise HTTPException(status_code=404, detail=f"job not found: {job_id}")
         return ApiResponse(success=True, data=status)
     except HTTPException:
         raise
@@ -424,7 +422,7 @@ async def get_render_status(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# ── 下载 ─────────────────────────────────────────────────────────────
+# Download
 
 
 @router.get("/download/{job_id}", response_model=ApiResponse)
@@ -432,11 +430,11 @@ async def get_download_url(
     job_id: str,
     user: AuthUser = Depends(get_current_user),
 ):
-    """获取渲染视频的下载链接 (R2 presigned URL)"""
+    """Get video download URL (R2 presigned URL)."""
     import re
 
     if not re.match(r"^[a-zA-Z0-9_-]+$", job_id):
-        raise HTTPException(status_code=400, detail="无效的任务ID格式")
+        raise HTTPException(status_code=400, detail="invalid job_id format")
     try:
         svc = _get_service()
         download = await svc.get_download_url(job_id)
@@ -448,3 +446,6 @@ async def get_download_url(
     except Exception as e:
         logger.error(f"[ppt_routes] download failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+

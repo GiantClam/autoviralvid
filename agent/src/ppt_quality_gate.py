@@ -511,8 +511,28 @@ _PITCH_MODULE_KEYWORDS = {
     "team": ("team", "founder", "团队", "创始人"),
     "ask": ("ask", "融资", "募资", "用途", "milestone", "里程碑"),
 }
-_TRAINING_OBJECTIVE_RE = re.compile(r"(学习目标|课程目标|你将能够|能够)")
-_TRAINING_MEASURABLE_VERBS = ("能够", "写出", "分析", "判断", "设计", "搭建", "识别", "完成", "运用")
+_TRAINING_OBJECTIVE_RE = re.compile(
+    r"(学习目标|课程目标|你将能够|能够|learning\s+goal|learning\s+objective|you\s+will\s+be\s+able\s+to)",
+    re.IGNORECASE,
+)
+_TRAINING_MEASURABLE_VERBS = (
+    "能够",
+    "写出",
+    "分析",
+    "判断",
+    "设计",
+    "搭建",
+    "识别",
+    "完成",
+    "运用",
+    "identify",
+    "analyze",
+    "design",
+    "build",
+    "evaluate",
+    "apply",
+    "explain",
+)
 _TRAINING_KNOWLEDGE_MAP_RE = re.compile(r"(知识地图|知识框架|课程地图|课程结构|本课结构|目录)")
 _TRAINING_INTERACTION_RE = re.compile(r"(互动|讨论|练习|小测|测验|思考题|挑战)")
 _INVESTOR_ASK_DETAIL_RE = re.compile(r"(\d+\s*(万|亿|m|million)|用途|里程碑|18个月|months?)", re.IGNORECASE)
@@ -1967,3 +1987,4 @@ def score_visual_professional_metrics(
             "source_text_issue_codes": sorted(set(_normalized_issue_codes(text_issue_codes))),
         },
     )
+

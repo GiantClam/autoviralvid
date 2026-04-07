@@ -1,6 +1,6 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
-from src import ppt_service
+from src import ppt_service_v2 as ppt_service
 
 
 def _base_payload() -> dict:
@@ -20,16 +20,16 @@ def _base_payload() -> dict:
                 "slide_type": "content",
                 "layout_grid": "grid_4",
                 "blocks": [
-                    {"block_type": "title", "card_id": "title", "content": "业务进展"},
-                    {"block_type": "kpi", "card_id": "k1", "content": {"label": "增长", "value": "42%"}},
-                    {"block_type": "chart", "card_id": "c1", "content": {"title": "趋势"}},
+                    {"block_type": "title", "card_id": "title", "content": "涓氬姟杩涘睍"},
+                    {"block_type": "kpi", "card_id": "k1", "content": {"label": "澧為暱", "value": "42%"}},
+                    {"block_type": "chart", "card_id": "c1", "content": {"title": "瓒嬪娍"}},
                 ],
             },
             {
                 "slide_id": "s-summary",
                 "slide_type": "summary",
                 "layout_grid": "hero_1",
-                "blocks": [{"block_type": "body", "card_id": "b1", "content": "结论与行动"}],
+                "blocks": [{"block_type": "body", "card_id": "b1", "content": "Summary and actions"}],
             },
         ],
     }
@@ -135,3 +135,7 @@ def test_presentation_contract_v2_has_minimum_archetype_coverage_for_20_slides()
     assert len(rows) == 20
     unique_archetypes = {str(row.get("archetype") or "") for row in rows if str(row.get("archetype") or "")}
     assert len(unique_archetypes) >= 6
+
+
+
+

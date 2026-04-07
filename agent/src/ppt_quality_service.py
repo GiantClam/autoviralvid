@@ -1,11 +1,11 @@
-"""Thin quality evaluation service for PPT export flow."""
+﻿"""Thin quality evaluation service for PPT export flow."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any, Iterable, List, TYPE_CHECKING
 
-import src.ppt_quality_gate as quality_gate
+from src.ppt_quality_checkers import QualityGateOrchestrator
 
 if TYPE_CHECKING:
     from src.ppt_quality_gate import QualityIssue, QualityResult, QualityScoreResult
@@ -26,6 +26,13 @@ class PPTQualityEvaluation:
 class PPTQualityService:
     """Facade around deck/layout validation + score computation."""
 
+    def __init__(
+        self,
+        *,
+        orchestrator: QualityGateOrchestrator | None = None,
+    ) -> None:
+        self._orchestrator = orchestrator or QualityGateOrchestrator()
+
     def evaluate_structural_quality(
         self,
         *,
@@ -35,34 +42,13 @@ class PPTQualityService:
         quality_threshold_offset: float,
         relaxed_codes: Iterable[str] | None = None,
     ) -> PPTQualityEvaluation:
-        content_gate = quality_gate.validate_deck(slides, profile=profile)
-        layout_gate = quality_gate.validate_layout_diversity(render_spec, profile=profile)
-        content_issues = list(content_gate.issues)
-        layout_issues = list(layout_gate.issues)
-        relaxed = {
-            str(code or "").strip()
-            for code in (relaxed_codes or [])
-            if str(code or "").strip()
-        }
-        if relaxed:
-            content_issues = [
-                issue
-                for issue in content_issues
-                if str(getattr(issue, "code", "")).strip() not in relaxed
-            ]
-            layout_issues = [
-                issue
-                for issue in layout_issues
-                if str(getattr(issue, "code", "")).strip() not in relaxed
-            ]
-        gate_issues = [*content_issues, *layout_issues]
-        score_result = quality_gate.score_deck_quality(
+        result = self._orchestrator.evaluate(
             slides=slides,
             render_spec=render_spec,
             profile=profile,
-            content_issues=content_issues,
-            layout_issues=layout_issues,
+            relaxed_codes=relaxed_codes,
         )
+        score_result = result.score_result
         effective_threshold = max(
             1.0,
             min(
@@ -74,12 +60,13 @@ class PPTQualityService:
             score_result.score
         ) >= float(effective_threshold)
         return PPTQualityEvaluation(
-            content_gate=content_gate,
-            layout_gate=layout_gate,
-            content_issues=content_issues,
-            layout_issues=layout_issues,
-            gate_issues=gate_issues,
+            content_gate=result.content_gate,
+            layout_gate=result.layout_gate,
+            content_issues=result.content_issues,
+            layout_issues=result.layout_issues,
+            gate_issues=result.gate_issues,
             score_result=score_result,
             effective_threshold=effective_threshold,
             score_passed=score_passed,
         )
+

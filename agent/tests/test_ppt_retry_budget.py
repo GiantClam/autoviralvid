@@ -1,6 +1,6 @@
-import pytest
+﻿import pytest
 
-from src.ppt_service import _normalize_retry_scope, _resolve_export_channel, _resolve_retry_budget
+from src.ppt_service_v2 import _normalize_retry_scope, _resolve_export_channel, _resolve_retry_budget
 
 
 def test_normalize_retry_scope_defaults_to_deck():
@@ -24,3 +24,5 @@ def test_resolve_export_channel_rejects_remote(monkeypatch):
     monkeypatch.setenv("PPT_EXPORT_CHANNEL", "local")
     with pytest.raises(ValueError, match="remote channel is disabled"):
         _resolve_export_channel("remote")
+
+

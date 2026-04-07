@@ -1,22 +1,22 @@
-import pytest
+﻿import pytest
 
-from src.ppt_service import _prepare_pipeline_contract_inputs
+from src.ppt_service_v2 import _prepare_pipeline_contract_inputs
 from src.schemas.ppt_pipeline import PPTPipelineRequest
 
 
 def _reference_desc() -> dict:
     return {
-        "title": "重建样例",
+        "title": "閲嶅缓鏍蜂緥",
         "slides": [
             {
                 "slide_id": "s1",
-                "title": "经营总览",
-                "blocks": [{"block_type": "body", "content": "营收提升 22%"}],
+                "title": "缁忚惀鎬昏",
+                "blocks": [{"block_type": "body", "content": "钀ユ敹鎻愬崌 22%"}],
             },
             {
                 "slide_id": "s2",
-                "title": "执行路径",
-                "blocks": [{"block_type": "list", "content": "Q1 验证;Q2 放量"}],
+                "title": "鎵ц璺緞",
+                "blocks": [{"block_type": "list", "content": "Q1 楠岃瘉;Q2 鏀鹃噺"}],
             },
         ],
         "theme": {
@@ -31,7 +31,7 @@ def _reference_desc() -> dict:
 
 def test_prepare_pipeline_contract_inputs_fails_fast_when_reference_contract_missing_fields():
     req = PPTPipelineRequest(
-        topic="经营复盘",
+        topic="缁忚惀澶嶇洏",
         reconstruct_from_reference=True,
         reference_desc={
             "slides": [],
@@ -49,7 +49,7 @@ def test_prepare_pipeline_contract_inputs_fails_fast_when_reference_contract_mis
 
 def test_prepare_pipeline_contract_inputs_derives_and_persists_contract_fields():
     req = PPTPipelineRequest(
-        topic="经营复盘",
+        topic="缁忚惀澶嶇洏",
         reconstruct_from_reference=True,
         reference_desc=_reference_desc(),
     )
@@ -61,3 +61,5 @@ def test_prepare_pipeline_contract_inputs_derives_and_persists_contract_fields()
     assert req.required_facts == out["required_facts"]
     assert isinstance(req.reference_desc, dict)
     assert req.reference_desc.get("anchors") == out["anchors"]
+
+

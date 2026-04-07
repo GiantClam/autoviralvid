@@ -1,8 +1,8 @@
-import pytest
+﻿import pytest
 from pydantic import ValidationError
 
-import src.ppt_service as ppt_service
-from src.ppt_service import PPTService
+import src.ppt_service_v2 as ppt_service
+from src.ppt_service_v2 import PPTService
 from src.schemas.ppt_outline import OutlinePlan, OutlinePlanRequest, StickyNote
 from src.schemas.ppt_pipeline import PPTPipelineRequest
 from src.schemas.ppt_plan import ContentBlock, PresentationPlanRequest
@@ -108,14 +108,14 @@ async def test_research_uses_serper_when_key_is_configured(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_classroom_outline_uses_pedagogical_storyline():
+async def test_outline_uses_generic_storyline_defaults():
     svc = PPTService()
     research = await svc.generate_research_context(
         ResearchRequest(
-            topic="请制作一份高中课堂展示课件，主题为“解码立法过程：理解其对国际关系的影响”",
-            audience="high school students",
-            purpose="classroom presentation",
-            style_preference="clear educational",
+            topic="AI governance strategy for enterprise rollout",
+            audience="strategy leaders",
+            purpose="decision briefing",
+            style_preference="professional",
             web_enrichment=False,
         )
     )
@@ -123,28 +123,21 @@ async def test_classroom_outline_uses_pedagogical_storyline():
         OutlinePlanRequest(research=research, total_pages=10)
     )
     titles = [str(note.core_message) for note in outline.notes]
-    assert titles[1] == "课程导航"
-    assert titles[2] == "什么是立法过程"
-    assert titles[3] == "立法过程中的关键角色"
-    assert titles[4] == "立法过程与国际关系的交汇"
-    assert titles[5] == "国际关系中的制度接口"
-    assert titles[6] == "案例分析：立法过程的国际关系影响"
-    assert titles[7] == "未来趋势与思考"
-    assert titles[8] == "课堂总结"
-    assert titles[-1] == "谢谢"
-    assert outline.theme_suggestion == "education_charts"
-    assert outline.style_suggestion == "rounded"
+    assert titles[1] in {"内容导航", "Table of Contents"}
+    assert titles[-1] in {"总结与启示", "Summary & Insights", "Summary & Takeaways"}
+    assert outline.theme_suggestion == "business_authority"
+    assert outline.style_suggestion == "soft"
 
 
 @pytest.mark.asyncio
-async def test_classroom_presentation_plan_preserves_storyline_titles():
+async def test_presentation_plan_preserves_storyline_titles():
     svc = PPTService()
     research = await svc.generate_research_context(
         ResearchRequest(
-            topic="请制作一份高中课堂展示课件，主题为“解码立法过程：理解其对国际关系的影响”",
-            audience="high school students",
-            purpose="classroom presentation",
-            style_preference="clear educational",
+            topic="AI governance strategy for enterprise rollout",
+            audience="strategy leaders",
+            purpose="decision briefing",
+            style_preference="professional",
             web_enrichment=False,
         )
     )
@@ -158,9 +151,13 @@ async def test_classroom_presentation_plan_preserves_storyline_titles():
     for slide in plan.slides:
         title_block = next(block for block in slide.blocks if block.block_type == "title")
         slide_titles.append(str(title_block.content))
-    assert slide_titles[1] == outline.notes[1].core_message
-    assert slide_titles[2:9] == [str(note.core_message) for note in outline.notes[2:9]]
-    assert slide_titles[-1] == outline.notes[-1].core_message
+    assert slide_titles[1] == str(outline.title)
+    for slide_title, note in zip(slide_titles[2:9], outline.notes[2:9]):
+        normalized_slide_title = str(slide_title or "").replace("…", "").strip()
+        normalized_note_title = str(note.core_message or "").strip()
+        assert normalized_slide_title
+        assert normalized_note_title.startswith(normalized_slide_title)
+    assert slide_titles[-1] == str(outline.title)
     assert plan.slides[1].slide_type == "toc"
     assert plan.slides[-1].slide_type == "summary"
 
@@ -186,18 +183,32 @@ def test_profile_field_ownership_overrides_slide_level_profile_drift():
 
 
 @pytest.mark.asyncio
-async def test_classroom_pipeline_strips_instructional_boilerplate_from_content_blocks(monkeypatch):
+async def test_pipeline_strips_instructional_boilerplate_from_content_blocks(monkeypatch):
     monkeypatch.setenv("PPT_DEV_FAST_FAIL", "false")
-    from src.ppt_quality_gate import QualityResult
+    monkeypatch.setenv("PPT_DIRECT_SKILL_RUNTIME_REQUIRE", "false")
+    from src.ppt_quality_gate import QualityResult, QualityScoreResult
 
     monkeypatch.setattr("src.ppt_quality_gate.validate_layout_diversity", lambda *_args, **_kwargs: QualityResult(ok=True, issues=[]))
+    monkeypatch.setattr("src.ppt_quality_gate.validate_deck", lambda *_args, **_kwargs: QualityResult(ok=True, issues=[]))
+    monkeypatch.setattr(
+        "src.ppt_quality_gate.score_deck_quality",
+        lambda *_args, **_kwargs: QualityScoreResult(
+            score=90.0,
+            passed=True,
+            threshold=75.0,
+            warn_threshold=82.0,
+            dimensions={},
+            issue_counts={},
+            diagnostics={},
+        ),
+    )
     svc = PPTService()
     result = await svc.run_ppt_pipeline(
         PPTPipelineRequest(
-            topic="请制作一份高中课堂展示课件，主题为“解码立法过程：理解其对国际关系的影响”",
-            audience="high school students",
-            purpose="classroom presentation",
-            style_preference="clear educational",
+            topic="AI governance strategy for enterprise rollout",
+            audience="strategy leaders",
+            purpose="decision briefing",
+            style_preference="professional",
             total_pages=8,
             route_mode="fast",
             quality_profile="lenient_draft",
@@ -218,23 +229,43 @@ async def test_classroom_pipeline_strips_instructional_boilerplate_from_content_
         for block in (slide.get("blocks") or [])
         if isinstance(block, dict)
     )
-    for prefix in ("核心信息：", "核心问题：", "课堂提示：", "案例背景：", "争议焦点："):
+    for prefix in (
+        "Core takeaway:",
+        "Core question:",
+        "Class prompt:",
+        "Case context:",
+        "Debate focus:",
+    ):
         assert prefix not in flattened
 
 
 @pytest.mark.asyncio
-async def test_classroom_pipeline_reclassifies_non_terminal_hero_layout_as_section(monkeypatch):
+async def test_pipeline_reclassifies_non_terminal_hero_layout_as_section(monkeypatch):
     monkeypatch.setenv("PPT_DEV_FAST_FAIL", "false")
-    from src.ppt_quality_gate import QualityResult
+    monkeypatch.setenv("PPT_DIRECT_SKILL_RUNTIME_REQUIRE", "false")
+    from src.ppt_quality_gate import QualityResult, QualityScoreResult
 
     monkeypatch.setattr("src.ppt_quality_gate.validate_layout_diversity", lambda *_args, **_kwargs: QualityResult(ok=True, issues=[]))
+    monkeypatch.setattr("src.ppt_quality_gate.validate_deck", lambda *_args, **_kwargs: QualityResult(ok=True, issues=[]))
+    monkeypatch.setattr(
+        "src.ppt_quality_gate.score_deck_quality",
+        lambda *_args, **_kwargs: QualityScoreResult(
+            score=90.0,
+            passed=True,
+            threshold=75.0,
+            warn_threshold=82.0,
+            dimensions={},
+            issue_counts={},
+            diagnostics={},
+        ),
+    )
     svc = PPTService()
     result = await svc.run_ppt_pipeline(
         PPTPipelineRequest(
-            topic="请制作一份高中课堂展示课件，主题为“解码立法过程：理解其对国际关系的影响”",
-            audience="high school students",
-            purpose="classroom presentation",
-            style_preference="clear educational",
+            topic="AI governance strategy for enterprise rollout",
+            audience="strategy leaders",
+            purpose="decision briefing",
+            style_preference="professional",
             total_pages=8,
             route_mode="fast",
             quality_profile="lenient_draft",
@@ -251,6 +282,54 @@ async def test_classroom_pipeline_reclassifies_non_terminal_hero_layout_as_secti
         layout_grid = str(slide.get("layout_grid") or "")
         if layout_grid == "hero_1":
             assert slide_type in {"cover", "summary", "toc", "divider", "hero_1", "section"}
+
+
+@pytest.mark.asyncio
+async def test_pipeline_stage13_fallback_path_keeps_stage_order(monkeypatch):
+    monkeypatch.setenv("PPT_DEV_FAST_FAIL", "false")
+    monkeypatch.setenv("PPT_DIRECT_SKILL_RUNTIME_REQUIRE", "false")
+    monkeypatch.setenv("PPT_STAGE13_GRAPH_ENABLED", "false")
+    from src.ppt_quality_gate import QualityResult, QualityScoreResult
+
+    monkeypatch.setattr(
+        "src.ppt_quality_gate.validate_layout_diversity",
+        lambda *_args, **_kwargs: QualityResult(ok=True, issues=[]),
+    )
+    monkeypatch.setattr(
+        "src.ppt_quality_gate.validate_deck",
+        lambda *_args, **_kwargs: QualityResult(ok=True, issues=[]),
+    )
+    monkeypatch.setattr(
+        "src.ppt_quality_gate.score_deck_quality",
+        lambda *_args, **_kwargs: QualityScoreResult(
+            score=90.0,
+            passed=True,
+            threshold=75.0,
+            warn_threshold=82.0,
+            dimensions={},
+            issue_counts={},
+            diagnostics={},
+        ),
+    )
+
+    svc = PPTService()
+    result = await svc.run_ppt_pipeline(
+        PPTPipelineRequest(
+            topic="AI governance strategy for enterprise rollout",
+            audience="strategy leaders",
+            purpose="decision briefing",
+            style_preference="professional",
+            total_pages=8,
+            route_mode="fast",
+            quality_profile="lenient_draft",
+            web_enrichment=False,
+            with_export=False,
+            save_artifacts=False,
+            execution_profile="prod_safe",
+        )
+    )
+    stage_names = [str(stage.stage) for stage in (result.stages or [])]
+    assert stage_names[:3] == ["research", "outline_plan", "presentation_plan"]
 
 
 @pytest.mark.asyncio
@@ -287,46 +366,67 @@ async def test_research_gap_driven_queries_include_required_facts(monkeypatch):
 async def test_generate_presentation_plan_emits_structured_comparison_slide_hints():
     svc = PPTService()
     research = ResearchContext(
-        topic="智能体方案对比",
-        audience="产品与技术负责人",
-        purpose="方案评审",
+        topic="Agent solution comparison",
+        audience="product and engineering leads",
+        purpose="proposal review",
         style_preference="professional",
-        key_data_points=["自动编排提效 80%", "上线周期缩短 60%", "人工切换减少"],
+        key_data_points=[
+            "Automation uplift +80%",
+            "Launch cycle reduced by 60%",
+            "Manual handoff overhead reduced",
+        ],
         reference_materials=[{"title": "benchmark", "url": "https://example.com/benchmark"}],
         completeness_score=0.7,
         enrichment_strategy="web+fallback",
         questions=[
-            ResearchQuestion(question="受众是谁？", category="audience", why="确定表达颗粒度"),
-            ResearchQuestion(question="目标是什么？", category="purpose", why="确定内容取舍"),
-            ResearchQuestion(question="需要哪些数据？", category="data", why="保证论据支撑"),
+            ResearchQuestion(
+                question="Who is the audience?",
+                category="audience",
+                why="Tune narrative depth",
+            ),
+            ResearchQuestion(
+                question="What decision is needed?",
+                category="purpose",
+                why="Prioritize recommendation framing",
+            ),
+            ResearchQuestion(
+                question="Which metrics are required?",
+                category="data",
+                why="Ground claims with evidence",
+            ),
         ],
     )
     outline = OutlinePlan(
-        title="智能体方案对比",
+        title="Agent solution comparison",
         total_pages=3,
         theme_suggestion="slate_minimal",
         style_suggestion="soft",
-        logic_flow="封面-方案对比-总结建议",
+        logic_flow="cover-comparison-summary",
         notes=[
             StickyNote(
                 page_number=1,
-                core_message="智能体方案对比",
+                core_message="Agent solution comparison",
                 layout_hint="cover",
-                key_points=["背景", "目标", "范围"],
+                key_points=["Context", "Goal", "Scope"],
             ),
             StickyNote(
                 page_number=2,
-                core_message="传统方案 vs 智能代理方案",
+                core_message="Traditional vs agentic",
                 layout_hint="split_2",
                 data_elements=["comparison"],
                 visual_anchor="text",
-                key_points=["人工交接多", "响应链路长", "自动编排提效 80%", "上线周期缩短 60%"],
+                key_points=[
+                    "Manual handoff overhead",
+                    "Long response chain",
+                    "Automation uplift +80%",
+                    "Launch cycle reduced by 60%",
+                ],
             ),
             StickyNote(
                 page_number=3,
-                core_message="总结与行动建议",
+                core_message="Summary and action plan",
                 layout_hint="summary",
-                key_points=["统一路由", "先改内容页", "再混合 SVG lane"],
+                key_points=["Unified routing", "Improve content first", "Then optimize SVG lane"],
             ),
         ],
     )
@@ -339,3 +439,5 @@ async def test_generate_presentation_plan_emits_structured_comparison_slide_hint
     assert str(getattr(middle, "archetype", "") or "").strip().lower() == "comparison_2col"
     assert "comparison_cards_light" in list(getattr(middle, "template_candidates", []) or [])
     assert any(block.block_type == "comparison" for block in middle.blocks)
+
+

@@ -1,10 +1,10 @@
-import pytest
+﻿import pytest
 import copy
 
 from src.ppt_quality_gate import QualityIssue, QualityResult
-import src.ppt_service as ppt_service
+import src.ppt_service_v2 as ppt_service
 from src.schemas.ppt import ExportRequest, SlideContent, SlideElement
-from src.ppt_service import PPTService
+from src.ppt_service_v2 import PPTService
 
 
 @pytest.fixture(autouse=True)
@@ -23,7 +23,7 @@ def _isolate_export_retry_flow_from_skill_runtime(monkeypatch):
 async def test_quality_gate_triggers_slide_retry_and_persists_diagnostics(monkeypatch):
     import src.minimax_exporter as minimax_exporter
     import src.ppt_quality_gate as quality_gate
-    import src.ppt_service as ppt_service
+    import src.ppt_service_v2 as ppt_service
     import src.ppt_visual_qa as ppt_visual_qa
     import src.pptx_rasterizer as pptx_rasterizer
     import src.r2 as r2
@@ -238,7 +238,7 @@ async def test_partial_retry_full_deck_result_skips_finalize_call(monkeypatch):
 async def test_template_file_url_uses_template_edit_route(monkeypatch):
     import src.minimax_exporter as minimax_exporter
     import src.pptx_engine as pptx_engine
-    import src.ppt_service as ppt_service
+    import src.ppt_service_v2 as ppt_service
     import src.r2 as r2
 
     def _unexpected_export(**_kwargs):
@@ -309,7 +309,7 @@ async def test_template_file_url_uses_template_edit_route(monkeypatch):
 async def test_template_renderer_summary_surfaces_in_observability_and_alerts(monkeypatch):
     import src.minimax_exporter as minimax_exporter
     import src.ppt_quality_gate as quality_gate
-    import src.ppt_service as ppt_service
+    import src.ppt_service_v2 as ppt_service
     import src.ppt_visual_qa as ppt_visual_qa
     import src.pptx_rasterizer as pptx_rasterizer
     import src.r2 as r2
@@ -545,7 +545,7 @@ async def test_strict_mode_fails_when_subagent_and_markitdown_are_blocked(monkey
 async def test_text_qa_surfaces_in_observability_and_alerts(monkeypatch):
     import src.minimax_exporter as minimax_exporter
     import src.ppt_quality_gate as quality_gate
-    import src.ppt_service as ppt_service
+    import src.ppt_service_v2 as ppt_service
     import src.ppt_visual_qa as ppt_visual_qa
     import src.pptx_rasterizer as pptx_rasterizer
     import src.r2 as r2
@@ -571,16 +571,16 @@ async def test_text_qa_surfaces_in_observability_and_alerts(monkeypatch):
                         "title": "结论：市场渗透加速",
                         "content_strategy": {
                             "assertion": "结论：市场渗透加速",
-                            "evidence": ["同比提升 38%"],
+                            "evidence": ["鍚屾瘮鎻愬崌 38%"],
                         },
-                        "elements": [{"type": "text", "content": "证据：同比提升 38%"}],
+                        "elements": [{"type": "text", "content": "璇佹嵁锛氬悓姣旀彁鍗?38%"}],
                     },
                     {
                         "slide_id": "s2",
                         "title": "",
                         "content_strategy": {
-                            "assertion": "关键结论：转化率提升",
-                            "evidence": ["转化率提升 22%", "ROI 增长"],
+                            "assertion": "鍏抽敭缁撹锛氳浆鍖栫巼鎻愬崌",
+                            "evidence": ["杞寲鐜囨彁鍗?22%", "ROI 澧為暱"],
                         },
                         "elements": [{"type": "text", "content": "TODO placeholder xxxx"}],
                     },
@@ -628,14 +628,14 @@ async def test_text_qa_surfaces_in_observability_and_alerts(monkeypatch):
         slides=[
             SlideContent(
                 slide_id="s1",
-                title="结论",
-                elements=[SlideElement(type="text", content="证据", block_id="b1")],
+                title="缁撹",
+                elements=[SlideElement(type="text", content="璇佹嵁", block_id="b1")],
                 narration="n1",
                 duration=120,
             ),
             SlideContent(
                 slide_id="s2",
-                title="补充",
+                title="琛ュ厖",
                 elements=[SlideElement(type="text", content="n2", block_id="b2")],
                 narration="n2",
                 duration=120,
@@ -1103,3 +1103,5 @@ async def test_standard_route_requires_native_rasterization(monkeypatch):
     with pytest.raises(MiniMaxExportError) as exc:
         await PPTService().export_pptx(req)
     assert "rasterization" in str(exc.value).lower()
+
+

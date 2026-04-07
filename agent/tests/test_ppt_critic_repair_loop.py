@@ -1,17 +1,17 @@
-import copy
+﻿import copy
 
 import pytest
 
 from src.ppt_quality_gate import QualityIssue, QualityResult, QualityScoreResult
 from src.schemas.ppt import ExportRequest, SlideContent, SlideElement
-from src.ppt_service import PPTService
+from src.ppt_service_v2 import PPTService
 
 
 @pytest.mark.asyncio
 async def test_visual_critic_patch_applies_before_retry(monkeypatch):
     import src.minimax_exporter as minimax_exporter
     import src.ppt_quality_gate as quality_gate
-    import src.ppt_service as ppt_service
+    import src.ppt_service_v2 as ppt_service
     import src.ppt_visual_qa as ppt_visual_qa
     import src.pptx_rasterizer as pptx_rasterizer
     import src.r2 as r2
@@ -20,6 +20,8 @@ async def test_visual_critic_patch_applies_before_retry(monkeypatch):
     monkeypatch.setenv("PPT_PARTIAL_RETRY_ENABLED", "true")
     monkeypatch.setenv("PPT_RETRY_MAX_ATTEMPTS", "3")
     monkeypatch.setenv("PPT_VISUAL_CRITIC_REPAIR_ENABLED", "true")
+    monkeypatch.setenv("PPT_DEFAULT_EXECUTION_PROFILE", "dev_strict")
+    monkeypatch.setattr(ppt_service, "_run_layer1_design_skill_chain", lambda **_kwargs: {})
 
     async def _fake_sleep(_seconds):
         return None
@@ -147,4 +149,6 @@ async def test_visual_critic_patch_applies_before_retry(monkeypatch):
     assert bool((patched_slide.get("visual") or {}).get("force_high_contrast")) is True
     statuses = [str(row.get("status")) for row in result.get("diagnostics", []) if isinstance(row, dict)]
     assert "visual_critic_patch" in statuses
+
+
 

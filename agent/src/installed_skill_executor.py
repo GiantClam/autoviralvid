@@ -1,7 +1,7 @@
 ﻿"""Installed skill executor for PPT planning/runtime patches.
 
 The executor is called by ``src.ppt_subagent_executor`` (stdin/stdout JSON),
-but it is also used directly by ``src.ppt_service`` in the main export path.
+but it is also used directly by ``src.ppt_service_v2`` in the main export path.
 """
 
 from __future__ import annotations
@@ -1551,3 +1551,5 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
+
