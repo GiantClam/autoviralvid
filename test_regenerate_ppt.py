@@ -166,12 +166,8 @@ try:
     print("Next Steps")
     print("=" * 70)
     print("1. Review generated PPTX file")
-    print("2. Run gap evaluation:")
-    print(
-        f"   python agent/src/ppt_gap_eval.py run --theme courseware --input-files {output_file}"
-    )
-    print("3. Compare with reference PPT (D:\\private\\test\\2.pptx)")
-    print("4. Generate visual comparison report")
+    print("2. Compare with reference PPT (D:\\private\\test\\2.pptx)")
+    print("3. Generate visual comparison report")
 
 except requests.exceptions.ConnectionError:
     print("\n[ERROR] Cannot connect to API server")

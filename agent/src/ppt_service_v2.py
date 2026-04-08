@@ -8699,12 +8699,12 @@ _GENERIC_AUDIENCE = {
     "all",
     "public",
     "everyone",
-    "澶т紬",
-    "閫氱敤",
-    "鍏ㄩ儴浜虹兢",
+    "??",
+    "??",
+    "??",
 }
-_GENERIC_PURPOSE = {"presentation", "general", "姹囨姤", "婕旂ず", "灞曠ず"}
-_GENERIC_STYLE = {"professional", "default", "normal", "鍟嗗姟", "涓撲笟", "甯歌"}
+_GENERIC_PURPOSE = {"presentation", "general", "??", "??", "??"}
+_GENERIC_STYLE = {"professional", "default", "normal", "??", "??", "??"}
 
 
 def _is_generic_slot(value: str, generic: set[str]) -> bool:
@@ -8754,7 +8754,7 @@ def _prepare_pipeline_contract_inputs(
         normalized_required_facts = audit.required_facts
         normalized_anchors = audit.anchors
 
-    anchor_constraints = [f"锚点约束:{item}" for item in normalized_anchors[:8]]
+    anchor_constraints = [f"????:{item}" for item in normalized_anchors[:8]]
     normalized_constraints = _dedup_strings(
         [*(req.constraints or []), *anchor_constraints],
         limit=20,
@@ -8778,10 +8778,10 @@ def _build_research_gaps(req: ResearchRequest, *, is_zh: bool) -> List[ResearchG
             ResearchGap(
                 code="audience",
                 severity="high",
-                message="鍙椾紬鎻忚堪杩囦簬娉涘寲锛岀己灏戞槑纭鑹蹭笌鍐崇瓥灞傜骇?"
+                message="?????????????????????"
                 if is_zh
                 else "Audience definition is too generic; role and decision level are missing.",
-                query_hint="鐩爣鍙椾紬 鍒嗗眰"
+                query_hint="?????? ???? ????"
                 if is_zh
                 else "target audience segmentation",
             )
@@ -8791,10 +8791,10 @@ def _build_research_gaps(req: ResearchRequest, *, is_zh: bool) -> List[ResearchG
             ResearchGap(
                 code="purpose",
                 severity="medium",
-                message="婕旂ず鐩爣涓嶅鏄庣‘锛岄毦浠ョ‘瀹氬彊浜嬮噸?"
+                message="???????????????????????"
                 if is_zh
                 else "Presentation objective is not specific enough for clear narrative focus.",
-                query_hint="鍟嗕笟鐩爣 KPI" if is_zh else "business objective KPI",
+                query_hint="???? KPI ????" if is_zh else "business objective KPI",
             )
         )
     if _is_generic_slot(req.style_preference, _GENERIC_STYLE):
@@ -8802,10 +8802,10 @@ def _build_research_gaps(req: ResearchRequest, *, is_zh: bool) -> List[ResearchG
             ResearchGap(
                 code="style",
                 severity="low",
-                message="瑙嗚椋庢牸鍋忓ソ涓嶆槑纭紝寤鸿琛ュ厖璋冩垨鍝佺墝绾︽潫?"
+                message="??????????????????????"
                 if is_zh
                 else "Visual style preference is vague; add tone or brand constraints.",
-                query_hint="鍝佺墝瑙嗚 椋庢牸" if is_zh else "brand visual style",
+                query_hint="???? ???? ????" if is_zh else "brand visual style",
             )
         )
     if not req.required_facts:
@@ -8813,10 +8813,10 @@ def _build_research_gaps(req: ResearchRequest, *, is_zh: bool) -> List[ResearchG
             ResearchGap(
                 code="required_facts",
                 severity="high",
-                message="缂哄皯蹇呴』灞曠ず鐨勬暟鎹偣锛屽浘琛ㄥ瀷渚濇嵁涓嶈冻?"
+                message="??????????????????????"
                 if is_zh
                 else "Missing must-have facts, limiting chart and evidence selection.",
-                query_hint="鏍稿績鎸囨爣 鏁版嵁" if is_zh else "core metrics data",
+                query_hint="???? ???? ????" if is_zh else "core metrics data",
             )
         )
     if not str(req.time_range or "").strip():
@@ -8824,10 +8824,10 @@ def _build_research_gaps(req: ResearchRequest, *, is_zh: bool) -> List[ResearchG
             ResearchGap(
                 code="time_range",
                 severity="medium",
-                message="缂哄皯鏃堕棿鑼冨洿锛岃秼鍔挎暟鎹棤娉曢檺瀹氬彛?"
+                message="????????????????"
                 if is_zh
                 else "Time range is missing, making trend framing ambiguous.",
-                query_hint="??瓒嬪娍" if is_zh else "last 3 years trend",
+                query_hint="??? ??? ??" if is_zh else "last 3 years trend",
             )
         )
     if not str(req.geography or "").strip():
@@ -8835,10 +8835,10 @@ def _build_research_gaps(req: ResearchRequest, *, is_zh: bool) -> List[ResearchG
             ResearchGap(
                 code="geography",
                 severity="low",
-                message="缂哄皯鍦板煙鑼冨洿锛屽競鍦烘暟鎹彲鑳藉彛寰勪笉涓㈣嚧?"
+                message="????????????????????"
                 if is_zh
                 else "Geographic scope is missing; market figures may be inconsistent.",
-                query_hint="涓浗 甯傚満" if is_zh else "regional market",
+                query_hint="???? ??/????" if is_zh else "regional market",
             )
         )
     return gaps
@@ -8849,35 +8849,28 @@ def _normalize_research_topic(topic: str, *, is_zh: bool) -> str:
     if not raw:
         return ""
     text = (
-        raw.replace("“", '"')
-        .replace("”", '"')
-        .replace("‘", "'")
-        .replace("’", "'")
+        raw.replace("?", '"')
+        .replace("?", '"')
+        .replace("?", "'")
+        .replace("?", "'")
         .strip()
     )
     if is_zh:
-        for marker in ("主题是", "主题为", "主题:", "主题：", "关于", "围绕"):
+        for marker in ("???", "???", "??:", "???", "??", "??"):
             if marker not in text:
                 continue
-            candidate = text.split(marker, 1)[1].strip().strip("\"' ")
-            candidate = re.split(r"[。！？!?]", candidate)[0].strip()
+            candidate = text.split(marker, 1)[1].strip().strip(""' ")
+            candidate = re.split(r"[????]", candidate)[0].strip()
             if candidate:
                 return candidate[:120]
-    quoted = re.findall(r"[\"']([^\"']{3,160})[\"']", text)
+    quoted = re.findall(r"["']([^"']{3,160})["']", text)
     if quoted:
         candidate = max((item.strip() for item in quoted), key=len, default="")
         if candidate:
             return candidate[:120]
-    text = re.sub(
-        r"^(请帮我)?\s*(制作|生成|创建|撰写|做)\s*(一份|一个|一套)?",
-        "",
-        text,
-        flags=re.IGNORECASE,
-    ).strip()
-    text = re.sub(
-        r"(课堂展示)?课件|演示课件|演示文稿|ppt", "", text, flags=re.IGNORECASE
-    ).strip()
-    text = re.sub(r"\s+", " ", text).strip(" ，。！？!?")
+    text = re.sub(r"^(?)?(??)?\s*(??|??|??|??|?)\s*(??|??|??)?", "", text, flags=re.IGNORECASE).strip()
+    text = re.sub(r"(????)???|????|????|ppt", "", text, flags=re.IGNORECASE).strip()
+    text = re.sub(r"\s+", " ", text).strip(" ?????")
     return text[:120] if text else raw[:120]
 
 
@@ -8887,17 +8880,17 @@ def _build_fallback_topic_points(topic: str, *, is_zh: bool) -> List[str]:
         return []
     subject, focus = _split_topic_focus(seed, prefer_zh=is_zh)
     if is_zh:
-        impact = focus or f"{subject}的核心议题"
+        impact = focus or f"{subject}?????"
         return _dedup_strings(
             [
-                f"{subject}的背景与定义",
-                f"{subject}的关键机制与结构",
-                f"{subject}的主要参与方与角色",
-                f"{subject}的流程步骤与关键节点",
-                f"{subject}在国际关系中的影响路径",
-                f"{subject}的代表案例与数据证据",
-                f"{subject}面临的争议风险与约束",
-                f"{impact}的案例与启示",
+                f"{subject}??????",
+                f"{subject}????????",
+                f"{subject}?????????",
+                f"{subject}??????????",
+                f"{subject}???????????",
+                f"{subject}??????????",
+                f"{subject}??????????",
+                f"{impact}??????",
             ],
             limit=8,
         )
@@ -8957,9 +8950,9 @@ def _build_research_queries(
     if not queries:
         default_queries = (
             [
-                f"{topic_seed} 鑳屾櫙 瀹氫箟",
-                f"{topic_seed} 鍏抽敭鏈哄埗 娴佺▼",
-                f"{topic_seed} 鏁版嵁 妗堜緥 璇佹嵁",
+                f"{topic_seed} ?? ??",
+                f"{topic_seed} ???? ??",
+                f"{topic_seed} ?? ?? ??",
             ]
             if is_zh
             else [
@@ -8986,7 +8979,7 @@ def _build_fallback_research_evidence(
     source_title = (
         str((references[0] or {}).get("title") or "").strip()
         if references and isinstance(references[0], dict)
-        else ("Fallback topic synthesis" if not is_zh else "涓婚鎺ㄥ琛ュ厖")
+        else ("Fallback topic synthesis" if not is_zh else "??????")
     )
     source_url = (
         str((references[0] or {}).get("url") or "").strip()
@@ -9006,7 +8999,7 @@ def _build_fallback_research_evidence(
             continue
         claim = str(expanded[0] or point).strip()[:500]
         snippet = (
-            "；".join(
+            "?".join(
                 str(item or "").strip()
                 for item in expanded[1:3]
                 if str(item or "").strip()
@@ -9022,7 +9015,7 @@ def _build_fallback_research_evidence(
             ResearchEvidence(
                 claim=claim,
                 source_title=source_title[:300]
-                or ("Fallback synthesis" if not is_zh else "琛ュ厖鎺ㄥ"),
+                or ("Fallback synthesis" if not is_zh else "??????"),
                 source_url=source_url,
                 snippet=snippet[:800],
                 confidence=0.46,
@@ -9033,6 +9026,7 @@ def _build_fallback_research_evidence(
         if idx >= 5:
             break
     return evidence_rows
+
 
 
 def _score_evidence_confidence(url: str, snippet: str) -> float:
@@ -9061,60 +9055,36 @@ _RELEVANCE_EN_STOPWORDS = {
     "slides",
 }
 _RELEVANCE_ZH_NOISE = {
-    "鎴戜滑",
-    "浣犱滑",
-    "浠栦滑",
-    "杩欎釜",
-    "閭ｄ釜",
-    "鐩稿叧",
-    "内容",
-    "涓婚",
-    "闂",
+    "??",
+    "??",
+    "??",
+    "??",
+    "??",
+    "??",
+    "??",
+    "??",
 }
-_MOJIBAKE_MARKERS = ("脙", "脗", "芒?", "茂录", "忙", "莽", "猫", "茅", "冒")
-_MOJIBAKE_CJK_MARKERS = (
-    "?",
-    "?",
-    "?",
-    "?",
-    "?",
-    "?",
-    "?",
-    "?",
-    "?",
-    "娑撯偓",
-)
+_MOJIBAKE_MARKERS = ("???", "??", "?", "???", "???", "??")
+_MOJIBAKE_CJK_MARKERS = ("?", "?", "?", "?", "?", "?", "?", "?")
 _MOJIBAKE_CJK_TOKENS = (
-    "蹇欒伖",
-    "鐩茬",
-    "鑱皳",
-    "娼炶伅",
-    "鑾借伔",
-    "鐩茶祩",
-    "鐚▌",
-    "鐚簱",
-    "鑱欒仧",
-    "婢堆勬殶",
-    "閸忚櫕?",
-    "?0?",
-    "閸ヤ粙?",
-    "缁斿?",
-    "閻梻?",
+    "???",
+    "???",
+    "???",
+    "???",
+    "???",
+    "???",
+    "???",
+    "???",
 )
-_MOJIBAKE_CJK_CHARS = set(
-    "鑱圭鑱綖鑾借伔鑱炶祩濞勮仜楹撹仸搴愯仚鑱熼崣閻ㄩ妴閿涢梽閺佺拠閹规径娑撻弰?"
-)
-_COMMON_ZH_FUNCTION_CHARS = "鐨勪竴鏄湪涓嶄簡鍜屽涓庡叾灏嗙敱鍙婁腑鑰屽彲?"
-_TOPIC_ZH_HINT_CHARS = "鑳屾櫙鐩爣绛栫暐鏈哄埗娴佺▼妗堜緥鏁版嵁瓒嬪娍鏂规硶瀹炶返搴旂敤鏁欒偛鍟嗕笟鎶㈡湳?"
+_MOJIBAKE_CJK_CHARS = set("????????")
+_COMMON_ZH_FUNCTION_CHARS = "?????????????"
+_TOPIC_ZH_HINT_CHARS = "????????????????????????????????????????"
 _SOFTWARE_TOPIC_HINTS = {
     "ai",
     "github",
-    "?",
-    "浠ｇ爜",
-    "缂栫▼",
-    "杞欢",
-    "妗嗘灦",
+    "gitlab",
     "python",
+    "prompt",
     "agent",
 }
 _RESEARCH_NOISE_TERMS = {
@@ -9123,10 +9093,9 @@ _RESEARCH_NOISE_TERMS = {
     "gitee",
     "pptagent",
     "pypi",
-    "?",
-    "浠撳簱",
-    "璐＄尞?",
-    "閫熸敹?",
+    "??",
+    "??",
+    "??",
 }
 
 

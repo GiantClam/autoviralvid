@@ -53,15 +53,15 @@ python -m uvicorn agent.main:app --host 0.0.0.0 --port 8124
 # 使用测试脚本
 python test_regenerate_ppt.py
 
-# 或者直接调用API
-curl -X POST http://127.0.0.1:8124/api/v1/ppt/pipeline \
+# 或者直接调用 Prompt 直出 API（当前主流程）
+curl -X POST http://127.0.0.1:8124/api/v1/ppt/generate-from-prompt \
   -H "Content-Type: application/json" \
   -d '{
-    "topic": "解码霍尔木兹海峡危机：国际关系影响",
-    "purpose": "课程讲义",
-    "quality_profile": "high_density_consulting",
+    "prompt": "请制作一份大学课堂展示课件，主题为“解码霍尔木兹海峡危机：理解其对国际关系的影响”",
     "total_pages": 13,
-    "with_export": true
+    "style": "professional",
+    "language": "zh-CN",
+    "include_images": true
   }'
 ```
 
@@ -85,21 +85,14 @@ curl -X POST http://127.0.0.1:8124/api/v1/ppt/pipeline \
 - [ ] 空白比例 ≥ 15%
 - [ ] 配色 ≤ 3种非中性色
 
-### 步骤4: 运行Gap评估
+### 步骤4: 运行主流程链路验证
 
 ```bash
-# 对比新旧版本
-python agent/src/ppt_gap_eval.py run \
-  --theme courseware \
-  --runs 1 \
-  --input-files test_output/regeneration_result_*.json \
-  --out ./ppt_gap_eval/after_fix
+# 检查模板接口
+curl -X GET http://127.0.0.1:8124/api/v1/ppt/templates
 
-# 生成对比报告
-python agent/src/ppt_gap_eval.py aggregate \
-  --in ./ppt_gap_eval/after_fix \
-  --out ./ppt_gap_eval/report.json \
-  --verdict ./ppt_gap_eval/verdict.json
+# 用脚本触发主流程并保存结果
+python test_regenerate_ppt.py
 ```
 
 ### 步骤5: 视觉对比

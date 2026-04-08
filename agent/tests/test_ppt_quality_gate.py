@@ -12,6 +12,35 @@ def test_detect_blank_or_garbled_slide():
     assert result.ok is False
 
 
+def test_detect_mojibake_in_block_text_as_encoding_invalid():
+    result = validate_slide(
+        {
+            "slide_id": "s-mojibake",
+            "title": "AI内容页",
+            "blocks": [
+                {"block_type": "body", "content": "鏂版氮2018鑲插効鐩涘吀 瀛曡偛鍒嗚 鍧 ·"},
+                {"block_type": "body", "content": "闅忔椂浜嗚В浜哄伐鏅鸿兘鐗╄仈缃"},
+            ],
+        }
+    )
+    assert result.ok is False
+    assert any(issue.code == "encoding_invalid" for issue in result.issues)
+
+
+def test_valid_chinese_block_text_not_flagged_as_encoding_invalid():
+    result = validate_slide(
+        {
+            "slide_id": "s-zh",
+            "title": "AI在国际关系中的影响",
+            "blocks": [
+                {"block_type": "body", "content": "霍尔木兹海峡危机对能源安全与地缘政治产生连锁影响。"},
+                {"block_type": "body", "content": "本页聚焦关键行为体、博弈逻辑与政策含义。"},
+            ],
+        }
+    )
+    assert all(issue.code != "encoding_invalid" for issue in result.issues)
+
+
 def test_detect_placeholder_pollution():
     result = validate_slide(
         {

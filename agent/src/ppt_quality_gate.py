@@ -63,6 +63,26 @@ _PLACEHOLDER_EXPLANATION_HINTS = (
     "avoid using",
 )
 
+# UTF-8/Unicode mojibake markers seen in upstream noisy snippets.
+_MOJIBAKE_CJK_CHAR_MARKERS = set(
+    "鍒鍙鍥闄鐨涓鏄鎴浠绗瀛鏁娴瀵鎺璁缁鏂氮鑲効鐩涘偛嗗鍧闅椂哄兘鐗绉戞妧"
+)
+_MOJIBAKE_CJK_TOKENS = (
+    "鏂版",
+    "瀛曡",
+    "鍙戝",
+    "鐩涘",
+    "涓撲笟",
+    "鍏充簬",
+    "鍥介檯",
+    "闅忔",
+    "鐣欓",
+)
+_COMMON_CJK_CHAR_HINTS = set(
+    "的一是了在人有我他这中大来上个国到说们为子和你地出道也时要就下得可里后自以会家学对生能而"
+    "国际关系影响危机海峡霍尔木兹课堂展示课件主题理解分析案例背景问题结论策略建议"
+)
+
 
 def _is_placeholder_false_positive(*, pattern: str, text: str) -> bool:
     normalized_pattern = str(pattern or "").strip()
@@ -176,6 +196,12 @@ def _text_values(slide: Dict[str, Any]) -> List[str]:
         content = str(element.get("content") or "").strip()
         if content:
             texts.append(content)
+    for block in slide.get("blocks") or []:
+        if not isinstance(block, dict):
+            continue
+        content = _extract_block_text(block)
+        if content:
+            texts.append(content)
     return texts
 
 
@@ -188,6 +214,19 @@ def _is_garbled(text: str) -> bool:
     mojibake_tokens = ("鈥", "锛", "鍙", "鐨", "銆", "闄")
     if sum(s.count(token) for token in mojibake_tokens) >= 2 and len(s) >= 6:
         return True
+    if sum(1 for token in _MOJIBAKE_CJK_TOKENS if token in s) >= 2:
+        return True
+    cjk_chars = [ch for ch in s if "\u4e00" <= ch <= "\u9fff"]
+    if len(cjk_chars) >= 8:
+        marker_hits = sum(1 for ch in cjk_chars if ch in _MOJIBAKE_CJK_CHAR_MARKERS)
+        common_hits = sum(1 for ch in cjk_chars if ch in _COMMON_CJK_CHAR_HINTS)
+        cjk_len = float(len(cjk_chars))
+        if (
+            marker_hits >= 3
+            and marker_hits / cjk_len >= 0.22
+            and common_hits / cjk_len <= 0.18
+        ):
+            return True
     q_ratio = s.count("?") / max(1, len(s))
     return s.count("?") >= 3 and q_ratio >= 0.15
 

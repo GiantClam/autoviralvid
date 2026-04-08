@@ -230,28 +230,24 @@ python test_regenerate_ppt.py
 # - 完整教学结构
 ```
 
-### 方案B: 离线验证（当前可用）
+### 方案B: Prompt直出链路验证（当前可用）
 
-**使用现有PPT文件进行对比**
+**直接验证当前主流程（无 legacy pipeline）**
 
 ```bash
-# 1. 使用gap评估工具对比
-python agent/src/ppt_gap_eval.py baseline \
-  --baseline "D:\private\test\2.pptx" \
-  --out ./eval/baseline
+# 1. 触发主流程 API
+curl -X POST http://127.0.0.1:8124/api/v1/ppt/generate-from-prompt \
+  -H "Content-Type: application/json" \
+  -d '{
+    "prompt": "请制作一份大学课堂展示课件，主题为“解码霍尔木兹海峡危机：理解其对国际关系的影响”",
+    "total_pages": 13,
+    "style": "professional",
+    "language": "zh-CN",
+    "include_images": true
+  }'
 
-# 2. 评估当前生成的PPT
-python agent/src/ppt_gap_eval.py run \
-  --theme courseware \
-  --runs 1 \
-  --input-files "解码霍尔木兹海峡危机_13页_模板SVG增强.pptx" \
-  --out ./eval/current
-
-# 3. 生成对比报告
-python agent/src/ppt_gap_eval.py aggregate \
-  --in ./eval \
-  --out ./eval/report.json \
-  --verdict ./eval/verdict.json
+# 2. 验证模板列表接口
+curl -X GET http://127.0.0.1:8124/api/v1/ppt/templates
 ```
 
 ### 方案C: 手动验证
@@ -355,7 +351,7 @@ python agent/src/ppt_gap_eval.py aggregate \
 ### 参考文档
 - `docs/plans/2026-04-01-ppt-design-quality-optimization-v1.md` - 架构重构计划
 - `docs/reports/2026-04-01-ppt-design-quality-refactor-progress.md` - 进度报告
-- `agent/src/ppt_gap_eval.py` - Gap评估工具
+- `agent/src/ppt_master_pipeline_runtime.py` - Prompt直出黑盒runtime
 
 ---
 
@@ -369,10 +365,10 @@ python agent/src/ppt_gap_eval.py aggregate \
    - 运行test_regenerate_ppt.py
    - 确认质量提升效果
 
-2. **生成对比报告**
-   - 使用gap_eval工具
-   - 对比修复前后差异
-   - 量化改进效果
+2. **生成链路核验**
+   - 验证 `/api/v1/ppt/generate-from-prompt`
+   - 验证 `/api/v1/ppt/templates`
+   - 检查返回 `output_pptx` 与 artifacts 完整性
 
 3. **视觉验证**
    - 转换为图片
@@ -420,8 +416,8 @@ python agent/src/ppt_gap_eval.py aggregate \
 ### 成功因素
 
 1. **系统性分析**
-   - 使用gap_eval工具精确定位问题
-   - 对比参考PPT找出差距
+   - 通过主流程输出与参考PPT对比定位问题
+   - 在 runtime/service 层收敛调用链
    - 识别根本原因而非表面症状
 
 2. **针对性修复**

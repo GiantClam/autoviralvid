@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """娴犲孩寮挎潻?JSON 閻㈢喐鍨?PPT閿涘牐鐨熼悽銊ョ暚閺佺繝瀵屽ù浣衡柤閿涘鈧?
 閻劍纭?
     python scripts/generate_ppt_from_desc.py --input desc.json --output output.pptx
@@ -81,7 +81,7 @@ def generate_via_api(
     focus_cluster: str = "auto",
     diagnostics: Optional[Dict[str, Any]] = None,
 ) -> bool:
-    payload = _build_pipeline_payload_from_desc(
+    payload = _build_prompt_direct_payload_from_desc(
         desc,
         execution_profile=execution_profile,
         strict_no_fallback=strict_no_fallback,
@@ -96,7 +96,7 @@ def generate_via_api(
                 json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
             )
         resp = requests.post(
-            f"{api_url}/api/v1/ppt/pipeline",
+            f"{api_url}/api/v1/ppt/generate-from-prompt",
             json=payload,
             headers={"Content-Type": "application/json"},
             timeout=600,
@@ -108,14 +108,17 @@ def generate_via_api(
             reason = f"API error: {data.get('error', 'unknown error')}"
             print(reason)
             if isinstance(diagnostics, dict):
-                diagnostics["failure_stage"] = "api_pipeline"
+                diagnostics["failure_stage"] = "api_prompt_direct"
                 diagnostics["failure_reason"] = reason
             return False
 
         result = data.get("data", {})
-        export = result.get("export", {})
-        pptx_url = export.get("pptx_url") or export.get("url")
-        pptx_base64 = str(export.get("pptx_base64", "") or "").strip()
+        export = result.get("export", {}) if isinstance(result.get("export"), dict) else {}
+        output_pptx = str(result.get("output_pptx") or export.get("output_pptx") or "").strip()
+        pptx_url = (
+            str(result.get("pptx_url") or export.get("pptx_url") or export.get("url") or "").strip()
+        )
+        pptx_base64 = str(result.get("pptx_base64") or export.get("pptx_base64") or "").strip()
 
         if pptx_url:
             download_url = pptx_url
@@ -128,38 +131,61 @@ def generate_via_api(
             _safe_print(f"PPT saved to: {output_path}")
 
             if render_output_path:
-                artifacts = result.get("artifacts", {})
+                artifacts = result.get("artifacts", {}) if isinstance(result.get("artifacts"), dict) else {}
                 Path(render_output_path).write_text(
                     json.dumps(
-                        artifacts.get("render_payload", {}),
+                        {"artifacts": artifacts, "result": result},
                         ensure_ascii=False,
                         indent=2,
                     ),
                     encoding="utf-8",
                 )
-                _safe_print(f"Render payload saved to: {render_output_path}")
+                _safe_print(f"Result metadata saved to: {render_output_path}")
 
             return True
+        elif output_pptx:
+            local_pptx = Path(output_pptx)
+            if local_pptx.exists() and local_pptx.is_file():
+                Path(output_path).write_bytes(local_pptx.read_bytes())
+                _safe_print(f"PPT saved to: {output_path}")
+                if render_output_path:
+                    artifacts = result.get("artifacts", {}) if isinstance(result.get("artifacts"), dict) else {}
+                    Path(render_output_path).write_text(
+                        json.dumps(
+                            {"artifacts": artifacts, "result": result},
+                            ensure_ascii=False,
+                            indent=2,
+                        ),
+                        encoding="utf-8",
+                    )
+                    _safe_print(f"Result metadata saved to: {render_output_path}")
+                return True
+            reason = f"API returned non-existing local output_pptx path: {output_pptx}"
+            print(reason)
+            if isinstance(diagnostics, dict):
+                diagnostics["failure_stage"] = "api_prompt_direct"
+                diagnostics["failure_reason"] = reason
+            return False
         elif pptx_base64:
             Path(output_path).write_bytes(base64.b64decode(pptx_base64))
             _safe_print(f"PPT saved to: {output_path}")
             if render_output_path:
-                artifacts = result.get("artifacts", {})
+                artifacts = result.get("artifacts", {}) if isinstance(result.get("artifacts"), dict) else {}
                 Path(render_output_path).write_text(
                     json.dumps(
-                        artifacts.get("render_payload", {}),
+                        {"artifacts": artifacts, "result": result},
                         ensure_ascii=False,
                         indent=2,
                     ),
                     encoding="utf-8",
                 )
-                _safe_print(f"Render payload saved to: {render_output_path}")
+                _safe_print(f"Result metadata saved to: {render_output_path}")
             return True
         else:
-            reason = "API did not return PPT payload (missing pptx_url/pptx_base64)"
+            reason = "API did not return PPT payload (missing output_pptx/pptx_url/pptx_base64)"
             print(reason)
             if isinstance(diagnostics, dict):
-                diagnostics["failure_stage"] = "api_pipeline"
+                diagnostics["failure_stage"] = "api_prompt_direct"
                 diagnostics["failure_reason"] = reason
             return False
 
@@ -1066,6 +1092,45 @@ def _build_pipeline_payload_from_desc(
         "force_ppt_master": bool(strict_no_fallback or str(execution_profile or "").strip().lower() == "dev_strict"),
     }
     return payload
+
+
+def _build_prompt_direct_payload_from_desc(
+    desc: Dict[str, Any],
+    *,
+    execution_profile: str = "dev_strict",
+    strict_no_fallback: bool = False,
+    creation_mode: str = "fidelity",
+    focus_cluster: str = "auto",
+) -> Dict[str, Any]:
+    # Keep signature aligned with legacy builder so existing callers don't change.
+    del execution_profile, strict_no_fallback, creation_mode, focus_cluster
+
+    slides = desc.get("slides") if isinstance(desc.get("slides"), list) else []
+    requested_pages = int(desc.get("total_pages") or desc.get("requested_total_pages") or len(slides) or 10)
+    total_pages = max(3, min(50, requested_pages))
+
+    language = str(desc.get("language") or "zh-CN").strip() or "zh-CN"
+    style_raw = str(desc.get("style") or desc.get("style_preference") or "professional").strip().lower()
+    style = style_raw if style_raw in {"professional", "creative", "academic", "minimal"} else "professional"
+
+    theme = desc.get("theme") if isinstance(desc.get("theme"), dict) else {}
+    color_scheme = str(desc.get("color_scheme") or theme.get("palette") or "").strip()
+    template_family = str(desc.get("template_family") or desc.get("template_id") or "").strip()
+    include_images = bool(desc.get("include_images", False))
+
+    prompt = _build_reconstruction_prompt(desc)
+    if not str(prompt).strip():
+        prompt = str(desc.get("topic") or desc.get("title") or "生成一份结构清晰的演示文稿").strip()
+
+    return {
+        "prompt": prompt,
+        "total_pages": total_pages,
+        "style": style,
+        "color_scheme": color_scheme or None,
+        "language": "en-US" if language.lower().startswith("en") else "zh-CN",
+        "template_family": template_family or None,
+        "include_images": include_images,
+    }
 
 
 def _is_api_reachable(api_url: str, timeout: float = 2.0) -> bool:

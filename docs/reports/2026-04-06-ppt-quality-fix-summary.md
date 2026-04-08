@@ -206,18 +206,21 @@ python verify_fixes.py
      --quality-profile "high_density_consulting"
    ```
 
-2. **运行gap评估**
+2. **运行主流程验证**
    ```bash
-   # 对比新旧版本
-   python agent/src/ppt_gap_eval.py run \
-     --theme courseware \
-     --runs 3 \
-     --out ./ppt_gap_eval/after_fix
-   
-   python agent/src/ppt_gap_eval.py aggregate \
-     --in ./ppt_gap_eval/after_fix \
-     --out ./ppt_gap_eval/report.json \
-     --verdict ./ppt_gap_eval/verdict.json
+   # 触发当前主流程
+   curl -X POST http://127.0.0.1:8124/api/v1/ppt/generate-from-prompt \
+     -H "Content-Type: application/json" \
+     -d '{
+       "prompt": "请制作一份大学课堂展示课件，主题为“解码霍尔木兹海峡危机：理解其对国际关系的影响”",
+       "total_pages": 13,
+       "style": "professional",
+       "language": "zh-CN",
+       "include_images": true
+     }'
+
+   # 检查模板接口
+   curl -X GET http://127.0.0.1:8124/api/v1/ppt/templates
    ```
 
 3. **视觉对比验证**
@@ -261,7 +264,7 @@ python verify_fixes.py
 
 - 架构重构计划: `docs/plans/2026-04-01-ppt-design-quality-optimization-v1.md`
 - 进度报告: `docs/reports/2026-04-01-ppt-design-quality-refactor-progress.md`
-- 质量评估工具: `agent/src/ppt_gap_eval.py`
+- Prompt直出运行时: `agent/src/ppt_master_pipeline_runtime.py`
 - 社区最佳实践: pptx-anthropics skill指南
 
 ## 提交记录
