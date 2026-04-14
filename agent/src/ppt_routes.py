@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import logging
 import json
+import re
 import uuid
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from src.auth import get_current_user, AuthUser
@@ -33,7 +35,6 @@ logger = logging.getLogger("ppt_routes")
 
 router = APIRouter(prefix="/api/v1/ppt", tags=["PPT"])
 
-# 閳光偓閳光偓 閹虫帒濮炴潪鑺ユ箛閸?閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓
 
 _ppt_service = None
 
@@ -48,14 +49,11 @@ def _get_service():
 
 
 def _request_id(request: Request) -> str:
-    """閼惧嘲褰囬幋鏍晸閹存劘濮逛痉D閻劋绨弮銉ョ箶鏉╁€熼嚋"""
+    """Return or generate request id."""
     rid = request.headers.get("x-request-id") or uuid.uuid4().hex[:12]
     return rid
 
 
-
-# 閳烘劏鏅查埡鎰ㄦ櫜閳烘劏鏅查埡鎰ㄦ櫜閳烘劏鏅查埡鎰ㄦ櫜閳烘劏鏅查埡鎰ㄦ櫜閳烘劏鏅查埡鎰ㄦ櫜閳烘劏鏅查埡鎰ㄦ櫜閳烘劏鏅查埡鎰ㄦ櫜閳烘劏鏅查埡鎰ㄦ櫜閳烘劏鏅查埡鎰ㄦ櫜閳烘劏鏅查埡鎰ㄦ櫜閳烘劏鏅查埡鎰ㄦ櫜閳烘劏鏅查埡鎰ㄦ櫜閳烘劏鏅查埡鎰ㄦ櫜閳烘劏鏅查埡鎰ㄦ櫜閳烘劏鏅查埡鎰ㄦ櫜閳烘劏鏅查埡鎰ㄦ櫜閳烘劏鏅查埡鎰ㄦ櫜
-# Feature A: PPT 閻㈢喐鍨?# 閳烘劏鏅查埡鎰ㄦ櫜閳烘劏鏅查埡鎰ㄦ櫜閳烘劏鏅查埡鎰ㄦ櫜閳烘劏鏅查埡鎰ㄦ櫜閳烘劏鏅查埡鎰ㄦ櫜閳烘劏鏅查埡鎰ㄦ櫜閳烘劏鏅查埡鎰ㄦ櫜閳烘劏鏅查埡鎰ㄦ櫜閳烘劏鏅查埡鎰ㄦ櫜閳烘劏鏅查埡鎰ㄦ櫜閳烘劏鏅查埡鎰ㄦ櫜閳烘劏鏅查埡鎰ㄦ櫜閳烘劏鏅查埡鎰ㄦ櫜閳烘劏鏅查埡鎰ㄦ櫜閳烘劏鏅查埡鎰ㄦ櫜閳烘劏鏅查埡鎰ㄦ櫜閳烘劏鏅查埡鎰ㄦ櫜
 
 
 @router.post("/outline", response_model=ApiResponse, status_code=200)
@@ -64,7 +62,7 @@ async def generate_outline(
     request: Request,
     user: AuthUser = Depends(get_current_user),
 ):
-    """閻㈢喐鍨歅PT婢堆呯堪 (Stage 1)"""
+    """Generate presentation outline (Stage 1)."""
     rid = _request_id(request)
     try:
         logger.info(
@@ -83,7 +81,7 @@ async def update_outline(
     req: PresentationOutline,
     user: AuthUser = Depends(get_current_user),
 ):
-    """缂傛牞绶?閺囧瓨鏌婃径褏缈?(閻劍鍩涚涵閸撳秳鎱ㄩ弨?"""
+    """Update outline content and recompute duration."""
     try:
         req.total_duration = sum(s.estimated_duration for s in req.slides)
         return ApiResponse(success=True, data=req.model_dump())
@@ -97,7 +95,7 @@ async def generate_content(
     request: Request,
     user: AuthUser = Depends(get_current_user),
 ):
-    """婵夊帠楠炶崵浼呴悧鍥у敶鐎?(Stage 2, 楠炴儼閻㈢喐鍨?"""
+    """Generate slide content (Stage 2)."""
     rid = _request_id(request)
     try:
         logger.info(
@@ -178,7 +176,7 @@ async def export_pptx(
     request: Request,
     user: AuthUser = Depends(get_current_user),
 ):
-    """鐎电厧鍤璓PTX閺傚洣娆?(Stage 3)"""
+    """Export PPTX (Stage 3)."""
     rid = _request_id(request)
     try:
         logger.info(
@@ -204,7 +202,6 @@ async def export_pptx(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# 閳光偓閳光偓 TTS 閸氬牊鍨?閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓閳光偓
 
 
 class TTSRequest(BaseModel):
@@ -392,7 +389,6 @@ async def get_download_url(
         raise HTTPException(status_code=500, detail=str(e))
 
 # Feature C: AI Prompt-based PPT Generation (ppt-master integration)
-# 鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣鈹佲攣
 
 
 @router.post("/generate-from-prompt", response_model=ApiResponse)
@@ -419,6 +415,8 @@ async def generate_ppt_from_prompt(
             language=req.language,
             template_family=req.template_family,
             include_images=req.include_images,
+            web_enrichment=req.web_enrichment,
+            image_asset_enrichment=req.image_asset_enrichment,
         )
 
         if result.get("success"):
@@ -446,6 +444,56 @@ async def list_templates(
         return ApiResponse(success=True, data={"templates": templates})
     except Exception as e:
         logger.error(f"[ppt_routes] list_templates failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/preview/{project_name}", response_model=ApiResponse)
+async def get_prompt_project_preview(
+    project_name: str,
+    user: AuthUser = Depends(get_current_user),
+):
+    """Get generated prompt-to-ppt project preview data."""
+    if not re.match(r"^[a-zA-Z0-9._-]+$", project_name):
+        raise HTTPException(status_code=400, detail="invalid project_name format")
+    try:
+        from src.ppt_master_service import PPTMasterService
+
+        service = PPTMasterService()
+        data = service.get_project_preview(project_name)
+        return ApiResponse(success=True, data=data)
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"[ppt_routes] get prompt project preview failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/download-output/{project_name}")
+async def download_prompt_output_pptx(
+    project_name: str,
+    user: AuthUser = Depends(get_current_user),
+):
+    """Download generated prompt-to-ppt output file."""
+    if not re.match(r"^[a-zA-Z0-9._-]+$", project_name):
+        raise HTTPException(status_code=400, detail="invalid project_name format")
+    try:
+        from src.ppt_master_service import PPTMasterService
+
+        service = PPTMasterService()
+        output_path = service.resolve_output_pptx_path(project_name)
+        return FileResponse(
+            str(output_path),
+            media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            filename=output_path.name,
+        )
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"[ppt_routes] download prompt output failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 

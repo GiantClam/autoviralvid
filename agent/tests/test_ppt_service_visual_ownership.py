@@ -1,34 +1,27 @@
-﻿import src.ppt_service_v2 as ppt_service
+﻿from src.ppt_service_v2 import _resolve_quality_profile_id
 
 
-def test_collect_visual_owner_conflicts_detects_mismatch():
-    slides = [
-        {
-            "slide_id": "s1",
-            "template_family": "hero_dark",
-            "layout_grid": "split_2",
-            "render_path": "svg",
-        }
-    ]
-    decision = {
-        "version": "v1",
-        "deck": {"template_family": "ops_lifecycle_light"},
-        "slides": [{"slide_id": "s1", "layout_grid": "timeline", "render_path": "svg"}],
-    }
-    conflicts = ppt_service._collect_visual_owner_conflicts(slides, decision)
-    assert conflicts
-    assert any("s1:layout_grid:split_2->timeline" in item for item in conflicts)
-    assert not any("s1:render_path:" in item for item in conflicts)
+def test_resolve_quality_profile_id_respects_explicit_value():
+    assert (
+        _resolve_quality_profile_id(
+            "training_deck",
+            topic="anything",
+            purpose="anything",
+            audience="anyone",
+            total_pages=10,
+        )
+        == "training_deck"
+    )
 
 
-def test_collect_visual_owner_conflicts_ignores_auto_values():
-    slides = [{"slide_id": "s1", "template_family": "auto", "layout_grid": "", "render_path": "auto"}]
-    decision = {
-        "version": "v1",
-        "deck": {"template_family": "ops_lifecycle_light"},
-        "slides": [{"slide_id": "s1", "layout_grid": "timeline", "render_path": "svg"}],
-    }
-    conflicts = ppt_service._collect_visual_owner_conflicts(slides, decision)
-    assert conflicts == []
-
-
+def test_resolve_quality_profile_id_auto_picks_training_for_classroom_keywords():
+    assert (
+        _resolve_quality_profile_id(
+            "auto",
+            topic="security curriculum",
+            purpose="classroom training",
+            audience="students",
+            total_pages=10,
+        )
+        == "training_deck"
+    )

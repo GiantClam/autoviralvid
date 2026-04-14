@@ -4,6 +4,7 @@ import React, { useMemo, useState } from 'react';
 import { Player } from '@remotion/player';
 import { Maximize2, Minimize2, Volume2, VolumeX, Download, Play } from 'lucide-react';
 import { useProject } from '@/contexts/ProjectContext';
+import { useT } from '@/lib/i18n';
 import VideoTemplate, {
   type VideoTemplateProps,
   type ClipData,
@@ -50,6 +51,7 @@ const TEMPLATE_STYLES: Record<string, VideoTemplateProps['style']> = {
 const FPS = 30;
 
 export default function RemotionPreview() {
+  const t = useT();
   const { project, tasks, scenes, finalVideoUrl } = useProject();
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
@@ -84,11 +86,15 @@ export default function RemotionPreview() {
   }, [scenes, clips]);
 
   // Compute composition dimensions based on project orientation
-  const orientation = (project as Record<string, unknown>)?.orientation as string || '竖屏';
+  const orientation = ((project as Record<string, unknown>)?.orientation as string) || 'vertical';
   const { width, height } = useMemo(() => {
     switch (orientation) {
-      case '横屏': return { width: 1280, height: 720 };
-      case '正方形': return { width: 720, height: 720 };
+      case 'horizontal':
+      case '横屏':
+        return { width: 1280, height: 720 };
+      case 'square':
+      case '正方形':
+        return { width: 720, height: 720 };
       default: return { width: 720, height: 1280 };
     }
   }, [orientation]);
@@ -139,8 +145,8 @@ export default function RemotionPreview() {
       <div className="flex items-center justify-center h-full bg-black/50 rounded-xl border border-gray-800">
         <div className="text-center text-gray-600 space-y-2">
           <Play className="w-12 h-12 mx-auto text-gray-700" />
-          <p className="text-sm">等待视频片段生成完成</p>
-          <p className="text-xs text-gray-700">已完成的片段将在此处预览</p>
+          <p className="text-sm">{t("preview.waitingClips")}</p>
+          <p className="text-xs text-gray-700">{t("preview.waitingClipsHint")}</p>
         </div>
       </div>
     );
@@ -153,7 +159,10 @@ export default function RemotionPreview() {
         <div className="flex items-center gap-2">
           <div className="w-2 h-2 rounded-full bg-green-500" />
           <span className="text-xs text-gray-400">
-            预览 · {clips.length} 个片段 · {(totalDurationInFrames / FPS).toFixed(1)}s
+            {t("preview.summary", {
+              clipCount: clips.length,
+              duration: (totalDurationInFrames / FPS).toFixed(1),
+            })}
           </span>
         </div>
         <div className="flex items-center gap-1">

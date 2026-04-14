@@ -14,7 +14,7 @@ async def test_template_export_flow_returns_expected_payload(monkeypatch):
     svc = PPTTemplateExportService()
 
     monkeypatch.setattr(
-        template_service_mod,
+        template_service_mod.pptx_engine,
         "fill_template_pptx",
         lambda **_kwargs: {
             "pptx_bytes": b"pptx",
@@ -93,4 +93,3 @@ async def test_template_export_flow_enforce_runtime_raises(monkeypatch):
 
 async def _async_value(value):
     return value
-

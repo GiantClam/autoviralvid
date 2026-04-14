@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import io
 import json
-from typing import Any, Dict
 
 from src import ppt_direct_skill_runtime as runtime_mod
 
@@ -197,71 +196,16 @@ def test_main_reads_stdin_and_writes_json(monkeypatch):
     assert parsed["results"][0]["skill"] == "slide-making-skill"
 
 
-def test_execute_direct_skill_runtime_codex_cli_mode_success(monkeypatch):
-    captured: Dict[str, Any] = {}
-
-    def _fake_codex(**kwargs):
-        captured.update(kwargs)
-        return {
-            "ok": True,
-            "data": {
-                "version": 1,
-                "results": [
-                    {
-                        "skill": "slide-making-skill",
-                        "status": "applied",
-                        "patch": {"layout_grid": "grid_3"},
-                        "outputs": {"text_constraints": {"bullet_max_items": 4}},
-                        "note": "ok",
-                    },
-                    {
-                        "skill": "ppt-orchestra-skill",
-                        "status": "applied",
-                        "patch": {"agent_type": "content-page-generator"},
-                        "outputs": {"recommended_load_skills": ["slide-making-skill", "ppt-orchestra-skill"]},
-                        "note": "ok",
-                    },
-                ],
-                "patch": {"layout_grid": "grid_3", "agent_type": "content-page-generator"},
-                "context": {"recommended_load_skills": ["slide-making-skill", "ppt-orchestra-skill"]},
-                "note": "codex_ok",
-            },
-        }
-
+def test_execute_direct_skill_runtime_ignores_codex_mode_flag(monkeypatch):
     monkeypatch.setenv("PPT_DIRECT_SKILL_RUNTIME_MODE", "codex_cli")
-    monkeypatch.setenv("CONTENT_LLM_MODEL", "openai/gpt-5.3-codex")
-    monkeypatch.setattr(runtime_mod, "invoke_codex_cli_json", _fake_codex)
     out = runtime_mod.execute_direct_skill_runtime(
         {
             "requested_skills": ["slide-making-skill", "ppt-orchestra-skill"],
-            "slide": {"slide_id": "s-codex", "slide_type": "content"},
-            "deck": {"title": "Demo"},
-        }
-    )
-    assert captured.get("model_id") == "gpt-5.3-codex"
-    assert out.get("version") == 1
-    assert isinstance(out.get("results"), list)
-    assert out.get("patch", {}).get("layout_grid") == "grid_3"
-    assert out.get("note") == "codex_ok"
-    assert all(row.get("source") == "codex_cli" for row in out.get("results") or [])
-
-
-def test_execute_direct_skill_runtime_codex_cli_mode_strict_error(monkeypatch):
-    def _fake_codex(**_kwargs):
-        return {"ok": False, "reason": "codex_cli_nonzero:boom"}
-
-    monkeypatch.setenv("PPT_DIRECT_SKILL_RUNTIME_MODE", "codex_cli")
-    monkeypatch.setenv("PPT_DIRECT_SKILL_RUNTIME_REQUIRE", "true")
-    monkeypatch.setattr(runtime_mod, "invoke_codex_cli_json", _fake_codex)
-    out = runtime_mod.execute_direct_skill_runtime(
-        {
-            "requested_skills": ["slide-making-skill", "ppt-orchestra-skill"],
-            "slide": {"slide_id": "s-codex-fail", "slide_type": "content"},
+            "slide": {"slide_id": "s-builtin", "slide_type": "content"},
             "deck": {"title": "Demo"},
         }
     )
     assert out.get("version") == 1
     results = out.get("results")
     assert isinstance(results, list) and len(results) == 2
-    assert all(row.get("status") == "error" for row in results)
-    assert all(row.get("source") == "codex_cli" for row in results)
+    assert all(row.get("source") == "direct_skill_runtime" for row in results)

@@ -94,7 +94,11 @@ def _build_direct_llm_input(project_llm_input: Dict[str, Any], skill_content: st
 def _invoke_live_json(messages: List[Dict[str, Any]]) -> Dict[str, Any]:
     client, model, _provider = _create_openai_client()
     if client is None:
-        pytest.skip("live equivalence requires AIBERM_API_BASE+AIBERM_API_KEY, or OPENROUTER_API_KEY, or OPENAI_API_KEY")
+        pytest.skip(
+            "live equivalence requires AIBERM_API_BASE+AIBERM_API_KEY, "
+            "or CRAZYROUTE_API_BASE+CRAZYROUTE_API_KEY, "
+            "or OPENROUTER_API_KEY, or OPENAI_API_KEY"
+        )
     response = client.chat.completions.create(
         model=model,
         messages=messages,

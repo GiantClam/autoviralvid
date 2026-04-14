@@ -12,6 +12,7 @@ import {
   X,
 } from "lucide-react";
 import { useProject } from "@/contexts/ProjectContext";
+import { useT } from "@/lib/i18n";
 
 // ── Scene Card ──
 
@@ -36,6 +37,7 @@ function SceneCard({
   onUpdate,
   onRegenerateImage,
 }: SceneCardProps) {
+  const t = useT();
   const [editing, setEditing] = useState(false);
   const [desc, setDesc] = useState(scene.desc);
   const [narration, setNarration] = useState(scene.narration || "");
@@ -94,14 +96,14 @@ function SceneCard({
                   <div className="absolute inset-0 rounded-full bg-[#E11D48]/20 blur-xl animate-pulse" />
                   <Loader2 className="relative h-10 w-10 animate-spin text-[#E11D48]" />
                 </div>
-                <span className="text-xs text-gray-500">生成图片中...</span>
+                <span className="text-xs text-gray-500">{t("storyboard.generatingImage")}</span>
               </>
             ) : (
               <>
                 <div className="w-16 h-16 rounded-2xl bg-white/[0.03] border border-white/[0.06] flex items-center justify-center">
                   <ImageIcon className="h-8 w-8 text-gray-600" />
                 </div>
-                <span className="text-xs text-gray-500">暂无图片</span>
+                <span className="text-xs text-gray-500">{t("storyboard.noImage")}</span>
               </>
             )}
           </div>
@@ -119,7 +121,7 @@ function SceneCard({
               ) : (
                 <RefreshCw className="h-4 w-4" />
               )}
-              重新生成
+              {t("storyboard.regenerate")}
             </button>
           </div>
         )}
@@ -137,7 +139,7 @@ function SceneCard({
       <div className="flex flex-1 flex-col gap-4 p-5">
         <div className="space-y-2">
           <label className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
-            场景描述
+            {t("storyboard.sceneDescription")}
           </label>
           {editing ? (
             <textarea
@@ -150,7 +152,7 @@ function SceneCard({
             <p
               className="cursor-pointer rounded-xl border border-transparent px-4 py-3 text-sm leading-relaxed text-gray-300 transition-all hover:border-white/[0.06] hover:bg-white/[0.02]"
               onClick={() => setEditing(true)}
-              title="点击编辑"
+              title={t("storyboard.clickToEdit")}
             >
               {scene.desc || "—"}
             </p>
@@ -159,7 +161,7 @@ function SceneCard({
 
         <div className="space-y-2">
           <label className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
-            旁白文案
+            {t("storyboard.narration")}
           </label>
           {editing ? (
             <textarea
@@ -172,9 +174,9 @@ function SceneCard({
             <p
               className="cursor-pointer rounded-xl border border-transparent px-4 py-3 text-sm leading-relaxed text-gray-400 italic transition-all hover:border-white/[0.06] hover:bg-white/[0.02]"
               onClick={() => setEditing(true)}
-              title="点击编辑"
+              title={t("storyboard.clickToEdit")}
             >
-              {scene.narration || "暂无旁白"}
+              {scene.narration || t("storyboard.noNarration")}
             </p>
           )}
         </div>
@@ -192,7 +194,7 @@ function SceneCard({
                 ) : (
                   <Check className="h-4 w-4" />
                 )}
-                保存
+                {t("storyboard.save")}
               </button>
               <button
                 onClick={handleCancel}
@@ -200,7 +202,7 @@ function SceneCard({
                 className="flex items-center gap-2 rounded-xl bg-white/[0.03] border border-white/[0.06] px-4 py-2 text-xs font-semibold text-gray-400 transition-all hover:bg-white/[0.06] hover:text-white disabled:opacity-50"
               >
                 <X className="h-4 w-4" />
-                取消
+                {t("storyboard.cancel")}
               </button>
             </>
           ) : (
@@ -210,7 +212,7 @@ function SceneCard({
                 className="flex items-center gap-2 rounded-xl bg-white/[0.03] border border-white/[0.06] px-4 py-2 text-xs font-semibold text-gray-400 transition-all hover:bg-white/[0.06] hover:text-white hover:border-white/[0.12]"
               >
                 <Edit3 className="h-4 w-4" />
-                编辑
+                {t("storyboard.edit")}
               </button>
               {!scene.image_url && !isGeneratingImages && (
                 <button
@@ -223,7 +225,7 @@ function SceneCard({
                   ) : (
                     <RefreshCw className="h-4 w-4" />
                   )}
-                  生成图片
+                  {t("storyboard.generateImages")}
                 </button>
               )}
             </>
@@ -262,6 +264,7 @@ function SceneSkeleton() {
 // ── Main Panel ──
 
 export default function StoryboardPanel() {
+  const t = useT();
   const {
     scenes,
     phase,
@@ -291,9 +294,9 @@ export default function StoryboardPanel() {
             <Sparkles className="h-4 w-4 text-white" />
           </div>
           <div>
-            <h2 className="text-sm font-bold text-white">分镜脚本</h2>
+            <h2 className="text-sm font-bold text-white">{t("storyboard.title")}</h2>
             {totalScenes > 0 && (
-              <span className="text-xs text-gray-500">{totalScenes} 场景</span>
+              <span className="text-xs text-gray-500">{t("storyboard.sceneCount", { count: totalScenes })}</span>
             )}
           </div>
         </div>
@@ -302,19 +305,19 @@ export default function StoryboardPanel() {
           {isGeneratingStoryboard && (
             <span className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#E11D48]/10 border border-[#E11D48]/20">
               <Loader2 className="h-3.5 w-3.5 animate-spin text-[#E11D48]" />
-              生成分镜中...
+              {t("storyboard.generatingStoryboard")}
             </span>
           )}
           {isGeneratingImages && (
             <span className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#E11D48]/10 border border-[#E11D48]/20">
               <Loader2 className="h-3.5 w-3.5 animate-spin text-[#E11D48]" />
-              生成图片 {imagesReady}/{totalScenes}
+              {t("storyboard.generatingImageProgress", { ready: imagesReady, total: totalScenes })}
             </span>
           )}
           {isGeneratingVideos && (
             <span className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-purple-500/10 border border-purple-500/20">
               <Loader2 className="h-3.5 w-3.5 animate-spin text-purple-400" />
-              生成视频 {taskSummary.succeeded}/{taskSummary.total}
+              {t("storyboard.generatingVideoProgress", { done: taskSummary.succeeded, total: taskSummary.total })}
             </span>
           )}
         </div>
@@ -333,8 +336,8 @@ export default function StoryboardPanel() {
               <Sparkles className="h-10 w-10 text-gray-600" />
             </div>
             <div className="text-center">
-              <p className="text-sm font-medium text-gray-400">尚未生成分镜脚本</p>
-              <p className="text-xs text-gray-600 mt-1">请先配置项目并生成分镜</p>
+              <p className="text-sm font-medium text-gray-400">{t("storyboard.emptyTitle")}</p>
+              <p className="text-xs text-gray-600 mt-1">{t("storyboard.emptyDesc")}</p>
             </div>
           </div>
         ) : (
@@ -369,11 +372,11 @@ export default function StoryboardPanel() {
       {totalScenes > 0 && (
         <div className="flex items-center justify-between border-t border-white/[0.06] px-6 py-4 bg-[#0a0a12]/50 backdrop-blur-sm">
           <div className="text-xs text-gray-500">
-            {isStoryboardReady && "分镜就绪，可以生成图片"}
-            {isImagesReady && `${imagesReady} 张图片就绪，可以生成视频`}
-            {isGeneratingImages && `正在生成图片 (${imagesReady}/${totalScenes})`}
+            {isStoryboardReady && t("storyboard.readyForImages")}
+            {isImagesReady && t("storyboard.readyForVideos", { count: imagesReady })}
+            {isGeneratingImages && t("storyboard.generatingImages", { ready: imagesReady, total: totalScenes })}
             {isGeneratingVideos &&
-              `正在生成视频 (${taskSummary.succeeded}/${taskSummary.total})`}
+              t("storyboard.generatingVideos", { done: taskSummary.succeeded, total: taskSummary.total })}
           </div>
 
           <div className="flex items-center gap-3">
@@ -388,7 +391,7 @@ export default function StoryboardPanel() {
                 ) : (
                   <ImageIcon className="h-4 w-4" />
                 )}
-                生成图片
+                {t("storyboard.generateImages")}
               </button>
             )}
 
@@ -403,7 +406,7 @@ export default function StoryboardPanel() {
                 ) : (
                   <Play className="h-4 w-4" />
                 )}
-                生成视频
+                {t("storyboard.generateVideos")}
               </button>
             )}
           </div>

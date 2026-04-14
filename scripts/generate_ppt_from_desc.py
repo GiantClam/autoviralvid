@@ -16,6 +16,7 @@ import base64
 import shutil
 import io
 import json
+import os
 import re
 import subprocess
 import sys
@@ -1020,10 +1021,13 @@ def _build_pipeline_payload_from_desc(
             "with_export": True,
             "save_artifacts": True,
             "export_channel": "local",
-            # zero_create uses extracted prompt hints; skip live web enrichment
-            # to avoid long-tail timeout risk in API pipeline mode.
-            "web_enrichment": False,
-            "image_asset_enrichment": False,
+            # Default to enabled enrichment unless explicitly disabled by env.
+            "web_enrichment": str(os.getenv("PPT_MASTER_WEB_ENRICHMENT", "true")).strip().lower()
+            not in {"0", "false", "no", "off"},
+            "image_asset_enrichment": str(
+                os.getenv("PPT_MASTER_IMAGE_ASSET_ENRICHMENT", "true")
+            ).strip().lower()
+            not in {"0", "false", "no", "off"},
             "research_min_completeness": 0.4,
             "desired_citations": 3,
             "min_reference_materials": 3,
@@ -1066,7 +1070,8 @@ def _build_pipeline_payload_from_desc(
         "with_export": True,
         "save_artifacts": True,
         "export_channel": "local",
-        "web_enrichment": False,
+        "web_enrichment": str(os.getenv("PPT_MASTER_WEB_ENRICHMENT", "true")).strip().lower()
+        not in {"0", "false", "no", "off"},
         "research_min_completeness": 0.3,
         "desired_citations": 1,
         "min_reference_materials": 1,

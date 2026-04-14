@@ -2,10 +2,9 @@
 LingChuang PPT full-flow E2E script.
 
 Flow:
-1. Simulate user input via `/api/v1/ppt/outline` using a long requirement text.
-2. Generate slide content via `/api/v1/ppt/content`.
-3. Export PPT via `/api/v1/ppt/export` (main Python orchestration path).
-4. Download PPTX and persist artifacts for quality harness consumption.
+1. Call `/api/v1/ppt/generate-from-prompt` to run real ppt-master workflow.
+2. Persist returned artifacts and output PPTX to test output folder.
+
 """
 
 from __future__ import annotations
@@ -17,7 +16,7 @@ import shutil
 import subprocess
 import tempfile
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 
 RENDERER_BASE = os.getenv("RENDERER_BASE", "http://127.0.0.1:8124")
@@ -184,38 +183,24 @@ def expect_success(resp: Dict[str, Any], stage: str) -> Dict[str, Any]:
     raise RuntimeError(f"{stage} failed: {json.dumps(resp, ensure_ascii=False)[:1000]}")
 
 
-def build_outline_request(requirement: str, num_slides: int) -> Dict[str, Any]:
-    return {
-        "requirement": requirement,
-        "language": "zh-CN",
-        "num_slides": num_slides,
-        "style": "professional",
-        "purpose": "企业介绍/商务合作路演",
-    }
-
-
-def build_export_request(
-    slides: List[Dict[str, Any]],
-    title: str,
+def build_generate_from_prompt_request(
+    requirement: str,
+    num_slides: int,
     *,
-    route_mode: str = "refine",
-    quality_profile: str = "high_density_consulting",
+    style: str = "professional",
+    language: str = "zh-CN",
+    template_family: str = "auto",
+    include_images: bool = False,
 ) -> Dict[str, Any]:
     return {
-        "slides": slides,
-        "title": title,
-        "author": "灵创智能",
-        "generator_mode": "official",
-        "route_mode": str(route_mode or "refine"),
-        "quality_profile": str(quality_profile or "high_density_consulting"),
-        "original_style": False,
-        "disable_local_style_rewrite": False,
-        "visual_priority": True,
-        "visual_preset": "tech_cinematic",
-        "visual_density": "balanced",
-        "constraint_hardness": "strict",
-        "svg_mode": "on",
-        "template_family": "auto",
+        "prompt": requirement,
+        "total_pages": max(3, min(50, int(num_slides))),
+        "style": style,
+        "language": language,
+        "template_family": template_family,
+        "include_images": bool(include_images),
+        "web_enrichment": True,
+        "image_asset_enrichment": True,
     }
 
 
@@ -228,39 +213,11 @@ def download_file(url: str, output_path: Path) -> bool:
     return result.returncode == 0 and output_path.exists() and output_path.stat().st_size > 0
 
 
-def write_render_surrogate(
-    output_dir: Path,
-    *,
-    outline_data: Dict[str, Any],
-    slides: List[Dict[str, Any]],
-    export_data: Dict[str, Any],
-) -> Path:
-    render_path = output_dir / "lingchuang_ppt.render.json"
-    render_payload = {
-        "mode": export_data.get("video_mode") or "mainflow_export",
-        "generator_mode": export_data.get("generator_mode") or "official",
-        "route_mode": export_data.get("route_mode") or "refine",
-        "quality_profile": export_data.get("quality_profile") or "high_density_consulting",
-        "quality_score": export_data.get("quality_score"),
-        "visual_qa": export_data.get("visual_qa"),
-        "official_input": {
-            "title": str(outline_data.get("title") or "灵创智能企业推介"),
-            "author": "灵创智能",
-            "slides": slides,
-        },
-        "slides": export_data.get("video_slides") if isinstance(export_data.get("video_slides"), list) else [],
-    }
-    render_path.write_text(json.dumps(render_payload, ensure_ascii=False, indent=2), encoding="utf-8")
-    return render_path
-
-
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--output-dir", default=str(OUTPUT_DIR))
     parser.add_argument("--requirement-file", default="")
     parser.add_argument("--num-slides", type=int, default=12)
-    parser.add_argument("--route-mode", default="refine")
-    parser.add_argument("--quality-profile", default="high_density_consulting")
     parser.add_argument("--export-timeout", type=int, default=1800)
     args = parser.parse_args()
 
@@ -273,90 +230,59 @@ def main() -> None:
         else DEFAULT_REQUIREMENT
     )
 
-    outline_req = build_outline_request(requirement_text, max(3, min(50, int(args.num_slides))))
     (output_dir / "requirement.txt").write_text(requirement_text, encoding="utf-8")
-    (output_dir / "outline_req.json").write_text(
-        json.dumps(outline_req, ensure_ascii=False, indent=2), encoding="utf-8"
+    prompt_req = build_generate_from_prompt_request(
+        requirement_text,
+        int(args.num_slides),
     )
-
-    outline_resp = call_api("POST", "/api/v1/ppt/outline", outline_req)
-    outline_data = expect_success(outline_resp, "outline")
-    (output_dir / "outline.json").write_text(
-        json.dumps(outline_data, ensure_ascii=False, indent=2), encoding="utf-8"
+    (output_dir / "prompt_master_req.json").write_text(
+        json.dumps(prompt_req, ensure_ascii=False, indent=2),
+        encoding="utf-8",
     )
-
-    content_req = {"outline": outline_data, "language": "zh-CN"}
-    (output_dir / "content_req.json").write_text(
-        json.dumps(content_req, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
-    content_resp = call_api("POST", "/api/v1/ppt/content", content_req)
-    if not (content_resp.get("success") and isinstance(content_resp.get("data"), list)):
-        raise RuntimeError(f"content failed: {json.dumps(content_resp, ensure_ascii=False)[:1000]}")
-    slides: List[Dict[str, Any]] = [item for item in content_resp["data"] if isinstance(item, dict)]
-    (output_dir / "slides.json").write_text(json.dumps(slides, ensure_ascii=False, indent=2), encoding="utf-8")
-
-    export_req = build_export_request(
-        slides,
-        str(outline_data.get("title") or "灵创智能企业推介"),
-        route_mode=args.route_mode,
-        quality_profile=args.quality_profile,
-    )
-    (output_dir / "export_req.json").write_text(
-        json.dumps(export_req, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
-    export_resp = call_api(
+    prompt_resp = call_api(
         "POST",
-        "/api/v1/ppt/export",
-        export_req,
-        timeout_sec=max(30, int(args.export_timeout)),
+        "/api/v1/ppt/generate-from-prompt",
+        prompt_req,
+        timeout_sec=max(120, int(args.export_timeout)),
     )
-    export_data = expect_success(export_resp, "export")
-    (output_dir / "export_result.json").write_text(
-        json.dumps(export_data, ensure_ascii=False, indent=2), encoding="utf-8"
+    prompt_data = expect_success(prompt_resp, "generate-from-prompt")
+    (output_dir / "prompt_master_result.json").write_text(
+        json.dumps(prompt_data, ensure_ascii=False, indent=2),
+        encoding="utf-8",
     )
 
-    pptx_url = str(export_data.get("url") or "").strip()
+    local_output = str(prompt_data.get("output_pptx") or "").strip()
     pptx_path = output_dir / "lingchuang_ppt.pptx"
-    downloaded = download_file(pptx_url, pptx_path)
-
-    render_path = write_render_surrogate(
-        output_dir,
-        outline_data=outline_data,
-        slides=slides,
-        export_data=export_data,
-    )
-
-    quality_obj = export_data.get("quality_score") if isinstance(export_data.get("quality_score"), dict) else {}
-    quality_passed = bool(quality_obj.get("passed"))
-    alerts = export_data.get("alerts") if isinstance(export_data.get("alerts"), list) else []
-    blocking_alerts = [
-        item
-        for item in alerts
-        if isinstance(item, dict) and str(item.get("severity") or "").strip().lower() in {"high", "critical"}
-    ]
+    copied = False
+    if local_output and Path(local_output).exists():
+        pptx_path.write_bytes(Path(local_output).read_bytes())
+        copied = True
+    pptx_url = str(prompt_data.get("url") or "").strip()
+    downloaded = copied or download_file(pptx_url, pptx_path)
 
     summary = {
-        "success": downloaded and bool(slides) and quality_passed and (len(blocking_alerts) == 0),
+        "success": bool(downloaded),
+        "flow": "prompt_master",
         "output_dir": str(output_dir),
         "renderer_base": RENDERER_BASE,
-        "slide_count": len(slides),
-        "outline_title": outline_data.get("title"),
+        "project_name": prompt_data.get("project_name"),
+        "project_path": prompt_data.get("project_path"),
+        "slide_count": int(prompt_data.get("total_slides") or 0),
         "pptx_url": pptx_url,
         "pptx_path": str(pptx_path) if downloaded else "",
-        "render_path": str(render_path),
-        "route_mode": export_data.get("route_mode"),
-        "quality_profile": export_data.get("quality_profile"),
-        "quality_score": export_data.get("quality_score"),
-        "quality_passed": quality_passed,
-        "visual_qa": export_data.get("visual_qa"),
-        "alerts": alerts,
-        "blocking_alerts": blocking_alerts,
+        "source_output_pptx": local_output,
+        "generation_time_seconds": prompt_data.get("generation_time_seconds"),
+        "artifacts": prompt_data.get("artifacts"),
     }
-    (output_dir / "summary.json").write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
+    (output_dir / "summary.json").write_text(
+        json.dumps(summary, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
     print(json.dumps(summary, ensure_ascii=False))
     if not summary["success"]:
         raise SystemExit(1)
 
-
 if __name__ == "__main__":
     main()
+
+

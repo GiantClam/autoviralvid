@@ -1,0 +1,262 @@
+# Config
+
+## Environment Variables
+
+- `AGENT_URL` (has default) — .env.example
+- `AI_CHAT_MODEL` (has default) — agent\.env.example
+- `AIBERM_API_BASE` (has default) — agent\.env
+- `AIBERM_API_KEY` (has default) — agent\.env
+- `ALLOW_PAID_DEPLOYED_E2E` **required** — src\integration\deployed-environment.test.ts
+- `API_BASE` **required** — src\integration\deployed-environment.test.ts
+- `AUDIO_SPLITTER_MIN_LAST_SEGMENT_SECONDS` **required** — agent\src\audio_splitter.py
+- `AUTH_REQUIRED` (has default) — agent\.env.example
+- `AUTH_SECRET` (has default) — agent\.env.example
+- `AWS_REGION` **required** — agent\src\lambda_renderer.py
+- `CF_NOTIFY_TOKEN` **required** — agent\.env.example
+- `CF_WORKER_NOTIFY_URL` **required** — agent\.env.example
+- `CONTENT_LLM_MODEL` (has default) — agent\.env
+- `CORS_ORIGIN` (has default) — agent\.env.example
+- `DEPLOYED_BACKEND_BEARER_TOKEN` **required** — src\integration\deployed-environment.test.ts
+- `DEPLOYED_BACKEND_URL` **required** — src\integration\deployed-environment.test.ts
+- `DEPLOYED_DIGITAL_HUMAN_AUDIO_URL` **required** — src\integration\deployed-environment.test.ts
+- `DEPLOYED_DIGITAL_HUMAN_AVATAR_URL` **required** — src\integration\deployed-environment.test.ts
+- `DEPLOYED_DIGITAL_HUMAN_DURATION` **required** — src\integration\deployed-environment.test.ts
+- `DEPLOYED_DIGITAL_HUMAN_POLL_INTERVAL_MS` **required** — src\integration\deployed-environment.test.ts
+- `DEPLOYED_DIGITAL_HUMAN_THEME` **required** — src\integration\deployed-environment.test.ts
+- `DEPLOYED_DIGITAL_HUMAN_TIMEOUT_MS` **required** — src\integration\deployed-environment.test.ts
+- `DEPLOYED_FETCH_RETRY_COUNT` **required** — src\integration\deployed-environment.test.ts
+- `DEPLOYED_FRONTEND_URL` **required** — src\integration\deployed-environment.test.ts
+- `DEPLOYED_LONG_DIGITAL_HUMAN_AUDIO_URL` **required** — src\integration\deployed-environment.test.ts
+- `DEPLOYED_LONG_DIGITAL_HUMAN_DURATION` **required** — src\integration\deployed-environment.test.ts
+- `DEPLOYED_LONG_DIGITAL_HUMAN_POLL_INTERVAL_MS` **required** — src\integration\deployed-environment.test.ts
+- `DEPLOYED_LONG_DIGITAL_HUMAN_THEME` **required** — src\integration\deployed-environment.test.ts
+- `DEPLOYED_LONG_DIGITAL_HUMAN_TIMEOUT_MS` **required** — src\integration\deployed-environment.test.ts
+- `DEPLOYED_SMOKE_TEST_TIMEOUT_MS` **required** — src\integration\deployed-environment.test.ts
+- `DEPLOYED_TEST_EMAIL` **required** — src\integration\deployed-environment.test.ts
+- `E2E_DH_AUDIO_URL` **required** — agent\scripts\e2e_digital_human_5min.py
+- `E2E_DH_DURATION_SECONDS` **required** — agent\scripts\e2e_digital_human_5min.py
+- `E2E_DH_MAX_POLLS` **required** — agent\scripts\e2e_digital_human_5min.py
+- `E2E_DH_PHOTO_URL` **required** — agent\scripts\e2e_digital_human_5min.py
+- `E2E_DH_POLL_INTERVAL_SECONDS` **required** — agent\scripts\e2e_digital_human_5min.py
+- `E2E_DH_THEME` **required** — agent\scripts\e2e_digital_human_5min.py
+- `EMBEDDING_REFERER` (has default) — agent\.env
+- `ENABLE_SUBTITLES` (has default) — agent\.env.example
+- `ENABLE_WAITLIST` (has default) — .env.example
+- `FFMPEG_FONT_FILE` **required** — agent\main.py
+- `FORCE_MUTE_MODEL_AUDIO` (has default) — agent\.env.example
+- `FRONTEND_BASE` **required** — scripts\ui_openclaw_remotion_e2e.py
+- `GOOGLE_CLIENT_ID` **required** — .env.example
+- `GOOGLE_CLIENT_SECRET` **required** — .env.example
+- `HEADLESS` **required** — scripts\ui_ppt_e2e.py
+- `HTTP_PROXY` **required** — agent\.env.example
+- `HTTPS_PROXY` **required** — agent\.env.example
+- `LIBLIB_API_KEY` **required** — agent\.env.example
+- `LLM_API_KEY` **required** — agent\src\openrouter_client.py
+- `LOG_DIR` (has default) — agent\.env.example
+- `MINIMAX_API_KEY` **required** — agent\.env.example
+- `MINIMAX_GROUP_ID` **required** — agent\.env.example
+- `MINIMAX_SPEECH_MODEL` (has default) — agent\.env.example
+- `MINIMAX_VOICE_ID` **required** — agent\.env.example
+- `NEXT_PUBLIC_AGENT_URL` (has default) — .env.example
+- `NEXT_PUBLIC_API_BASE` (has default) — .env.example
+- `NEXT_PUBLIC_AUTH_ENABLED` (has default) — .env.example
+- `NEXT_PUBLIC_DISABLE_API_TOKEN` **required** — src\lib\project-client.ts
+- `NEXT_PUBLIC_SENTRY_DSN` **required** — .env.example
+- `NEXT_PUBLIC_SITE_URL` (has default) — .env.example
+- `NEXTAUTH_SECRET` (has default) — .env.example
+- `NEXTAUTH_URL` (has default) — .env.example
+- `NODE_ENV` **required** — src\components\Sidebar.tsx
+- `OPENAI_API_KEY` **required** — agent\src\ppt_subagent_executor.py
+- `OPENROUTER_API_BASE` (has default) — agent\.env
+- `OPENROUTER_API_KEY` **required** — agent\.env.example
+- `OPENROUTER_BASE_URL` (has default) — agent\.env.example
+- `OPENROUTER_FALLBACK_API_BASE` (has default) — agent\.env
+- `OPENROUTER_FALLBACK_API_KEY` (has default) — agent\.env
+- `OPENROUTER_FALLBACK_MODEL` (has default) — agent\.env
+- `OPENROUTER_HTTP_PROXY` **required** — agent\src\openrouter_client.py
+- `OPENROUTER_HTTPS_PROXY` **required** — agent\src\openrouter_client.py
+- `OPENROUTER_PROXY` **required** — agent\src\openrouter_client.py
+- `PAYPAL_CLIENT_ID` **required** — .env.example
+- `PAYPAL_CLIENT_SECRET` **required** — .env.example
+- `PAYPAL_MODE` (has default) — .env.example
+- `PAYPAL_PLAN_ENTERPRISE` **required** — .env.example
+- `PAYPAL_PLAN_PRO` **required** — .env.example
+- `PIXVERSE_API_KEY` **required** — agent\src\providers_video_pixverse.py
+- `PORT` (has default) — agent\.env.example
+- `PPT_ALLOW_LEGACY_MODE` **required** — agent\src\configs\settings.py
+- `PPT_CODEX_CLI_BIN` **required** — scripts\compare_codex_cli_vs_project_ppt.py
+- `PPT_CODEX_PPT_PARITY_CASES` **required** — agent\tests\test_ppt_codex_cli_ppt_parity_live.py
+- `PPT_CODEX_PPT_PARITY_LIVE` **required** — agent\tests\test_ppt_codex_cli_ppt_parity_live.py
+- `PPT_CODEX_PPT_PARITY_MIN_SCORE` **required** — agent\tests\test_ppt_codex_cli_ppt_parity_live.py
+- `PPT_CODEX_PPT_PARITY_TIMEOUT_SEC` **required** — agent\tests\test_ppt_codex_cli_ppt_parity_live.py
+- `PPT_CODEX_SKILL_DOC_MAX_CHARS` **required** — scripts\compare_codex_cli_vs_project_ppt.py
+- `PPT_DEFAULT_EXECUTION_PROFILE` **required** — agent\src\ppt_service_v2.py
+- `PPT_DIRECT_SKILL_RUNTIME_ARGS` (has default) — agent\.env
+- `PPT_DIRECT_SKILL_RUNTIME_BIN` (has default) — agent\.env
+- `PPT_DIRECT_SKILL_RUNTIME_CODEX_ARGS` **required** — agent\src\ppt_direct_skill_runtime.py
+- `PPT_DIRECT_SKILL_RUNTIME_CODEX_BIN` **required** — agent\src\ppt_direct_skill_runtime.py
+- `PPT_DIRECT_SKILL_RUNTIME_CODEX_CWD` **required** — agent\src\ppt_direct_skill_runtime.py
+- `PPT_DIRECT_SKILL_RUNTIME_CODEX_TIMEOUT_SEC` **required** — agent\src\ppt_direct_skill_runtime.py
+- `PPT_DIRECT_SKILL_RUNTIME_CWD` (has default) — agent\.env
+- `PPT_DIRECT_SKILL_RUNTIME_ENABLED` (has default) — agent\.env
+- `PPT_DIRECT_SKILL_RUNTIME_MODE` **required** — agent\src\ppt_direct_skill_runtime.py
+- `PPT_DIRECT_SKILL_RUNTIME_REQUIRE` (has default) — agent\.env
+- `PPT_DIRECT_SKILL_RUNTIME_SKILL_CONTENT_MAX_CHARS` **required** — agent\src\ppt_direct_skill_runtime.py
+- `PPT_DIRECT_SKILL_RUNTIME_TIMEOUT_SEC` **required** — agent\src\installed_skill_executor.py
+- `PPT_ENABLE_LEGACY_FALLBACK` (has default) — agent\.env.example
+- `PPT_EXECUTION_PROFILE` **required** — agent\src\ppt_master_skill_adapter.py
+- `PPT_EXECUTION_ROLE` **required** — agent\src\ppt_subagent_executor.py
+- `PPT_EXPORT_ALLOW_LOCAL_ASYNC_ON_WEB` **required** — agent\src\v7_routes.py
+- `PPT_EXPORT_CHANNEL` **required** — agent\src\configs\settings.py
+- `PPT_EXPORT_SYNC_ENABLED` **required** — agent\src\v7_routes.py
+- `PPT_EXPORT_TASKS_TABLE` **required** — agent\src\v7_routes.py
+- `PPT_EXPORT_WORKER_BASE_URL` **required** — agent\src\v7_routes.py
+- `PPT_EXPORT_WORKER_REQUIRE_SIGNATURE` **required** — agent\src\v7_routes.py
+- `PPT_EXPORT_WORKER_SHARED_SECRET` **required** — agent\src\v7_routes.py
+- `PPT_EXPORT_WORKER_SIGNATURE_TTL_SEC` **required** — agent\src\v7_routes.py
+- `PPT_EXPORT_WORKER_TIMEOUT_SEC` **required** — agent\src\v7_routes.py
+- `PPT_EXPORT_WORKER_TOKEN` **required** — agent\src\v7_routes.py
+- `PPT_FORCE_PPT_MASTER` **required** — agent\src\ppt_master_skill_adapter.py
+- `PPT_GENERATOR_MODE` (has default) — agent\.env.example
+- `PPT_IMAGE_AI_SVG_ENABLED` **required** — agent\src\ppt_service_v2.py
+- `PPT_IMAGE_ASSET_ENABLED` **required** — agent\src\ppt_service_v2.py
+- `PPT_IMAGE_ASSET_PROVIDER` (has default) — agent\.env.example
+- `PPT_IMAGE_BUILTIN_AUTO_ENABLED` **required** — agent\src\ppt_service_v2.py
+- `PPT_IMAGE_ICON_BG_ENABLED` **required** — agent\src\ppt_service_v2.py
+- `PPT_IMAGE_RELEVANCE_MIN_SCORE` **required** — agent\src\ppt_service_v2.py
+- `PPT_IMAGE_SERPER_KEYWORD_LIMIT` (has default) — agent\.env.example
+- `PPT_INSTALLED_SKILL_EXECUTOR_ARGS` **required** — agent\src\ppt_subagent_executor.py
+- `PPT_INSTALLED_SKILL_EXECUTOR_BIN` **required** — agent\src\ppt_subagent_executor.py
+- `PPT_INSTALLED_SKILL_EXECUTOR_CWD` **required** — agent\src\ppt_subagent_executor.py
+- `PPT_INSTALLED_SKILL_EXECUTOR_ENABLED` **required** — agent\src\ppt_subagent_executor.py
+- `PPT_INSTALLED_SKILL_EXECUTOR_TIMEOUT_SEC` **required** — agent\src\ppt_subagent_executor.py
+- `PPT_MASTER_CODEX_BIN` **required** — agent\tests\test_ppt_master_service_short_path.py
+- `PPT_MASTER_IMAGE_MODEL` **required** — agent\src\ppt_master_blackbox_local.py
+- `PPT_MASTER_RUNTIME_MODE` **required** — agent\src\ppt_master_service.py
+- `PPT_MASTER_SKILL_ROOTS` **required** — agent\src\ppt_master_skill_adapter.py
+- `PPT_MASTER_SKILL_RUNTIME_ARGS` **required** — agent\src\ppt_master_service.py
+- `PPT_MASTER_SKILL_RUNTIME_BIN` **required** — agent\src\ppt_master_service.py
+- `PPT_MASTER_SKILL_RUNTIME_CWD` **required** — agent\src\ppt_master_service.py
+- `PPT_MODULE_SUBAGENT_EXEC_ENABLED` **required** — scripts\compare_codex_cli_vs_project_ppt.py
+- `PPT_OFFICIAL_ROLLOUT_PERCENT` (has default) — agent\.env.example
+- `PPT_PARTIAL_RETRY_ENABLED` (has default) — agent\.env.example
+- `PPT_PIPELINE_EXPORT_TIMEOUT_SEC` **required** — agent\src\ppt_service_v2.py
+- `PPT_PIPELINE_STAGE_TIMEOUT_SEC` **required** — agent\src\ppt_service_v2.py
+- `PPT_PRIMARY_VISUAL_SKILL` **required** — agent\src\installed_skill_executor.py
+- `PPT_RETRY_ENABLED` (has default) — agent\.env.example
+- `PPT_RETRY_MAX_ATTEMPTS` (has default) — agent\.env.example
+- `PPT_ROUTE_MODE` **required** — agent\src\configs\settings.py
+- `PPT_SKILL_EQ_LIVE` **required** — agent\tests\test_ppt_skill_effect_equivalence_live.py
+- `PPT_SUBAGENT_ENABLE_SKILL_RUNTIME` **required** — agent\src\ppt_subagent_executor.py
+- `PPT_SUBAGENT_SKILL_CONTENT_MAX_CHARS` **required** — agent\src\ppt_subagent_executor.py
+- `PPT_SUBAGENT_SKILL_ROOTS` **required** — agent\src\ppt_subagent_executor.py
+- `PPT_SVG_FINALIZER_ENABLED` **required** — agent\src\ppt_svg_finalizer.py
+- `PPT_TEMPLATE_EDIT_ENGINE` **required** — agent\src\pptx_engine.py
+- `PPT_TEMPLATE_MARKITDOWN_ENABLED` **required** — agent\src\pptx_engine.py
+- `PPT_TEMPLATE_MARKITDOWN_TIMEOUT_SEC` **required** — agent\src\pptx_engine.py
+- `PPT_TEXT_QA_MARKITDOWN_ENABLED` **required** — agent\src\ppt_export_text_qa_service.py
+- `PPT_TEXT_QA_MARKITDOWN_TIMEOUT_SEC` **required** — agent\src\ppt_export_text_qa_service.py
+- `PPT_V7_SCREEN_TEXT_MAX_CHARS` **required** — agent\src\schemas\ppt_v7.py
+- `PPT_VIDEO_BASE_MODE` (has default) — agent\.env.example
+- `PPT_VISUAL_CRITIC_MAX_TARGET_SLIDES` **required** — agent\src\ppt_service_v2.py
+- `PPT_VISUAL_DENSITY` (has default) — agent\.env.example
+- `PPT_VISUAL_PRESET` (has default) — agent\.env.example
+- `PPT_VISUAL_PRIORITY` (has default) — agent\.env.example
+- `PPT_VISUAL_QA_MAX_MM_SLIDES` **required** — agent\src\ppt_visual_qa.py
+- `PPT_VISUAL_QA_MULTIMODAL` **required** — agent\src\configs\settings.py
+- `PPT_ZERO_CREATE_DEFAULT_MODE` **required** — scripts\run_reference_regression_once.py
+- `PROMPT_LLM_MODEL` (has default) — agent\.env.example
+- `PROVIDER_IMAGE` (has default) — agent\.env.example
+- `PROVIDER_VIDEO` (has default) — agent\.env.example
+- `R2_ACCESS_KEY` **required** — agent\.env.example
+- `R2_ACCOUNT_ID` **required** — agent\.env.example
+- `R2_BUCKET` (has default) — agent\.env.example
+- `R2_PUBLIC_BASE` (has default) — agent\.env.example
+- `R2_PUBLIC_HOSTS` **required** — agent\src\ppt_service_v2.py
+- `R2_SECRET_KEY` **required** — agent\.env.example
+- `RATE_LIMIT_RPM` (has default) — agent\.env.example
+- `REMOTION_LAMBDA_FUNCTION` **required** — agent\src\lambda_renderer.py
+- `REMOTION_RENDERER_URL` (has default) — .env.local
+- `REMOTION_SERVE_URL` **required** — agent\src\lambda_renderer.py
+- `RENDER_FFMPEG_CRF` (has default) — agent\.env.example
+- `RENDER_FFMPEG_PRESET` (has default) — agent\.env.example
+- `RENDER_OUTPUT_DIR` (has default) — agent\.env.example
+- `RENDERER_BASE` **required** — scripts\e2e_lingchuang_ppt.py
+- `RUN_DEPLOYED_DIGITAL_HUMAN_E2E` **required** — src\integration\deployed-environment.test.ts
+- `RUN_DEPLOYED_INTEGRATION_TESTS` **required** — src\integration\deployed-environment.test.ts
+- `RUN_DEPLOYED_LONG_DIGITAL_HUMAN_E2E` **required** — src\integration\deployed-environment.test.ts
+- `RUN_INTEGRATION_TESTS` **required** — vitest.config.ts
+- `RUNNINGHUB_API_BASE` (has default) — agent\.env.example
+- `RUNNINGHUB_API_KEY` **required** — agent\.env.example
+- `RUNNINGHUB_IMAGE_WORKFLOW_ID` **required** — agent\.env.example
+- `RUNNINGHUB_MAX_CONCURRENT` (has default) — agent\.env.example
+- `RUNNINGHUB_MAX_RETRIES` (has default) — agent\.env.example
+- `RUNNINGHUB_MODE` **required** — agent\src\providers_video_runninghub.py
+- `RUNNINGHUB_QWEN_FL_WORKFLOW_ID` **required** — agent\.env.example
+- `RUNNINGHUB_QWEN_STORYBOARD_WORKFLOW_ID` **required** — agent\.env.example
+- `RUNNINGHUB_SORA2_WORKFLOW_ID` **required** — agent\.env.example
+- `RUNNINGHUB_TIMEOUT` (has default) — agent\.env.example
+- `RUNNINGHUB_WORKFLOW_ID` **required** — agent\.env.example
+- `SAFE_TRIM_SECS` (has default) — agent\.env.example
+- `SERPER_API_KEY` **required** — agent\.env.example
+- `SERPER_API_URL` (has default) — agent\.env.example
+- `SITE_URL` **required** — agent\src\agent_skills.py
+- `SKILLS_COST_WEIGHT` (has default) — agent\.env.example
+- `SKILLS_MAX_COST` (has default) — agent\.env.example
+- `SKILLS_MAX_FALLBACKS` (has default) — agent\.env.example
+- `SKILLS_MAX_LATENCY_MS` (has default) — agent\.env.example
+- `SKILLS_QUALITY_WEIGHT` (has default) — agent\.env.example
+- `SKILLS_RELIABILITY_WEIGHT` (has default) — agent\.env.example
+- `SKILLS_SPEED_WEIGHT` (has default) — agent\.env.example
+- `SKIP_AGENT_INSTALL` **required** — scripts\postinstall.mjs
+- `SLOW_MO` **required** — scripts\ui_ppt_e2e.py
+- `SORA2_TOKEN_ENGINE_KEY` **required** — agent\src\generators\token_engine.py
+- `STORYBOARD_LLM_MODEL` (has default) — agent\.env.example
+- `SUBTITLE_FONT` (has default) — agent\.env.example
+- `SUBTITLE_FONTSIZE` (has default) — agent\.env.example
+- `SUBTITLE_STROKE_COLOR` (has default) — agent\.env.example
+- `SUBTITLE_STROKE_WIDTH` (has default) — agent\.env.example
+- `SUPABASE_ANON_KEY` (has default) — agent\.env.example
+- `SUPABASE_DB_PASSWORD` **required** — agent\run_migration.py
+- `SUPABASE_SERVICE_KEY` (has default) — agent\.env
+- `SUPABASE_SERVICE_ROLE_KEY` (has default) — agent\.env.example
+- `SUPABASE_URL` (has default) — agent\.env.example
+- `TTS_GLOBAL_CONCURRENCY` **required** — agent\src\tts_synthesizer.py
+- `UI_E2E_FRONTEND_PORT` **required** — scripts\run_ppt_e2e.py
+- `UI_E2E_OUTPUT_DIR` **required** — scripts\run_ppt_e2e.py
+- `UI_E2E_PPT_RENDER_SUBMIT_TIMEOUT_MS` **required** — scripts\ui_ppt_v7_workspace_real_e2e.py
+- `UI_E2E_RENDERER_PORT` **required** — scripts\run_ppt_e2e.py
+- `UI_E2E_SCENARIO` **required** — scripts\run_ui_openclaw_e2e.py
+- `UI_E2E_V7_TIMEOUT` **required** — scripts\ui_ppt_v7_workspace_real_e2e.py
+- `VERCEL` **required** — agent\src\ppt_subagent_executor.py
+- `VERCEL_ENV` **required** — agent\src\ppt_subagent_executor.py
+- `VERCEL_PROJECT_PRODUCTION_URL` **required** — src\lib\runtime-env.ts
+- `VERCEL_URL` **required** — src\lib\runtime-env.ts
+- `VIDEO_QUEUE_MAX_CONCURRENT` (has default) — agent\.env.example
+- `VIDEO_QUEUE_MAX_GENERAL_RETRIES` (has default) — agent\.env.example
+- `VIDEO_QUEUE_MAX_QUEUE_RETRIES` (has default) — agent\.env.example
+- `VIDEO_QUEUE_POLL_INTERVAL` (has default) — agent\.env.example
+- `VIDEO_QUEUE_PROVIDER_POLL_RETRIES` (has default) — agent\.env.example
+- `WORKFLOW_CLIP_DURATION` (has default) — agent\.env.example
+- `WORKFLOW_EXECUTOR_TIMEOUT` (has default) — agent\.env.example
+- `WORKFLOW_TOTAL_DURATION` (has default) — agent\.env.example
+- `ZHENZHEN_API_BASE` **required** — agent\.env.example
+- `ZHENZHEN_API_KEY` **required** — agent\.env.example
+- `ZHENZHEN_NOTIFY_HOOK` **required** — agent\.env.example
+
+## Config Files
+
+- `.env.example`
+- `Dockerfile`
+- `agent\.env.example`
+- `docker-compose.yml`
+- `next.config.ts`
+- `tsconfig.json`
+
+## Key Dependencies
+
+- @prisma/client: 6.19.2
+- next: ^16.1.6
+- next-auth: ^5.0.0-beta.30
+- react: ^19.2.1
+- zod: ^3.24.4

@@ -1,0 +1,77 @@
+# Components
+
+- **Error** [client] — props: error, reset — `src\app\error.tsx`
+- **GlobalError** [client] — props: error, reset — `src\app\global-error.tsx`
+- **RootLayout** — `src\app\layout.tsx`
+- **PrivacyPolicy** — `src\app\legal\privacy\page.tsx`
+- **TermsOfService** — `src\app\legal\terms\page.tsx`
+- **NotFound** [client] — `src\app\not-found.tsx`
+- **Home** [client] — `src\app\page.tsx`
+- **PPTPromptPage** [client] — `src\app\ppt\page.tsx`
+- **ProjectsPage** [client] — `src\app\projects\page.tsx`
+- **ResetPasswordPage** [client] — `src\app\reset-password\page.tsx`
+- **SettingsPage** [client] — `src\app\settings\page.tsx`
+- **AIAssistant** [client] — `src\components\AIAssistant.tsx`
+- **BatchPanel** [client] — props: templateId, theme, style, duration, orientation, aspectRatio, onClose — `src\components\BatchPanel.tsx`
+- **ClipManager** [client] — `src\components\ClipManager.tsx`
+- **LandingPage** [client] — `src\components\LandingPage.tsx`
+- **LanguageSwitcher** [client] — props: className — `src\components\LanguageSwitcher.tsx`
+- **MoonCard** — props: themeColor, status, respond — `src\components\moon.tsx`
+- **OutlineEditor** [client] — props: outline, onChange, onConfirm, onBack — `src\components\OutlineEditor.tsx`
+- **PPTPreview** [client] — props: slides, controlledIndex, onIndexChange — `src\components\PPTPreview.tsx`
+- **PricingModal** [client] — props: isOpen, onClose, currentPlan, quotaUsed, quotaTotal — `src\components\PricingModal.tsx`
+- **ProcessGuide** — props: onClose, className — `src\components\ProcessGuide.tsx`
+- **ProgressPanel** [client] — props: compact — `src\components\ProgressPanel.tsx`
+- **ProjectForm** [client] — props: onTemplateChange, initialTemplateId, onPptV7StateChange, pptV7RetryToken — `src\components\ProjectForm.tsx`
+- **Providers** [client] — `src\components\Providers.tsx`
+- **QuotaBar** [client] — props: onUpgrade — `src\components\QuotaBar.tsx`
+- **RemotionPreview** [client] — `src\components\RemotionPreview.tsx`
+- **RenderProgress** [client] — props: jobId, pollInterval, onComplete, onError — `src\components\RenderProgress.tsx`
+- **SocialPanel** [client] — `src\components\SocialPanel.tsx`
+- **StoryboardPanel** [client] — `src\components\StoryboardPanel.tsx`
+- **TemplateGallery** [client] — props: onSelect — `src\components\TemplateGallery.tsx`
+- **AssetLibrary** — `src\components\VideoEditor\AssetLibrary.tsx`
+- **EditorPanel** — `src\components\VideoEditor\EditorPanel.tsx`
+- **Player** — `src\components\VideoEditor\Player.tsx`
+- **PropertyEditor** — `src\components\VideoEditor\PropertyEditor.tsx`
+- **SCALE** — `src\components\VideoEditor\Timeline.tsx`
+- **WeatherCard** — props: location, themeColor — `src\components\weather.tsx`
+- **EditorProvider** [client] — `src\contexts\EditorContext.tsx`
+- **ProjectProvider** [client] — `src\contexts\ProjectContext.tsx`
+- **LocaleProvider** [client] — `src\lib\i18n\context.tsx`
+- **DrawCircleAction** — props: width, height — `src\remotion\components\ActionEngine.tsx`
+- **SpotlightAction** — `src\remotion\components\ActionEngine.tsx`
+- **UnderlineAction** — props: width — `src\remotion\components\ActionEngine.tsx`
+- **SubtitleBar** — props: role, text — `src\remotion\components\ActionEngine.tsx`
+- **ScriptPlayer** — props: script, segments, visualContent — `src\remotion\components\ActionEngine.tsx`
+- **ZoomIn** — props: speed — `src\remotion\components\Animations.tsx`
+- **PanLeft** — props: distance — `src\remotion\components\Animations.tsx`
+- **PanRight** — props: distance — `src\remotion\components\Animations.tsx`
+- **Static** — `src\remotion\components\Animations.tsx`
+- **MarpSlide** — props: markdown, theme — `src\remotion\components\MarpSlide.tsx`
+- **HeroSlide** — props: data — `src\remotion\components\PremiumSlides.tsx`
+- **PointsSlide** — props: data — `src\remotion\components\PremiumSlides.tsx`
+- **StatsSlide** — props: data — `src\remotion\components\PremiumSlides.tsx`
+- **QuoteSlide** — props: data — `src\remotion\components\PremiumSlides.tsx`
+- **VersusSlide** — props: data — `src\remotion\components\PremiumSlides.tsx`
+- **ClosingSlide** — props: data — `src\remotion\components\PremiumSlides.tsx`
+- **PremiumSlideRenderer** — props: data — `src\remotion\components\PremiumSlides.tsx`
+- **CoverLayout** — props: content — `src\remotion\components\SlideLayouts.tsx`
+- **BulletPointsLayout** — props: content, emphasisWords — `src\remotion\components\SlideLayouts.tsx`
+- **ComparisonLayout** — props: content, emphasisWords — `src\remotion\components\SlideLayouts.tsx`
+- **QuoteLayout** — props: content, emphasisWords — `src\remotion\components\SlideLayouts.tsx`
+- **BigNumberLayout** — props: content — `src\remotion\components\SlideLayouts.tsx`
+- **SplitImageLayout** — props: content, emphasisWords, imagePos — `src\remotion\components\SlideLayouts.tsx`
+- **SlideLayoutRenderer** — props: slide — `src\remotion\components\SlideLayouts.tsx`
+- **ImageSlideshow** — props: slides — `src\remotion\compositions\ImageSlideshow.tsx`
+- **KeywordPulse** — props: slides — `src\remotion\compositions\MarpPresentation.tsx`
+- **SlidePresentation** — props: slides, bgmUrl, bgmVolume, defaultTransition — `src\remotion\compositions\SlidePresentation.tsx`
+- **BeautyReview** — `src\remotion\compositions\templates\BeautyReview.tsx`
+- **BrandStory** — `src\remotion\compositions\templates\BrandStory.tsx`
+- **FoodShowcase** — `src\remotion\compositions\templates\FoodShowcase.tsx`
+- **KnowledgeEdu** — `src\remotion\compositions\templates\KnowledgeEdu.tsx`
+- **ProductShowcase** — `src\remotion\compositions\templates\ProductShowcase.tsx`
+- **TechUnbox** — `src\remotion\compositions\templates\TechUnbox.tsx`
+- **Tutorial** — props: clips, subtitles, steps, totalSteps, bgmUrl, bgmVolume, style, introText, outroText — `src\remotion\compositions\templates\Tutorial.tsx`
+- **VideoTemplate** — props: clips, subtitles, bgmUrl, bgmVolume, transition, style, introText, outroText — `src\remotion\compositions\VideoTemplate.tsx`
+- **RemotionRoot** — `src\remotion\index.tsx`

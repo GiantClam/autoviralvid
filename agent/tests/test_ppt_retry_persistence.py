@@ -1,38 +1,26 @@
-﻿from src import ppt_service_v2 as ppt_service
+from __future__ import annotations
+
+from pathlib import Path
+
+from src import ppt_master_native_runtime as runtime
 
 
-class _FakeTable:
-    def __init__(self):
-        self.inserted = None
-
-    def insert(self, payload):
-        self.inserted = payload
-        return self
-
-    def execute(self):
-        return {"ok": True}
+def test_safe_slug_keeps_ascii_and_cjk() -> None:
+    value = runtime._safe_slug("霍尔木兹 Crisis 2026 / classroom", "fallback")  # noqa: SLF001
+    assert value
+    assert "fallback" not in value
+    assert " " not in value
 
 
-class _FakeSupabase:
-    def __init__(self):
-        self.table_name = None
-        self.table_obj = _FakeTable()
-
-    def table(self, name):
-        self.table_name = name
-        return self.table_obj
-
-
-def test_persist_failure_code_and_scope(monkeypatch):
-    fake = _FakeSupabase()
-    monkeypatch.setattr(ppt_service, "_get_supabase", lambda: fake)
-
-    payload = {"failure_code": "timeout", "retry_scope": "slide"}
-    ppt_service._persist_ppt_retry_diagnostic(payload)
-
-    assert fake.table_name == "autoviralvid_ppt_retry_diagnostics"
-    assert fake.table_obj.inserted["failure_code"] == "timeout"
-    assert fake.table_obj.inserted["retry_scope"] == "slide"
-
-
+def test_run_cmd_reports_nonzero_without_throw(tmp_path: Path) -> None:
+    script = tmp_path / "exit1.py"
+    script.write_text("import sys\nsys.exit(1)\n", encoding="utf-8")
+    code, stdout, stderr = runtime._run_cmd(  # noqa: SLF001
+        cmd=["python", str(script)],
+        cwd=tmp_path,
+        timeout_sec=30,
+    )
+    assert code == 1
+    assert isinstance(stdout, str)
+    assert isinstance(stderr, str)
 

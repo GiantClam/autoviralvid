@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { projectApi } from '@/lib/project-client';
 import { useProject } from '@/contexts/ProjectContext';
+import { useT } from '@/lib/i18n';
 
 interface ChatMessage {
   role: 'user' | 'assistant';
@@ -20,12 +21,13 @@ interface ChatMessage {
 }
 
 export default function AIAssistant() {
+  const t = useT();
   const { project, scenes, phase } = useProject();
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       role: 'assistant',
-      content: '你好！我是 AI 创意助手。我可以帮你优化分镜描述、推荐风格搭配、解答生成问题。有什么需要帮助的吗？',
+      content: t("assistant.welcome"),
       timestamp: Date.now(),
     },
   ]);
@@ -74,21 +76,22 @@ export default function AIAssistant() {
 
       const assistantMessage: ChatMessage = {
         role: 'assistant',
-        content: result.reply || '抱歉，我暂时无法回答这个问题。',
+        content: result.reply || t("assistant.fallbackReply"),
         timestamp: Date.now(),
       };
       setMessages(prev => [...prev, assistantMessage]);
     } catch (e) {
+      const message = e instanceof Error ? e.message : t("assistant.networkError");
       const errorMessage: ChatMessage = {
         role: 'assistant',
-        content: `出错了：${e instanceof Error ? e.message : '网络异常，请稍后重试'}`,
+        content: t("assistant.errorPrefix", { message }),
         timestamp: Date.now(),
       };
       setMessages(prev => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
     }
-  }, [input, isLoading, project, scenes, phase]);
+  }, [input, isLoading, phase, project, scenes, t]);
 
   if (!isOpen) {
     return (
@@ -120,10 +123,10 @@ export default function AIAssistant() {
             <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 rounded-full border-2 border-[#0a0a12]" />
           </div>
           <div>
-            <span className="text-sm font-bold text-white">AI 创意助手</span>
+            <span className="text-sm font-bold text-white">{t("assistant.title")}</span>
             <div className="flex items-center gap-1.5 text-xs text-emerald-400">
               <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
-              在线
+              {t("assistant.online")}
             </div>
           </div>
         </div>
@@ -177,7 +180,11 @@ export default function AIAssistant() {
 
       {messages.length <= 2 && (
         <div className="px-5 pb-3 flex flex-wrap gap-2 relative">
-          {['优化分镜描述', '推荐风格搭配', '提高视频质量'].map(action => (
+          {[
+            t("assistant.quickActionImproveStoryboard"),
+            t("assistant.quickActionRecommendStyle"),
+            t("assistant.quickActionImproveQuality"),
+          ].map(action => (
             <button
               key={action}
               onClick={() => {
@@ -201,7 +208,7 @@ export default function AIAssistant() {
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && sendMessage()}
-            placeholder="输入你的问题..."
+            placeholder={t("assistant.inputPlaceholder")}
             className="flex-1 bg-white/[0.03] border border-white/[0.06] rounded-xl px-4 py-3 text-sm text-gray-200 placeholder-gray-600 focus:border-[#E11D48]/50 focus:ring-2 focus:ring-[#E11D48]/10 focus:outline-none transition-all duration-300"
             disabled={isLoading}
           />

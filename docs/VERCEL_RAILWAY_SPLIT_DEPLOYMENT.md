@@ -56,16 +56,8 @@ If you need installed external skill runtime on Railway:
 # Optional explicit cwd override (defaults to agent root automatically)
 # PPT_INSTALLED_SKILL_EXECUTOR_CWD=/app
 
-# Direct skill runtime backend (default: builtin heuristic).
-# For Codex CLI + SKILL.md parity planning:
-# PPT_DIRECT_SKILL_RUNTIME_MODE=codex_cli
+# Direct skill runtime backend (builtin only in normal production flow).
 # PPT_DIRECT_SKILL_RUNTIME_REQUIRE=true
-# PPT_DIRECT_SKILL_RUNTIME_CODEX_BIN=codex
-# PPT_DIRECT_SKILL_RUNTIME_CODEX_ARGS=["exec","--skip-git-repo-check","--sandbox","read-only"]
-# PPT_DIRECT_SKILL_RUNTIME_CODEX_TIMEOUT_SEC=90
-# PPT_DIRECT_SKILL_RUNTIME_CODEX_CWD=/app
-# PPT_DIRECT_SKILL_RUNTIME_SKILL_ROOTS=/app/vendor/minimax-skills/plugins/pptx-plugin/skills:/app/vendor/minimax-skills/skills
-# PPT_DIRECT_SKILL_RUNTIME_SKILL_CONTENT_MAX_CHARS=120000
 ```
 
 ## Operational notes

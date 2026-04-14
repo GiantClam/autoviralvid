@@ -23,13 +23,15 @@ import {
   X,
 } from "lucide-react";
 
-// 鈹€鈹€ Upload limits & allowed types 鈹€鈹€
+type Translator = (
+  key: TranslationKey,
+  params?: Record<string, string | number>,
+) => string;
 
 const UPLOAD_LIMITS = {
   image: {
     maxSizeMB: 20,
     allowedTypes: ["image/png", "image/jpeg", "image/jpg", "image/webp"],
-    labelKey: "form.imageFileLabel" as const,
   },
   audio: {
     maxSizeMB: 500,
@@ -37,33 +39,44 @@ const UPLOAD_LIMITS = {
       "audio/mpeg", "audio/mp3", "audio/wav", "audio/x-wav",
       "audio/ogg", "audio/aac", "audio/m4a", "audio/x-m4a",
     ],
-    labelKey: "form.audioFileLabel" as const,
   },
 } as const;
 
-function validateUploadFile(file: File, kind: keyof typeof UPLOAD_LIMITS, label: string) {
+function validateUploadFile(
+  file: File,
+  kind: keyof typeof UPLOAD_LIMITS,
+  label: string,
+  t: Translator,
+) {
   const limit = UPLOAD_LIMITS[kind];
   const maxBytes = limit.maxSizeMB * 1024 * 1024;
 
   if (file.size > maxBytes) {
-    throw new Error(`${label} ${limit.maxSizeMB}MB (${(file.size / 1024 / 1024).toFixed(1)}MB)`);
+    throw new Error(
+      t("form.fileTooLargeMessage", {
+        label,
+        maxSizeMB: limit.maxSizeMB,
+        sizeMB: (file.size / 1024 / 1024).toFixed(1),
+      }),
+    );
   }
 
-  // Allow empty type (some browsers don't set it) but reject known-bad types
   if (file.type && !(limit.allowedTypes as readonly string[]).includes(file.type)) {
     throw new Error(
-      `${label}: "${file.type}" - ${limit.allowedTypes.join(", ")}`,
+      t("form.unsupportedFormatMessage", {
+        label,
+        fileType: file.type,
+        allowedTypes: limit.allowedTypes.join(", "),
+      }),
     );
   }
 }
 
-// 鈹€鈹€ File upload helper 鈹€鈹€
-
 async function uploadFileToR2(
   file: File,
+  t: Translator,
   onProgress?: (pct: number) => void,
 ): Promise<string> {
-  // 1. Get presigned URL from backend
   const presignRes = await fetch("/api/upload/presign", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -73,11 +86,10 @@ async function uploadFileToR2(
     }),
   });
   if (!presignRes.ok) {
-    throw new Error(`鑾峰彇涓婁紶閾炬帴澶辫触: ${presignRes.status}`);
+    throw new Error(t("form.getUploadUrlFailedWithStatus", { status: presignRes.status }));
   }
   const { upload_url, public_url } = await presignRes.json();
 
-  // 2. Upload file directly to R2 via presigned PUT
   await new Promise<void>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open("PUT", upload_url);
@@ -87,8 +99,11 @@ async function uploadFileToR2(
         if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
       };
     }
-    xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`涓婁紶澶辫触: ${xhr.status}`)));
-    xhr.onerror = () => reject(new Error("涓婁紶缃戠粶閿欒"));
+    xhr.onload = () =>
+      (xhr.status >= 200 && xhr.status < 300
+        ? resolve()
+        : reject(new Error(t("form.uploadFailedWithStatus", { status: xhr.status }))));
+    xhr.onerror = () => reject(new Error(t("form.uploadNetworkError")));
     xhr.send(file);
   });
 
@@ -125,7 +140,11 @@ export interface PptV7PanelState {
   slideCount: number;
 }
 
-async function callV7Api<T>(path: "generate" | "tts" | "export", body: Record<string, unknown>): Promise<T> {
+async function callV7Api<T>(
+  path: "generate" | "tts" | "export",
+  body: Record<string, unknown>,
+  t: Translator,
+): Promise<T> {
   const res = await fetch(`/api/projects/v7/${path}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -142,19 +161,19 @@ async function callV7Api<T>(path: "generate" | "tts" | "export", body: Record<st
   try {
     json = raw ? JSON.parse(raw) : null;
   } catch {
-    throw new Error(`V7 鎺ュ彛杩斿洖闈?JSON: ${raw.slice(0, 200)}`);
+    throw new Error(t("form.v7NonJson", { preview: raw.slice(0, 200) }));
   }
 
   if (!res.ok) {
-    throw new Error(json?.error || json?.detail || `V7 鎺ュ彛澶辫触: ${res.status}`);
+    throw new Error(
+      json?.error || json?.detail || t("form.v7RequestFailedWithStatus", { status: res.status }),
+    );
   }
   if (!json?.success) {
-    throw new Error(json?.error || "V7 鎺ュ彛杩斿洖澶辫触");
+    throw new Error(json?.error || t("form.v7RequestFailed"));
   }
   return json.data as T;
 }
-
-// 鈹€鈹€ Template options (keys for i18n) 鈹€鈹€
 
 type TemplateOption = {
   id: string;
@@ -174,7 +193,7 @@ const TEMPLATE_IDS: ReadonlyArray<TemplateOption> = [
   { id: "knowledge-edu", labelKey: "gallery.tplKnowledgeEdu" },
   { id: "funny-skit", labelKey: "gallery.tplFunnySkit" },
   { id: "travel-vlog", labelKey: "gallery.tplTravelVlog" },
-  { id: "ppt-v7", label: "PPT & Video V7" },
+  { id: "ppt-v7", labelKey: "gallery.tplPptV7" },
 ];
 
 const STYLE_KEYS = [
@@ -194,16 +213,12 @@ const ORIENTATION_KEYS = [
   { value: "square", labelKey: "form.square", ratio: "1:1" },
 ] as const satisfies ReadonlyArray<{ value: string; labelKey: TranslationKey; ratio: string }>;
 
-// 鈹€鈹€ Props 鈹€鈹€
-
 interface ProjectFormProps {
   onTemplateChange?: (templateId: string) => void;
   initialTemplateId?: string;
   onPptV7StateChange?: (state: PptV7PanelState) => void;
   pptV7RetryToken?: number;
 }
-
-// 鈹€鈹€ Component 鈹€鈹€
 
 export default function ProjectForm({ onTemplateChange, initialTemplateId, onPptV7StateChange, pptV7RetryToken }: ProjectFormProps) {
   const t = useT();
@@ -220,7 +235,7 @@ export default function ProjectForm({ onTemplateChange, initialTemplateId, onPpt
   const [audioUrl, setAudioUrl] = useState("");
   const [voiceMode, setVoiceMode] = useState(0);
   const [voiceText, setVoiceText] = useState("");
-  const [motionPrompt, setMotionPrompt] = useState("妯＄壒姝ｅ湪鍋氫骇鍝佸睍绀猴紝杩涜鐢靛晢鐩存挱甯﹁揣");
+  const [motionPrompt, setMotionPrompt] = useState(t("form.motionPlaceholder"));
 
   // File upload state
   const [imageUploading, setImageUploading] = useState(false);
@@ -278,18 +293,17 @@ export default function ProjectForm({ onTemplateChange, initialTemplateId, onPpt
     setMotionPrompt(
       typeof project.motion_prompt === "string" && project.motion_prompt
         ? project.motion_prompt
-        : "妯＄壒姝ｅ湪鍋氫骇鍝佸睍绀猴紝杩涜鐢靛晢鐩存挱甯﹁揣",
+        : t("form.motionPlaceholder"),
     );
     setImageFileName("");
     setAudioFileName("");
-  }, [onTemplateChange, project]);
+  }, [onTemplateChange, project, t]);
 
-  // 鈹€鈹€ File upload handlers 鈹€鈹€
   const handleImageFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     try {
-      validateUploadFile(file, "image", t("form.imageFileLabel"));
+      validateUploadFile(file, "image", t("form.imageFileLabel"), t);
     } catch (err) {
       alert(err instanceof Error ? err.message : String(err));
       if (imageInputRef.current) imageInputRef.current.value = "";
@@ -299,7 +313,7 @@ export default function ProjectForm({ onTemplateChange, initialTemplateId, onPpt
     setImageUploadPct(0);
     setImageFileName(file.name);
     try {
-      const url = await uploadFileToR2(file, setImageUploadPct);
+      const url = await uploadFileToR2(file, t, setImageUploadPct);
       setProductImageUrl(url);
     } catch (err) {
       alert(`${t("form.imageUploadFailed")}: ${err instanceof Error ? err.message : err}`);
@@ -314,7 +328,7 @@ export default function ProjectForm({ onTemplateChange, initialTemplateId, onPpt
     const file = e.target.files?.[0];
     if (!file) return;
     try {
-      validateUploadFile(file, "audio", t("form.audioFileLabel"));
+      validateUploadFile(file, "audio", t("form.audioFileLabel"), t);
     } catch (err) {
       alert(err instanceof Error ? err.message : String(err));
       if (audioInputRef.current) audioInputRef.current.value = "";
@@ -324,7 +338,7 @@ export default function ProjectForm({ onTemplateChange, initialTemplateId, onPpt
     setAudioUploadPct(0);
     setAudioFileName(file.name);
     try {
-      const url = await uploadFileToR2(file, setAudioUploadPct);
+      const url = await uploadFileToR2(file, t, setAudioUploadPct);
       setAudioUrl(url);
     } catch (err) {
       alert(`${t("form.audioUploadFailed")}: ${err instanceof Error ? err.message : err}`);
@@ -362,28 +376,28 @@ export default function ProjectForm({ onTemplateChange, initialTemplateId, onPpt
         requirement,
         num_slides: Math.max(3, Math.min(30, pptSlideCount)),
         language: "zh-CN",
-      });
+      }, t);
 
       setPptV7Step("tts");
       const ttsData = await callV7Api<{ slides: Array<Record<string, unknown>> }>("tts", {
         slides: generated.slides,
         voice_style: "zh-CN-female",
-      });
+      }, t);
 
       setPptV7Step("exporting");
       const exported = await callV7Api<V7ExportResponse>("export", {
         slides: ttsData.slides,
-      });
+      }, t);
 
       setPptV7Result(exported);
       setPptV7Step("done");
     } catch (err) {
-      setPptV7Error(err instanceof Error ? err.message : "V7 鐢熸垚澶辫触");
+      setPptV7Error(err instanceof Error ? err.message : t("form.v7GenerateFailed"));
       setPptV7Step("idle");
     } finally {
       setPptV7Busy(false);
     }
-  }, [theme, pptSlideCount]);
+  }, [pptSlideCount, t, theme]);
 
   useEffect(() => {
     const token = pptV7RetryToken ?? 0;
@@ -463,14 +477,12 @@ export default function ProjectForm({ onTemplateChange, initialTemplateId, onPpt
 
   const busy = isLoading || phase === "generating_storyboard" || pptV7Busy;
 
-  // 鈹€鈹€ Shared input class 鈹€鈹€
   const inp =
     "w-full rounded-xl bg-white/[0.03] border border-white/[0.06] text-gray-200 text-[13px] " +
     "px-3.5 py-2.5 outline-none transition-all duration-300 placeholder:text-gray-600 " +
     "focus:border-[#E11D48]/50 focus:ring-2 focus:ring-[#E11D48]/10 focus:bg-white/[0.05] " +
     "hover:border-white/[0.12] hover:bg-white/[0.04]";
 
-  // 鈹€鈹€ Label 鈹€鈹€
   const Label = ({ icon: Icon, children }: { icon: React.ElementType; children: React.ReactNode }) => (
     <div className="flex items-center gap-2 mb-2">
       <div className="w-5 h-5 rounded-md bg-gradient-to-br from-[#E11D48]/20 to-purple-500/10 flex items-center justify-center">
@@ -484,23 +496,19 @@ export default function ProjectForm({ onTemplateChange, initialTemplateId, onPpt
 
   return (
     <aside className="flex flex-col h-full w-full md:max-w-[400px] bg-[#0a0a12]/80 backdrop-blur-xl">
-      {/* 鈹€鈹€ Header 鈹€鈹€ */}
       <div className="flex items-center gap-3 px-5 py-4 border-b border-white/[0.06] bg-gradient-to-r from-[#E11D48]/5 to-transparent">
         <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#E11D48] to-[#9333EA] flex items-center justify-center shadow-lg shadow-[#E11D48]/20">
           <Clapperboard className="w-4 h-4 text-white" />
         </div>
         <div className="flex-1">
-          <h2 className="text-sm font-bold text-white tracking-tight">{isPptV7 ? "PPT V7 閰嶇疆" : t("form.videoConfig")}</h2>
+          <h2 className="text-sm font-bold text-white tracking-tight">{isPptV7 ? t("form.pptV7Config") : t("form.videoConfig")}</h2>
           <span className="text-[10px] text-gray-500">
-            {isPptV7 ? "鍙?Agent + MiniMax + Remotion" : isDigitalHuman ? t("form.digitalHumanMode") : t("form.aiGenMode")}
+            {isPptV7 ? t("form.pptV7Mode") : isDigitalHuman ? t("form.digitalHumanMode") : t("form.aiGenMode")}
           </span>
         </div>
       </div>
 
-      {/* 鈹€鈹€ Scrollable form 鈹€鈹€ */}
       <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
-
-        {/* 鈹€鈹€ Template + Theme 鈹€鈹€ */}
         <section>
           <Label icon={Clapperboard}>{t("form.template")}</Label>
           <div className="relative">
@@ -532,10 +540,10 @@ export default function ProjectForm({ onTemplateChange, initialTemplateId, onPpt
 
         {isPptV7 && (
           <section className="rounded-xl border border-white/[0.08] bg-white/[0.02] p-3 space-y-3">
-            <div className="text-xs font-semibold text-gray-300">PPT V7 鍙傛暟</div>
+            <div className="text-xs font-semibold text-gray-300">{t("form.pptV7Params")}</div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <div className="text-[11px] text-gray-500 mb-1">椤垫暟</div>
+                <div className="text-[11px] text-gray-500 mb-1">{t("form.slideCount")}</div>
                 <input
                   type="number"
                   min={3}
@@ -546,13 +554,13 @@ export default function ProjectForm({ onTemplateChange, initialTemplateId, onPpt
                 />
               </div>
               <div>
-                <div className="text-[11px] text-gray-500 mb-1">流程</div>
+                <div className="text-[11px] text-gray-500 mb-1">{t("form.pipeline")}</div>
                 <div className="h-[42px] rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 flex items-center text-xs text-gray-400">
-                  {pptV7Step === "idle" && "等待开始"}
-                  {pptV7Step === "generating" && "生成内容中..."}
-                  {pptV7Step === "tts" && "合成旁白中..."}
-                  {pptV7Step === "exporting" && "导出 PPTX 中..."}
-                  {pptV7Step === "done" && "已完成"}
+                  {pptV7Step === "idle" && t("form.pptV7Waiting")}
+                  {pptV7Step === "generating" && t("form.pptV7GeneratingContent")}
+                  {pptV7Step === "tts" && t("form.pptV7SynthesizingVoice")}
+                  {pptV7Step === "exporting" && t("form.pptV7Exporting")}
+                  {pptV7Step === "done" && t("form.pptV7Completed")}
                 </div>
               </div>
             </div>
@@ -564,7 +572,7 @@ export default function ProjectForm({ onTemplateChange, initialTemplateId, onPpt
             {pptV7Result && (
               <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/[0.08] p-3 space-y-2">
                 <div className="text-xs text-emerald-300">
-                  完成：{pptV7Result.slide_count} 页
+                  {t("form.pptV7CompletedSlides", { count: pptV7Result.slide_count })}
                 </div>
                 <a
                   href={pptV7Result.pptx_url}
@@ -572,7 +580,7 @@ export default function ProjectForm({ onTemplateChange, initialTemplateId, onPpt
                   rel="noreferrer"
                   className="inline-flex items-center gap-2 text-xs font-semibold text-emerald-300 hover:text-emerald-200"
                 >
-                  下载 PPTX
+                  {t("pptV7.downloadPptx")}
                 </a>
               </div>
             )}
@@ -583,10 +591,8 @@ export default function ProjectForm({ onTemplateChange, initialTemplateId, onPpt
 
         {!isPptV7 && (
           <>
-        {/* 鈹€鈹€ Assets 鈹€鈹€ */}
         <section>
           <Label icon={ImagePlus}>{isDigitalHuman ? t("form.imageDigitalHumanLabel") : t("form.imageLabel")}</Label>
-          {/* Hidden file input */}
           <input
             ref={imageInputRef}
             type="file"
@@ -626,7 +632,7 @@ export default function ProjectForm({ onTemplateChange, initialTemplateId, onPpt
                 <div className="h-full bg-[#E11D48]/70 rounded-full transition-all duration-300"
                      style={{ width: `${imageUploadPct}%` }} />
               </div>
-              <p className="text-[10px] text-gray-500 mt-0.5">{imageFileName} 路 {imageUploadPct}%</p>
+              <p className="text-[10px] text-gray-500 mt-0.5">{imageFileName} / {imageUploadPct}%</p>
             </div>
           )}
           {!imageUploading && imageFileName && productImageUrl && (
@@ -645,7 +651,6 @@ export default function ProjectForm({ onTemplateChange, initialTemplateId, onPpt
           <>
             <section>
               <Label icon={Music}>{t("form.audioFile")}</Label>
-              {/* Hidden file input */}
               <input
                 ref={audioInputRef}
                 type="file"
@@ -685,7 +690,7 @@ export default function ProjectForm({ onTemplateChange, initialTemplateId, onPpt
                     <div className="h-full bg-[#E11D48]/70 rounded-full transition-all duration-300"
                          style={{ width: `${audioUploadPct}%` }} />
                   </div>
-                  <p className="text-[10px] text-gray-500 mt-0.5">{audioFileName} 路 {audioUploadPct}%</p>
+                  <p className="text-[10px] text-gray-500 mt-0.5">{audioFileName} / {audioUploadPct}%</p>
                 </div>
               )}
               {!audioUploading && audioFileName && audioUrl && (
@@ -706,7 +711,6 @@ export default function ProjectForm({ onTemplateChange, initialTemplateId, onPpt
 
             <Divider />
 
-            {/* 鈹€鈹€ Voice Mode 鈹€鈹€ */}
             <section>
               <Label icon={Mic2}>{t("form.voiceMode")}</Label>
               <div className="flex rounded-xl border border-white/[0.06] overflow-hidden bg-white/[0.02]">
@@ -758,9 +762,7 @@ export default function ProjectForm({ onTemplateChange, initialTemplateId, onPpt
 
         <Divider />
 
-        {/* 鈹€鈹€ Visual params 鈹€鈹€ */}
         <div className="grid grid-cols-2 gap-x-3 gap-y-3">
-          {/* Style */}
           <section>
             <Label icon={Palette}>{t("form.style")}</Label>
             <div className="relative">
@@ -777,7 +779,6 @@ export default function ProjectForm({ onTemplateChange, initialTemplateId, onPpt
             </div>
           </section>
 
-          {/* Duration */}
           <section>
             <Label icon={Clock}>{t("form.duration")}</Label>
             <div className="flex items-center gap-2">
@@ -795,7 +796,6 @@ export default function ProjectForm({ onTemplateChange, initialTemplateId, onPpt
           </section>
         </div>
 
-        {/* Orientation - inline segmented */}
         <section>
           <Label icon={Monitor}>{t("form.screen")}</Label>
           <div className="flex rounded-xl border border-white/[0.06] overflow-hidden bg-white/[0.02]">
@@ -830,7 +830,6 @@ export default function ProjectForm({ onTemplateChange, initialTemplateId, onPpt
           </>
         )}
 
-        {/* 鈹€鈹€ Error 鈹€鈹€ */}
         {error && (
           <div className="rounded-lg bg-red-500/[0.08] border border-red-500/20 px-3 py-2 text-xs text-red-400 flex items-center gap-2">
             <span className="w-4 h-4 rounded-full bg-red-500/20 flex items-center justify-center shrink-0 text-[10px]">!</span>
@@ -839,7 +838,6 @@ export default function ProjectForm({ onTemplateChange, initialTemplateId, onPpt
         )}
       </div>
 
-      {/* 鈹€鈹€ Action button (sticky bottom) 鈹€鈹€ */}
       <div className="px-5 py-4 border-t border-white/[0.06] bg-[#0a0a12]/50 backdrop-blur-sm">
         <button
           type="button"
@@ -862,9 +860,9 @@ export default function ProjectForm({ onTemplateChange, initialTemplateId, onPpt
           )}
           <span className="relative z-10">
             {busy
-              ? (isPptV7 ? "澶勭悊涓?.." : t("form.generating"))
+              ? (isPptV7 ? t("form.processing") : t("form.generating"))
               : isPptV7
-                ? "鐢熸垚 PPT V7"
+                ? t("form.generatePptV7")
                 : isDigitalHuman
                   ? t("form.generateDigitalHuman")
                   : t("form.startGenerate")}

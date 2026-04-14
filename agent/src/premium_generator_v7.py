@@ -9,7 +9,7 @@ import os
 import re
 from collections import Counter
 from math import ceil
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 
 from src.schemas.ppt_v7 import DialogueLine, PresentationData, SlideAction, SlideData
 
@@ -115,6 +115,162 @@ def _extract_json(text: str) -> Dict[str, Any]:
             pass
 
     raise ValueError(f"cannot parse json: {raw[:400]}")
+
+
+_MARKDOWN_HEADING_RE = re.compile(r"(?m)^\s*##+\s*(.+?)\s*$")
+_LIST_ITEM_RE = re.compile(r"^\s*(?:[-*+]|(?:\d+[.)、]))\s+(.+?)\s*$")
+
+
+def _strip_markdown_text(text: str) -> str:
+    cleaned = re.sub(r"<[^>]+>", " ", text or "")
+    cleaned = re.sub(r"`([^`]*)`", r"\1", cleaned)
+    cleaned = re.sub(r"\*\*([^*]+)\*\*", r"\1", cleaned)
+    cleaned = re.sub(r"__([^_]+)__", r"\1", cleaned)
+    cleaned = re.sub(r"[*_#>\-]", " ", cleaned)
+    cleaned = re.sub(r"\s+", " ", cleaned)
+    return cleaned.strip(" ：:，,。；;")
+
+
+def _extract_markdown_sections(raw: str) -> List[Tuple[str, str]]:
+    matches = list(_MARKDOWN_HEADING_RE.finditer(raw or ""))
+    if not matches:
+        return []
+
+    sections: List[Tuple[str, str]] = []
+    for idx, match in enumerate(matches):
+        start = match.end()
+        end = matches[idx + 1].start() if idx + 1 < len(matches) else len(raw)
+        heading = match.group(1).strip()
+        body = raw[start:end].strip()
+        sections.append((heading, body))
+    return sections
+
+
+def _extract_markdown_label(body: str, labels: List[str]) -> str:
+    for raw_line in (body or "").splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        normalized = _strip_markdown_text(line)
+        compact = normalized.replace(" ", "").lower()
+        for label in labels:
+            token = label.replace(" ", "").lower()
+            if compact.startswith(token):
+                value = normalized[len(label) :].lstrip("：: ").strip()
+                if value:
+                    return value
+    return ""
+
+
+def _extract_markdown_points(body: str) -> List[str]:
+    points: List[str] = []
+    for raw_line in (body or "").splitlines():
+        line = raw_line.strip()
+        if not line or line == "---":
+            continue
+        bullet = _LIST_ITEM_RE.match(line)
+        candidate = bullet.group(1) if bullet else ""
+        if not candidate and line.startswith("**") and line.endswith("**"):
+            continue
+        if not candidate and any(token in line for token in ("- ", "* ", "• ")):
+            candidate = line
+        candidate = _strip_markdown_text(candidate)
+        if len(candidate) < 4:
+            continue
+        points.append(candidate)
+
+    deduped: List[str] = []
+    seen = set()
+    for point in points:
+        key = point.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(point)
+        if len(deduped) >= 5:
+            break
+    return deduped
+
+
+def _guess_slide_type_from_markdown(
+    heading: str,
+    body: str,
+    slide_index: int,
+    total_sections: int,
+    points: List[str],
+) -> str:
+    heading_text = _strip_markdown_text(heading).lower()
+    body_text = _strip_markdown_text(body).lower()
+    signal = f"{heading_text} {body_text}"
+
+    if slide_index == 1 or any(token in signal for token in ("封面", "title", "cover")):
+        return "cover"
+    if slide_index == 2 or any(token in signal for token in ("目录", "agenda", "toc", "contents")):
+        return "toc"
+    if slide_index == total_sections or any(
+        token in signal for token in ("总结", "summary", "conclusion", "结论", "thanks")
+    ):
+        return "summary"
+    if any(token in signal for token in ("过渡", "章节", "section", "divider", "transition")):
+        return "divider"
+    if any(token in signal for token in ("阶段", "历程", "timeline", "路径", "roadmap")):
+        return "timeline"
+    if any(token in signal for token in ("观点", "结论", "stat", "quote", "数据")) and points:
+        return "quote_stat"
+    if len(points) >= 3:
+        return "grid_3"
+    return "grid_2"
+
+
+def _markdown_outline_to_plan(raw: str, target_count: int) -> Dict[str, Any]:
+    sections = _extract_markdown_sections(raw)
+    if not sections:
+        raise ValueError("planner response did not contain markdown sections")
+
+    slides: List[Dict[str, Any]] = []
+    for ordinal, (heading, body) in enumerate(sections, start=1):
+        title = _extract_markdown_label(body, ["标题", "Title", "主题", "Topic", "页面标题"])
+        if not title:
+            heading_text = _strip_markdown_text(heading)
+            title = re.sub(r"^(?:第?\s*\d+\s*[页pP]?[:：.\-、]?\s*)", "", heading_text).strip() or heading_text
+
+        points = _extract_markdown_points(body)
+        key_message = (
+            _extract_markdown_label(body, ["核心结论", "关键结论", "核心信息", "Key Message", "Main Message"])
+            or title
+            or f"第{ordinal}页核心观点"
+        )
+        slide_type = _guess_slide_type_from_markdown(heading, body, ordinal, len(sections), points)
+        slides.append(
+            {
+                "slide_index": ordinal,
+                "slide_type": slide_type,
+                "key_message": _trim_text(key_message, 32),
+                "data_points": [_trim_text(point, 40) for point in points if point][:5],
+            }
+        )
+
+    plan_title = (
+        _extract_markdown_label(raw, ["主题", "Title", "标题"])
+        or slides[0]["key_message"]
+        or "商业演示文稿"
+    )
+    logger.warning(
+        "[v7] planner returned markdown instead of JSON, recovered %d sections into plan",
+        len(slides),
+    )
+    return {
+        "title": _trim_text(plan_title, 80) or "商业演示文稿",
+        "design_system": "tech_blue",
+        "slides": slides[: max(1, target_count)],
+    }
+
+
+def _extract_planner_payload(text: str, target_count: int) -> Dict[str, Any]:
+    try:
+        return _extract_json(text)
+    except ValueError:
+        return _markdown_outline_to_plan(text, target_count)
 
 
 def _trim_text(text: str, max_len: int) -> str:
@@ -414,7 +570,7 @@ async def generate_v7(
         max_tokens=2500,
         response_format={"type": "json_object"},
     )
-    plan = _extract_json(planner_raw)
+    plan = _extract_planner_payload(planner_raw, target_count)
     planner_slides = plan.get("slides", []) if isinstance(plan.get("slides"), list) else []
     planned_types = _plan_slide_types(target_count, planner_slides)
     metas = _slide_meta_from_plan(planner_slides, planned_types)

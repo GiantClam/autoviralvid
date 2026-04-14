@@ -10,7 +10,7 @@ from copy import deepcopy
 from typing import Any, Dict, List, Mapping
 
 CANONICAL_DECISION_TRACE_OWNER = "agent/src/ppt_design_decision.py"
-FINAL_OWNER_ASSERTION_OWNER = "agent/src/ppt_service_v2.py"
+FINAL_OWNER_ASSERTION_OWNER = "agent/src/ppt_service_v2/__init__.py"
 
 _DECK_FIELDS = (
     "style_variant",

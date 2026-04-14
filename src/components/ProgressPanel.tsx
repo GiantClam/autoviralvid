@@ -3,6 +3,7 @@
 import React from "react";
 import { CheckCircle2, Clock3, Loader2, Sparkles, Video } from "lucide-react";
 import { useProject } from "@/contexts/ProjectContext";
+import { useT } from "@/lib/i18n";
 
 const PHASE_WEIGHT: Record<string, number> = {
   idle: 0,
@@ -19,34 +20,35 @@ const PHASE_WEIGHT: Record<string, number> = {
   error: 0,
 };
 
-function getPhaseLabel(phase: string) {
+function getPhaseLabel(phase: string, t: ReturnType<typeof useT>) {
   switch (phase) {
     case "generating_storyboard":
-      return "正在生成分镜";
+      return t("progress.generatingStoryboard");
     case "storyboard_ready":
-      return "分镜已完成";
+      return t("progress.storyboardReady");
     case "generating_images":
-      return "正在生成图片";
+      return t("progress.generatingImages");
     case "images_ready":
-      return "图片已完成";
+      return t("progress.imagesReady");
     case "generating_videos":
-      return "正在生成视频";
+      return t("progress.generatingVideos");
     case "stitching":
-      return "正在拼接成片";
+      return t("progress.stitching");
     case "rendering":
-      return "正在渲染";
+      return t("progress.rendering");
     case "videos_ready":
-      return "片段已完成";
+      return t("progress.videosReady");
     case "completed":
-      return "已完成";
+      return t("progress.completed");
     case "error":
-      return "处理失败";
+      return t("progress.failed");
     default:
-      return "等待开始";
+      return t("progress.waiting");
   }
 }
 
 export default function ProgressPanel({ compact = false }: { compact?: boolean }) {
+  const t = useT();
   const { phase, taskSummary, scenes, finalVideoUrl } = useProject();
 
   if (phase === "idle" || phase === "configuring") return null;
@@ -62,10 +64,10 @@ export default function ProgressPanel({ compact = false }: { compact?: boolean }
 
   return (
     <div className={`${compact ? "mx-3 mt-2 p-3" : "mx-4 mt-4 p-4"} rounded-2xl border border-white/[0.08] bg-gradient-to-br from-[#E11D48]/8 to-purple-500/6`}>
-      <div className={`${compact ? "mb-2" : "mb-3"} flex items-center justify-between`}>
+        <div className={`${compact ? "mb-2" : "mb-3"} flex items-center justify-between`}>
         <div className="flex items-center gap-2 text-sm font-semibold text-gray-200">
           <Sparkles className="h-4 w-4 text-[#E11D48]" />
-          生成进度
+          {t("progress.title")}
         </div>
         <div className="text-xs text-gray-400">{progress}%</div>
       </div>
@@ -86,20 +88,20 @@ export default function ProgressPanel({ compact = false }: { compact?: boolean }
           ) : (
             <Clock3 className="h-3.5 w-3.5 text-gray-400" />
           )}
-          <span>{getPhaseLabel(phase)}</span>
+          <span>{getPhaseLabel(phase, t)}</span>
         </div>
 
         <div className="text-gray-500">
           {taskSummary.total > 0
             ? `${taskSummary.succeeded}/${taskSummary.total}`
-            : `${scenes.length} 场景`}
+            : t("progress.sceneCount", { count: scenes.length })}
         </div>
       </div>
 
       {finalVideoUrl && (
         <div className={`${compact ? "mt-2" : "mt-3"} inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-1 text-[11px] text-emerald-400`}>
           <Video className="h-3.5 w-3.5" />
-          最终视频已就绪
+          {t("progress.finalVideoReady")}
         </div>
       )}
     </div>

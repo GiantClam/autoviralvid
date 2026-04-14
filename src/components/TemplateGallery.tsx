@@ -30,7 +30,7 @@ export function TemplateGallery({ onSelect }: TemplateGalleryProps) {
         { id: 'home-living', title: t("gallery.tplHomeLiving"), description: t("gallery.tplHomeLivingDesc"), icon: Sofa, tag: t("gallery.tagEcommerce"), tagType: 'default' as const, gradient: 'from-emerald-500 to-teal-600', category: 'ecommerce' as const },
         { id: 'brand-story', title: t("gallery.tplBrandStory"), description: t("gallery.tplBrandStoryDesc"), icon: Star, tag: t("gallery.tagPro"), tagType: 'pro' as const, gradient: 'from-blue-500 to-indigo-600', category: 'general' as const },
         { id: 'digital-human', title: t("gallery.tplDigitalHuman"), description: t("gallery.tplDigitalHumanDesc"), icon: Video, tag: t("gallery.tagDigitalHuman"), tagType: 'digital-human' as const, gradient: 'from-rose-500 to-purple-600', category: 'general' as const },
-        { id: 'ppt-v7', title: 'PPT & Video V7', description: 'Dual-agent PPT generation with TTS and export pipeline.', icon: Presentation, tag: 'PPT V7', tagType: 'pro' as const, gradient: 'from-cyan-500 to-indigo-600', category: 'general' as const },
+        { id: 'ppt-v7', title: t("gallery.tplPptV7"), description: t("gallery.tplPptV7Desc"), icon: Presentation, tag: t("gallery.tagPptV7"), tagType: 'pro' as const, gradient: 'from-cyan-500 to-indigo-600', category: 'general' as const },
         { id: 'knowledge-edu', title: t("gallery.tplKnowledgeEdu"), description: t("gallery.tplKnowledgeEduDesc"), icon: BookOpen, tag: t("gallery.tagContent"), tagType: 'default' as const, gradient: 'from-sky-500 to-blue-600', category: 'content' as const },
         { id: 'funny-skit', title: t("gallery.tplFunnySkit"), description: t("gallery.tplFunnySkitDesc"), icon: Laugh, tag: t("gallery.tagContent"), tagType: 'default' as const, gradient: 'from-lime-500 to-green-600', category: 'content' as const },
         { id: 'travel-vlog', title: t("gallery.tplTravelVlog"), description: t("gallery.tplTravelVlogDesc"), icon: Plane, tag: t("gallery.tagContent"), tagType: 'default' as const, gradient: 'from-rose-500 to-orange-600', category: 'content' as const },
@@ -38,9 +38,9 @@ export function TemplateGallery({ onSelect }: TemplateGalleryProps) {
     ], [t]);
 
     const CATEGORIES: { key: 'ecommerce' | 'content' | 'general'; label: string; icon: React.ElementType; description: string }[] = [
-        { key: 'ecommerce', label: t("gallery.catEcommerce"), icon: ShoppingBag, description: "Product showcases & reviews" },
-        { key: 'general', label: t("gallery.catBrand"), icon: Megaphone, description: "Brand stories & promotions" },
-        { key: 'content', label: t("gallery.catContent"), icon: Film, description: "Educational & entertainment" },
+        { key: 'ecommerce', label: t("gallery.catEcommerce"), icon: ShoppingBag, description: t("gallery.catDescEcommerce") },
+        { key: 'general', label: t("gallery.catBrand"), icon: Megaphone, description: t("gallery.catDescBrand") },
+        { key: 'content', label: t("gallery.catContent"), icon: Film, description: t("gallery.catDescContent") },
     ];
 
     const getTagStyles = (tagType: 'hot' | 'pro' | 'digital-human' | 'default') => {
@@ -87,7 +87,7 @@ export function TemplateGallery({ onSelect }: TemplateGalleryProps) {
                         
                         <h1 className="text-3xl sm:text-5xl md:text-6xl font-extrabold tracking-tight animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
                             <span className="block text-white">{t("gallery.title")}</span>
-                            <span className="block mt-2 text-gradient-primary">Professional Quality</span>
+                            <span className="block mt-2 text-gradient-primary">{t("gallery.professionalQuality")}</span>
                         </h1>
                         
                         <p className="text-gray-400 text-base md:text-xl max-w-2xl animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
@@ -99,7 +99,7 @@ export function TemplateGallery({ onSelect }: TemplateGalleryProps) {
                     <div className="sticky top-2 z-20 rounded-2xl border border-white/[0.06] bg-black/50 p-3 backdrop-blur-xl">
                         <div className="mb-3 flex items-center gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
                             {([
-                                { key: 'all', label: '全部模板' },
+                                { key: 'all', label: t("gallery.allTemplates") },
                                 { key: 'ecommerce', label: t("gallery.catEcommerce") },
                                 { key: 'general', label: t("gallery.catBrand") },
                                 { key: 'content', label: t("gallery.catContent") },
@@ -122,7 +122,7 @@ export function TemplateGallery({ onSelect }: TemplateGalleryProps) {
                             <input
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
-                                placeholder="搜索模板、标签或场景"
+                                placeholder={t("gallery.searchPlaceholder")}
                                 className="w-full rounded-xl border border-white/[0.08] bg-white/[0.03] py-2.5 pl-9 pr-9 text-sm text-gray-200 outline-none transition-colors placeholder:text-gray-600 focus:border-[#E11D48]/50"
                             />
                             {search && (
@@ -194,7 +194,7 @@ export function TemplateGallery({ onSelect }: TemplateGalleryProps) {
                                                     
                                                     {/* Action indicator */}
                                                     <div className="flex items-center gap-2 mt-4 text-gray-600 group-hover:text-[#E11D48] transition-colors">
-                                                        <span className="text-xs font-medium">Use template</span>
+                                                        <span className="text-xs font-medium">{t("gallery.useTemplate")}</span>
                                                         <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
                                                     </div>
                                                 </div>
@@ -214,8 +214,8 @@ export function TemplateGallery({ onSelect }: TemplateGalleryProps) {
 
                     {visibleTemplates.length === 0 && (
                         <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-10 text-center">
-                            <p className="text-sm text-gray-300">没有找到匹配模板</p>
-                            <p className="mt-1 text-xs text-gray-500">尝试更换关键词或分类</p>
+                            <p className="text-sm text-gray-300">{t("gallery.noMatches")}</p>
+                            <p className="mt-1 text-xs text-gray-500">{t("gallery.tryDifferentKeywords")}</p>
                         </div>
                     )}
                     
@@ -230,8 +230,8 @@ export function TemplateGallery({ onSelect }: TemplateGalleryProps) {
                                         <Wand2 className="w-7 h-7 text-white" />
                                     </div>
                                     <div>
-                                        <h3 className="text-xl font-bold">Need something custom?</h3>
-                                        <p className="text-gray-400 text-sm">Create a blank project and let AI do the magic</p>
+                                        <h3 className="text-xl font-bold">{t("gallery.customTitle")}</h3>
+                                        <p className="text-gray-400 text-sm">{t("gallery.customDesc")}</p>
                                     </div>
                                 </div>
                                 
@@ -240,7 +240,7 @@ export function TemplateGallery({ onSelect }: TemplateGalleryProps) {
                                     className="group px-6 py-3 bg-gradient-to-r from-[#E11D48] to-[#BE123C] text-white rounded-full font-semibold text-sm transition-all cursor-pointer flex items-center gap-2 shadow-lg shadow-[#E11D48]/30 hover:shadow-[#E11D48]/50 hover:scale-105"
                                 >
                                     <Sparkles className="w-4 h-4" />
-                                    Start from Scratch
+                                    {t("gallery.startFromScratch")}
                                     <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                                 </button>
                             </div>

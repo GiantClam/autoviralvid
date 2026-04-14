@@ -57,6 +57,10 @@ def test_subagent_executor_applies_llm_patch_and_merges_skills(monkeypatch):
 def test_subagent_executor_skips_when_no_model_credentials(monkeypatch):
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("AIBERM_API_KEY", raising=False)
+    monkeypatch.delenv("AIBERM_API_BASE", raising=False)
+    monkeypatch.delenv("CRAZYROUTE_API_KEY", raising=False)
+    monkeypatch.delenv("CRAZYROUTE_API_BASE", raising=False)
     monkeypatch.setenv("PPT_SUBAGENT_ENABLE_SKILL_RUNTIME", "false")
 
     output = execute_subagent_task(_sample_task())
@@ -265,6 +269,62 @@ def test_create_openai_client_prefers_aiberm_over_openrouter(monkeypatch):
     assert model == "openai/gpt-5.3-codex"
     assert provider == "aiberm"
     assert "aiberm.example" in str(getattr(client, "base_url", ""))
+
+
+def test_create_openai_client_remaps_model_for_aiberm(monkeypatch):
+    monkeypatch.setenv("CONTENT_LLM_MODEL", "anthropic/claude-sonnet-4.6")
+    monkeypatch.setenv("AIBERM_API_BASE", "https://aiberm.example/v1")
+    monkeypatch.setenv("AIBERM_API_KEY", "sk-aiberm")
+    monkeypatch.delenv("CRAZYROUTE_API_BASE", raising=False)
+    monkeypatch.delenv("CRAZYROUTE_API_KEY", raising=False)
+
+    _client, model, provider = _create_openai_client()
+
+    assert provider == "aiberm"
+    assert model == "claude-sonnet-4-6"
+
+
+def test_create_openai_client_prefers_crazyroute_over_openrouter_when_aiberm_missing(monkeypatch):
+    monkeypatch.setenv("CONTENT_LLM_MODEL", "openai/gpt-5.3-codex")
+    monkeypatch.delenv("AIBERM_API_BASE", raising=False)
+    monkeypatch.delenv("AIBERM_API_KEY", raising=False)
+    monkeypatch.setenv("CRAZYROUTE_API_BASE", "https://crazyroute.example/v1")
+    monkeypatch.setenv("CRAZYROUTE_API_KEY", "sk-crazyroute")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-openrouter")
+
+    client, model, provider = _create_openai_client()
+
+    assert client is not None
+    assert model == "openai/gpt-5.3-codex"
+    assert provider == "crazyroute"
+    assert "crazyroute.example" in str(getattr(client, "base_url", ""))
+
+
+def test_create_openai_client_remaps_model_for_crazyroute(monkeypatch):
+    monkeypatch.setenv("CONTENT_LLM_MODEL", "anthropic/claude-sonnet-4.6")
+    monkeypatch.delenv("AIBERM_API_BASE", raising=False)
+    monkeypatch.delenv("AIBERM_API_KEY", raising=False)
+    monkeypatch.setenv("CRAZYROUTE_API_BASE", "https://crazyroute.example/v1")
+    monkeypatch.setenv("CRAZYROUTE_API_KEY", "sk-crazyroute")
+
+    _client, model, provider = _create_openai_client()
+
+    assert provider == "crazyroute"
+    assert model == "claude-sonnet-4-6"
+
+
+def test_create_openai_client_remaps_model_for_openrouter(monkeypatch):
+    monkeypatch.setenv("CONTENT_LLM_MODEL", "claude-sonnet-4-6")
+    monkeypatch.delenv("AIBERM_API_BASE", raising=False)
+    monkeypatch.delenv("AIBERM_API_KEY", raising=False)
+    monkeypatch.delenv("CRAZYROUTE_API_BASE", raising=False)
+    monkeypatch.delenv("CRAZYROUTE_API_KEY", raising=False)
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-openrouter")
+
+    _client, model, provider = _create_openai_client()
+
+    assert provider == "openrouter"
+    assert model == "anthropic/claude-sonnet-4.6"
 
 
 def test_subagent_executor_handles_none_load_skills(monkeypatch):

@@ -48,6 +48,9 @@ OPENROUTER_API_BASE=https://openrouter.ai/api/v1
 # Optional: use AIBERM as primary upstream, auto-fallback to OpenRouter
 # AIBERM_API_BASE=https://your-aiberm-gateway.example.com/v1
 # AIBERM_API_KEY=
+# Optional: CRAZYROUTE works the same as AIBERM and is used when AIBERM is absent
+# CRAZYROUTE_API_BASE=https://your-crazyroute-gateway.example.com/v1
+# CRAZYROUTE_API_KEY=
 # OPENROUTER_FALLBACK_API_BASE=https://openrouter.ai/api/v1
 # OPENROUTER_FALLBACK_API_KEY=   # optional, defaults to OPENROUTER_API_KEY
 # CONTENT_LLM_MODEL=openai/gpt-5.3-codex  # optional
@@ -106,6 +109,11 @@ PPT_MODULE_RETRY_MAX_PARALLEL=5
 CONTENT_LLM_MODEL=openai/gpt-5.3-codex
 OPENROUTER_API_KEY=
 OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
+# Optional OpenAI-compatible gateways (priority: AIBERM -> CRAZYROUTE -> OPENROUTER)
+# AIBERM_API_BASE=
+# AIBERM_API_KEY=
+# CRAZYROUTE_API_BASE=
+# CRAZYROUTE_API_KEY=
 
 # OR OpenAI mode
 # OPENAI_API_KEY=

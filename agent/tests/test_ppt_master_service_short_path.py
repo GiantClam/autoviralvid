@@ -19,6 +19,8 @@ def test_build_skill_runtime_request_defaults(monkeypatch) -> None:
         language="zh-CN",
         template_family="auto",
         include_images=False,
+        web_enrichment=None,
+        image_asset_enrichment=None,
     )
 
     assert payload["prompt"] == "test topic"
@@ -27,6 +29,8 @@ def test_build_skill_runtime_request_defaults(monkeypatch) -> None:
     assert payload["language"] == "zh-CN"
     assert payload["template_family"] == "auto"
     assert payload["include_images"] is False
+    assert payload["web_enrichment"] is True
+    assert payload["image_asset_enrichment"] is True
     assert payload["timeout_sec"] == 3600
 
 
@@ -42,6 +46,8 @@ def test_build_skill_runtime_request_timeout_override(monkeypatch) -> None:
         language="en-US",
         template_family="auto",
         include_images=False,
+        web_enrichment=None,
+        image_asset_enrichment=None,
     )
     assert payload["language"] == "en-US"
     assert payload["timeout_sec"] == 900
@@ -54,6 +60,24 @@ def test_runtime_command_defaults(monkeypatch) -> None:
     command = service._runtime_command()
     assert len(command) >= 3
     assert command[1:] == ["-m", "src.ppt_master_pipeline_runtime"]
+
+
+def test_build_skill_runtime_request_enrichment_override() -> None:
+    service = PPTMasterService()
+    payload = service._build_skill_runtime_request(
+        prompt="test",
+        project_name="ai_gen_test",
+        total_pages=10,
+        style="professional",
+        color_scheme=None,
+        language="zh-CN",
+        template_family="auto",
+        include_images=False,
+        web_enrichment=False,
+        image_asset_enrichment=False,
+    )
+    assert payload["web_enrichment"] is False
+    assert payload["image_asset_enrichment"] is False
 
 
 def test_ensure_runtime_env_no_codex_defaults(monkeypatch) -> None:

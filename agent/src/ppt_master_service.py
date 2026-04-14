@@ -6,6 +6,7 @@ import asyncio
 import base64
 import json
 import os
+import re
 import shlex
 import sys
 from datetime import datetime
@@ -23,6 +24,13 @@ def _env_int(name: str, default: int) -> int:
         return int(raw)
     except Exception:
         return default
+
+
+def _env_bool(name: str, default: bool) -> bool:
+    raw = str(os.getenv(name, "")).strip().lower()
+    if not raw:
+        return bool(default)
+    return raw in {"1", "true", "yes", "on"}
 
 
 class PPTMasterService:
@@ -50,6 +58,8 @@ class PPTMasterService:
         template_name: Optional[str] = None,
         template_family: Optional[str] = None,
         include_images: bool = False,
+        web_enrichment: Optional[bool] = None,
+        image_asset_enrichment: Optional[bool] = None,
     ) -> Dict[str, Any]:
         start_time = datetime.now()
         project_name = f"ai_gen_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
@@ -65,6 +75,8 @@ class PPTMasterService:
                 language=language,
                 template_family=resolved_template,
                 include_images=include_images,
+                web_enrichment=web_enrichment,
+                image_asset_enrichment=image_asset_enrichment,
             )
             runtime_payload = await self._run_skill_runtime(req)
             if not isinstance(runtime_payload, dict):
@@ -164,7 +176,19 @@ class PPTMasterService:
         language: str,
         template_family: str,
         include_images: bool,
+        web_enrichment: Optional[bool],
+        image_asset_enrichment: Optional[bool],
     ) -> Dict[str, Any]:
+        resolved_web_enrichment = (
+            bool(web_enrichment)
+            if web_enrichment is not None
+            else _env_bool("PPT_MASTER_WEB_ENRICHMENT", True)
+        )
+        resolved_image_asset_enrichment = (
+            bool(image_asset_enrichment)
+            if image_asset_enrichment is not None
+            else _env_bool("PPT_MASTER_IMAGE_ASSET_ENRICHMENT", True)
+        )
         return {
             "prompt": str(prompt or "").strip(),
             "project_name": project_name,
@@ -175,6 +199,8 @@ class PPTMasterService:
             "language": "en-US" if str(language).strip() == "en-US" else "zh-CN",
             "template_family": str(template_family or "auto").strip() or "auto",
             "include_images": bool(include_images),
+            "web_enrichment": resolved_web_enrichment,
+            "image_asset_enrichment": resolved_image_asset_enrichment,
             "timeout_sec": max(
                 120,
                 _env_int(
@@ -335,6 +361,117 @@ class PPTMasterService:
                 }
             )
         return templates
+
+    def _resolve_project_path(self, project_name: str) -> Path:
+        name = str(project_name or "").strip()
+        if not re.match(r"^[A-Za-z0-9._-]+$", name):
+            raise ValueError("invalid project_name format")
+        target = (self.output_base / name).resolve()
+        base = self.output_base.resolve()
+        if base not in target.parents:
+            raise ValueError("invalid project_name path")
+        return target
+
+    @staticmethod
+    def _read_excerpt(path: Path, max_chars: int = 5000) -> str:
+        if not path.exists() or not path.is_file():
+            return ""
+        return path.read_text(encoding="utf-8", errors="ignore")[:max_chars].strip()
+
+    def resolve_output_pptx_path(self, project_name: str) -> Path:
+        project_path = self._resolve_project_path(project_name)
+        if not project_path.exists():
+            raise FileNotFoundError(f"project not found: {project_name}")
+        candidates = sorted(
+            project_path.glob("*.pptx"),
+            key=lambda p: p.stat().st_mtime,
+            reverse=True,
+        )
+        if not candidates:
+            raise FileNotFoundError(f"pptx not found for project: {project_name}")
+        return candidates[0]
+
+    def get_project_preview(self, project_name: str) -> Dict[str, Any]:
+        project_path = self._resolve_project_path(project_name)
+        if not project_path.exists():
+            raise FileNotFoundError(f"project not found: {project_name}")
+
+        skill_result_path = project_path / "skill_result.json"
+        skill_payload: Dict[str, Any] = {}
+        if skill_result_path.exists():
+            try:
+                parsed = json.loads(
+                    skill_result_path.read_text(encoding="utf-8", errors="ignore")
+                )
+                if isinstance(parsed, dict):
+                    skill_payload = parsed
+            except Exception:
+                skill_payload = {}
+
+        artifacts = (
+            skill_payload.get("artifacts")
+            if isinstance(skill_payload.get("artifacts"), dict)
+            else {}
+        )
+        export = (
+            skill_payload.get("export")
+            if isinstance(skill_payload.get("export"), dict)
+            else {}
+        )
+
+        design_spec_path = project_path / "design_spec.md"
+        source_md_path: Optional[Path] = None
+        notes_total_path = project_path / "notes" / "total.md"
+
+        source_raw = str(artifacts.get("source_md") or "").strip()
+        if source_raw:
+            source_candidate = Path(source_raw)
+            if source_candidate.exists() and source_candidate.is_file():
+                source_md_path = source_candidate
+        if source_md_path is None:
+            source_candidates = sorted(
+                (project_path / "sources").glob("*.md"),
+                key=lambda p: p.stat().st_mtime,
+                reverse=True,
+            )
+            if source_candidates:
+                source_md_path = source_candidates[0]
+
+        design_raw = str(artifacts.get("design_spec") or "").strip()
+        if design_raw:
+            design_candidate = Path(design_raw)
+            if design_candidate.exists() and design_candidate.is_file():
+                design_spec_path = design_candidate
+
+        source_excerpt = (
+            self._read_excerpt(source_md_path) if source_md_path else ""
+        )
+        design_excerpt = self._read_excerpt(design_spec_path)
+        notes_excerpt = self._read_excerpt(notes_total_path)
+
+        preview_images = []
+        for item in export.get("slide_image_urls") or []:
+            value = str(item or "").strip()
+            if value.startswith("http://") or value.startswith("https://"):
+                preview_images.append(value)
+
+        svg_count = len(list((project_path / "svg_final").glob("*.svg")))
+        output_pptx = ""
+        try:
+            output_pptx = str(self.resolve_output_pptx_path(project_name))
+        except Exception:
+            output_pptx = ""
+
+        return {
+            "project_name": project_path.name,
+            "project_path": str(project_path),
+            "output_pptx": output_pptx,
+            "source_excerpt": source_excerpt,
+            "design_excerpt": design_excerpt,
+            "notes_excerpt": notes_excerpt,
+            "preview_image_urls": preview_images,
+            "svg_count": svg_count,
+        }
 
 
 async def generate_ppt_from_prompt(

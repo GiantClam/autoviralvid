@@ -69,11 +69,12 @@ function PptV7ResultPanel({
   history: PptV7HistoryItem[];
   onRetry: () => void;
 }) {
+  const t = useT();
   const steps: Array<{ key: PptV7PanelState['step']; label: string }> = [
-    { key: 'generating', label: 'Generate Content' },
-    { key: 'tts', label: 'Synthesize Voice' },
-    { key: 'exporting', label: 'Export PPTX' },
-    { key: 'done', label: 'Done' },
+    { key: 'generating', label: t("pptV7.stepGenerate") },
+    { key: 'tts', label: t("pptV7.stepTts") },
+    { key: 'exporting', label: t("pptV7.stepExport") },
+    { key: 'done', label: t("pptV7.stepDone") },
   ];
 
   const currentOrder = state.step === 'idle' ? 0 : steps.findIndex((s) => s.key === state.step) + 1;
@@ -84,8 +85,8 @@ function PptV7ResultPanel({
         <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <h3 className="text-lg font-semibold text-white">PPT V7 Result Panel</h3>
-              <p className="mt-1 text-sm text-gray-500">Dual-agent pipeline: MiniMax + Remotion</p>
+              <h3 className="text-lg font-semibold text-white">{t("pptV7.resultPanelTitle")}</h3>
+              <p className="mt-1 text-sm text-gray-500">{t("pptV7.resultPanelDesc")}</p>
             </div>
 
             <div className="flex items-center gap-2">
@@ -96,22 +97,22 @@ function PptV7ResultPanel({
                 className="inline-flex items-center gap-1.5 rounded-full border border-white/[0.12] bg-white/[0.04] px-3 py-1 text-xs text-gray-200 transition hover:bg-white/[0.08] disabled:opacity-40"
               >
                 <RefreshCw className="h-3.5 w-3.5" />
-                Retry
+                {t("pptV7.retry")}
               </button>
 
               {state.busy ? (
                 <span className="inline-flex items-center gap-2 rounded-full border border-[#E11D48]/25 bg-[#E11D48]/10 px-3 py-1 text-xs text-[#E11D48]">
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  Running
+                  {t("pptV7.running")}
                 </span>
               ) : state.result ? (
                 <span className="inline-flex items-center gap-2 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-3 py-1 text-xs text-emerald-300">
                   <CheckCircle2 className="h-3.5 w-3.5" />
-                  Completed
+                  {t("pptV7.completed")}
                 </span>
               ) : (
                 <span className="inline-flex items-center gap-2 rounded-full border border-white/[0.12] bg-white/[0.03] px-3 py-1 text-xs text-gray-400">
-                  Idle
+                  {t("pptV7.idle")}
                 </span>
               )}
             </div>
@@ -119,20 +120,20 @@ function PptV7ResultPanel({
 
           <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
             <div className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-3">
-              <p className="text-xs text-gray-500">Requirement</p>
+              <p className="text-xs text-gray-500">{t("pptV7.requirement")}</p>
               <p className="mt-1 text-sm text-gray-200">
-                {state.requirement || 'Fill requirement on the left and click Generate PPT V7'}
+                {state.requirement || t("pptV7.requirementPlaceholder")}
               </p>
             </div>
             <div className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-3">
-              <p className="text-xs text-gray-500">Target Slides</p>
+              <p className="text-xs text-gray-500">{t("pptV7.targetSlides")}</p>
               <p className="mt-1 text-sm text-gray-200">{state.slideCount}</p>
             </div>
           </div>
         </div>
 
         <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5">
-          <h4 className="text-sm font-semibold text-gray-200">Progress</h4>
+          <h4 className="text-sm font-semibold text-gray-200">{t("pptV7.progress")}</h4>
           <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-4">
             {steps.map((step, idx) => {
               const order = idx + 1;
@@ -150,7 +151,9 @@ function PptV7ResultPanel({
                   }`}
                 >
                   <div className="font-medium">{step.label}</div>
-                  <div className="mt-1 text-[11px]">{done ? 'Done' : active ? 'Running' : 'Waiting'}</div>
+                  <div className="mt-1 text-[11px]">
+                    {done ? t("pptV7.done") : active ? t("pptV7.running") : t("pptV7.waiting")}
+                  </div>
                 </div>
               );
             })}
@@ -170,9 +173,12 @@ function PptV7ResultPanel({
           <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h4 className="text-sm font-semibold text-gray-200">Latest Result</h4>
+                <h4 className="text-sm font-semibold text-gray-200">{t("pptV7.latestResult")}</h4>
                 <p className="mt-1 text-xs text-gray-500">
-                  Run ID: {state.result.run_id} · {state.result.slide_count} slides
+                  {t("pptV7.resultSummary", {
+                    runId: state.result.run_id,
+                    slideCount: state.result.slide_count,
+                  })}
                 </p>
               </div>
               <a
@@ -182,13 +188,13 @@ function PptV7ResultPanel({
                 className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#E11D48] to-[#9333EA] px-4 py-2 text-sm font-medium text-white transition hover:from-[#F43F5E] hover:to-[#A855F7]"
               >
                 <FileDown className="h-4 w-4" />
-                Download PPTX
+                {t("pptV7.downloadPptx")}
               </a>
             </div>
 
             {state.result.slide_image_urls?.length > 0 && (
               <div className="mt-4">
-                <p className="mb-2 text-xs text-gray-500">Slide Previews</p>
+                <p className="mb-2 text-xs text-gray-500">{t("pptV7.slidePreviews")}</p>
                 <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
                   {state.result.slide_image_urls.slice(0, 8).map((url, idx) => (
                     <div key={`${url}-${idx}`} className="overflow-hidden rounded-lg border border-white/[0.08] bg-white/[0.03]">
@@ -202,10 +208,10 @@ function PptV7ResultPanel({
         )}
 
         <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5">
-          <h4 className="text-sm font-semibold text-gray-200">Recent Runs</h4>
+          <h4 className="text-sm font-semibold text-gray-200">{t("pptV7.recentRuns")}</h4>
           <div className="mt-3 space-y-2">
             {history.length === 0 ? (
-              <p className="text-xs text-gray-500">No run history yet.</p>
+              <p className="text-xs text-gray-500">{t("pptV7.noHistory")}</p>
             ) : (
               history.map((item) => (
                 <div key={item.id} className="flex items-center justify-between gap-3 rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-2">
@@ -231,7 +237,7 @@ function PptV7ResultPanel({
                         rel="noreferrer"
                         className="text-[11px] text-[#E11D48] hover:underline"
                       >
-                        open
+                        {t("pptV7.open")}
                       </a>
                     )}
                   </div>
@@ -348,8 +354,8 @@ function ProjectWorkspace({
       <div className="flex-1 hidden md:flex flex-col overflow-hidden border-l border-white/[0.06]">
         {isPptV7Mode ? (
           <div className="shrink-0 border-b border-white/[0.06] bg-black/30 px-4 py-3">
-            <p className="text-sm font-semibold text-gray-200">PPT V7 Workspace</p>
-            <p className="mt-0.5 text-xs text-gray-500">Progress, result and download are shown here.</p>
+            <p className="text-sm font-semibold text-gray-200">{t("workspace.pptV7WorkspaceTitle")}</p>
+            <p className="mt-0.5 text-xs text-gray-500">{t("workspace.pptV7WorkspaceDesc")}</p>
           </div>
         ) : (
           <ProgressPanel />
@@ -433,6 +439,7 @@ function HomeContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const routeRunId = searchParams.get('runId');
+  const t = useT();
 
   const [view, setView] = useState<ViewState>('gallery');
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
@@ -485,7 +492,7 @@ function HomeContent() {
             </div>
             <span className="font-bold tracking-tight bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">AutoViralVid</span>
             <div className="hidden sm:flex items-center gap-2 ml-3">
-              <span className="px-2 py-0.5 rounded-full bg-[#E11D48]/10 border border-[#E11D48]/20 text-[10px] text-[#E11D48] font-medium">AI Powered</span>
+              <span className="px-2 py-0.5 rounded-full bg-[#E11D48]/10 border border-[#E11D48]/20 text-[10px] text-[#E11D48] font-medium">{t("home.aiPowered")}</span>
             </div>
           </div>
           <div className="flex items-center gap-4">
@@ -493,14 +500,14 @@ function HomeContent() {
               href="/projects"
               className="hidden rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-sm text-gray-300 transition-colors hover:bg-white/[0.06] md:inline-flex"
             >
-              History
+              {t("home.historyLink")}
             </Link>
             <LanguageSwitcher />
             <div className="text-sm text-gray-400 hidden sm:flex items-center gap-2">
               <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#E11D48] to-purple-600 flex items-center justify-center text-xs font-bold">
-                {userEmail?.[0]?.toUpperCase() || 'U'}
+                {userEmail?.[0]?.toUpperCase() || t("home.userFallback").slice(0, 1)}
               </div>
-              <span className="max-w-[120px] truncate">{userEmail?.split('@')[0] || 'User'}</span>
+              <span className="max-w-[120px] truncate">{userEmail?.split('@')[0] || t("home.userFallback")}</span>
             </div>
           </div>
         </div>

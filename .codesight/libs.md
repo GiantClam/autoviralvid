@@ -1,0 +1,1086 @@
+# Libraries
+
+- `agent\main.py`
+  - function main: ()
+  - function lifespan: (app)
+  - function validation_exception_handler: (_request, exc)
+  - function http_exception_handler: (_request, exc)
+  - function generic_exception_handler: (_request, exc)
+  - function healthz: ()
+  - _...12 more_
+- `agent\scripts\advance_run_once.py` — function main: ()
+- `agent\scripts\e2e_digital_human_5min.py` — function read_project_row: (svc, run_id), function main: ()
+- `agent\scripts\poll_run_with_worker.py` — function main: ()
+- `agent\src\agent_skills.py`
+  - function optimize_prompt_tool: (user_prompt) -> str
+  - function generate_sora2_prompt_tool: (product_name, product_features, video_type, language, duration, reference_image_info, reference_image_description) -> str
+  - function review_storyboard_impl: (storyboards_json, num_clips, goal, styles, total_duration, max_retries) -> str
+  - function review_storyboard_tool: (storyboards_json, num_clips, goal, styles, total_duration, max_retries) -> str
+  - function plan_storyboard_tool: (goal, styles, total_duration, num_clips) -> str
+  - function generate_keyframe_tool: (storyboards_json, image_control) -> str
+  - _...13 more_
+- `agent\src\api_routes.py`
+  - class CreateProjectRequest
+  - class UpdateSceneRequest
+  - class RegenerateImageRequest
+  - class RegenerateVideoRequest
+  - class BatchCreateRequest
+  - class AIAssistantRequest
+- `agent\src\audio_splitter.py`
+  - function get_audio_duration: (url) -> float
+  - function split_audio: (url, run_id, max_segment_seconds) -> List[SegmentInfo]
+  - class SegmentInfo
+- `agent\src\auth.py` — class AuthUser
+- `agent\src\avatar_agent.py` — function avatar_node: (state, Any]), class AvatarAgent
+- `agent\src\check_duplicate_tasks.py` — function check_duplicates: ()
+- `agent\src\check_supabase_detailed.py`
+  - function get_table_schema: (client, table_name)
+  - function get_table_stats: (client, table_name)
+  - function main: ()
+- `agent\src\check_supabase_tables.py`
+  - function check_connection: (client)
+  - function list_tables: (client)
+  - function get_table_info: (client, table_name)
+  - function main: ()
+- `agent\src\configs\settings.py`
+  - function get_config: () -> AppConfig
+  - function validate_config: () -> tuple[bool, list[str]]
+  - class SkillsConfig
+  - class VideoQueueConfig
+  - class WorkflowConfig
+  - class RunningHubConfig
+  - _...2 more_
+- `agent\src\configure_r2_cors.py` — function configure_cors: ()
+- `agent\src\content_generator.py` — function generate_content: (outline, language, ai_call, max_concurrency, on_progress, **kwargs) -> List[SlideContent]
+- `agent\src\creative_agent.py`
+  - function get_narrative_for_template: (template_id) -> dict
+  - function get_pipeline_hint_for_template: (template_id) -> str | None
+  - function extract_project_info: (theme, style, duration, orientation, video_type, keywords, product_image) -> str
+  - function submit_production_plan: () -> str
+- `agent\src\delete_invalid_skills.py` — function delete_invalid_skills: ()
+- `agent\src\document_parser.py` — function parse_document: (file_url, file_type) -> ParsedDocument
+- `agent\src\generators\base.py` — class BaseGenerator
+- `agent\src\generators\comfyui.py` — class ComfyUIGenerator
+- `agent\src\generators\fallback.py` — class MultiGenerator
+- `agent\src\generators\token_engine.py` — class TokenEngineGenerator
+- `agent\src\generators\zhenzhen.py` — class ZhenZhenGenerator
+- `agent\src\installed_skill_executor.py` — function execute_installed_skill_request: (payload, Any]) -> Dict[str, Any], function main: () -> int
+- `agent\src\job_manager.py` — class JobManager
+- `agent\src\lambda_renderer.py`
+  - function start_render: (slides, Any]], config, Any], webhook_url, prefer_local) -> Dict[str, Any]
+  - function start_local_render: (slides, Any]], config, Any]) -> Dict[str, Any]
+  - function start_lambda_render: (slides, Any]], config, Any], webhook_url) -> Dict[str, Any]
+  - function get_render_progress: (render_id) -> Dict[str, Any]
+- `agent\src\llm_client.py` — function get_llm_client: () -> LLMClient, class LLMClient
+- `agent\src\main.py` — function main: () -> None
+- `agent\src\marp_generator.py` — function generate_marp: (req_data, language, ai_call) -> PresentationMarp
+- `agent\src\marp_service.py` — function generate_pptx: (presentation, output_name) -> str
+- `agent\src\minimax_exporter.py`
+  - function build_payload: (*, slides, Any]], title, author, style_variant, palette_key, theme_recipe, tone, verbatim_content, deck_id, retry_scope, target_slide_ids, target_block_ids, retry_hint, idempotency_key, route_mode, render_channel, generator_mode, enable_legacy_fallback, original_style, disable_local_style_rewrite, visual_priority, visual_preset, visual_density, deck_archetype_profile, constraint_hardness, svg_mode, template_family, template_id, skill_profile, hardness_profile, schema_profile, contract_profile, quality_profile, enforce_visual_contract, design_spec, Any] | None, design_decision, Any] | None) -> Dict[str, Any]
+  - function export_minimax_pptx: (*, slides, Any]], title, author, style_variant, palette_key, theme_recipe, tone, verbatim_content, deck_id, retry_scope, target_slide_ids, target_block_ids, retry_hint, idempotency_key, route_mode, render_channel, generator_mode, enable_legacy_fallback, original_style, disable_local_style_rewrite, visual_priority, visual_preset, visual_density, deck_archetype_profile, constraint_hardness, svg_mode, template_family, template_id, skill_profile, hardness_profile, schema_profile, contract_profile, quality_profile, enforce_visual_contract, design_spec, Any] | None, design_decision, Any] | None, timeout) -> Dict[str, Any]
+  - class MiniMaxExportError
+- `agent\src\openrouter_client.py` — class OpenRouterError, class OpenRouterClient
+- `agent\src\outline_generator.py` — function generate_outline: (requirement, language, num_slides, style, purpose, ai_call, on_progress, image_generation_enabled, video_generation_enabled) -> PresentationOutline
+- `agent\src\pptx_comparator.py`
+  - function extract_deck_fingerprint: (pptx_bytes) -> DeckFingerprint
+  - function compare_decks: (ref, gen, max_slides) -> ComparisonReport
+  - function compare_pptx_files: (ref_path, gen_path) -> ComparisonReport
+  - class ElementFingerprint
+  - class SlideFingerprint
+  - class DeckFingerprint
+  - _...2 more_
+- `agent\src\pptx_engine.py`
+  - function render_cover: (prs, slide_data, theme)
+  - function render_bullet_points: (prs, slide_data, theme)
+  - function render_comparison: (prs, slide_data, theme)
+  - function render_quote: (prs, slide_data, theme)
+  - function render_big_number: (prs, slide_data, theme)
+  - function render_split: (prs, slide_data, theme, side)
+  - _...2 more_
+- `agent\src\pptx_rasterizer.py` — function rasterize_pptx_bytes_to_png_bytes: (pptx_bytes) -> List[bytes]
+- `agent\src\pptx_theme_patch.py` — function patch_pptx_theme_colors: (pptx_bytes, palette_key) -> bytes
+- `agent\src\ppt_archetype_selector.py` — function load_archetype_catalog: () -> Dict[str, Any], function select_slide_archetype: (slide, Any], *, top_k, rerank_window) -> Dict[str, Any]
+- `agent\src\ppt_codex_skill_bridge.py`
+  - function normalize_text: (value, fallback) -> str
+  - function as_list: (value) -> List[Any]
+  - function normalize_skill_key: (value) -> str
+  - function dedupe_skills: (values) -> List[str]
+  - function normalize_codex_cli_model_id: (model_id) -> str
+  - function parse_command_args: (raw_value) -> List[str]
+  - _...6 more_
+- `agent\src\ppt_content_layout_profiles.py`
+  - function build_content_layout_plan: (*, title, evidence, visual_anchor, data_elements, layout_hint) -> Dict[str, Any]
+  - function choose_content_layout_profile: (*, title, evidence, visual_anchor, data_elements, layout_hint) -> str
+  - function profile_block_types: (profile) -> Dict[str, bool]
+  - function profile_template_whitelist: (profile) -> List[str]
+- `agent\src\ppt_design_constraints.py` — function validate_render_payload_design: (render_payload, Any]) -> Dict[str, Any]
+- `agent\src\ppt_design_decision.py`
+  - function normalize_design_decision_v1: (raw) -> Dict[str, Any]
+  - function build_design_decision_v1: (*, style_variant, palette_key, theme_recipe, tone, template_family, quality_profile, route_mode, skill_profile, slides, Any]] | None, decision_source, decision_trace, Any]] | None) -> Dict[str, Any]
+  - function decision_deck_value: (decision, Any] | None, key, default) -> str
+  - function apply_design_decision_to_slides: (slides, Any]], decision, Any] | None) -> List[Dict[str, Any]]
+  - function attach_design_decision_v1: (payload, Any], *, decision, Any] | None, decision_source, decision_trace, Any]] | None) -> Dict[str, Any]
+  - function freeze_retry_visual_identity: (slides, Any]], decision, Any] | None) -> List[Dict[str, Any]]
+- `agent\src\ppt_direct_skill_runtime.py` — function execute_direct_skill_runtime: (payload, Any]) -> Dict[str, Any], function main: () -> int
+- `agent\src\ppt_executor_service.py` — class PPTExecutorService
+- `agent\src\ppt_export_contract_service.py` — class PPTExportContractService
+- `agent\src\ppt_export_decision_service.py` — class ExportDecisionBuildResult, class PPTExportDecisionService
+- `agent\src\ppt_export_failure_service.py` — class PPTExportFailureService
+- `agent\src\ppt_export_media_service.py` — class PPTExportMediaResult, class PPTExportMediaService
+- `agent\src\ppt_export_observability_utils.py`
+  - function merge_strict_blockers_into_alerts: (alerts, Any]], strict_blockers, Any]]) -> List[Dict[str, Any]]
+  - function build_persisted_diagnostics: (*, diagnostics, Any]], template_renderer_summary, Any] | None, text_qa, Any] | None, strict_blockers, Any]] | None) -> List[Dict[str, Any]]
+  - function build_strict_failure_detail: (strict_blockers, Any]] | None, *, max_items, max_len) -> str
+- `agent\src\ppt_export_pipeline.py` — class ExportStage, class ExportPipelineTimeline
+- `agent\src\ppt_export_reorchestrate_service.py` — class PPTExportReorchestrateResult, class PPTExportReorchestrateService
+- `agent\src\ppt_export_report_service.py` — class PPTExportReportService
+- `agent\src\ppt_export_retry_utils.py` — function degrade_render_paths_for_retry: (*, seed_slides, Any]], failure_code, scope, scoped_slide_ids) -> Dict[str, Any], function collect_issue_retry_target_slides: (gate_issues) -> List[str]
+- `agent\src\ppt_export_service.py` — class PPTExportService
+- `agent\src\ppt_export_text_qa_service.py` — class PPTExportTextQAService
+- `agent\src\ppt_failure_classifier.py` — function classify_failure: (error) -> FailureClassification, class FailureClassification
+- `agent\src\ppt_layout_solver.py` — function load_archetype_slot_spec: (path) -> Dict[str, Any], function solve_slide_layout: (slide, Any], *, archetype, slot_spec, Any] | None) -> Dict[str, Any]
+- `agent\src\ppt_master_blackbox_local.py` — function run_blackbox_request: (request_payload, Any]) -> Dict[str, Any]
+- `agent\src\ppt_master_design_spec.py`
+  - function choose_render_path: (slide, Any], *, svg_mode) -> str
+  - function apply_render_paths: (slides, Any]], *, svg_mode) -> List[Dict[str, Any]]
+  - function build_design_spec: (*, theme, Any] | None, template_family, style_variant, theme_recipe, tone, visual_preset, visual_density, visual_priority, topic) -> Dict[str, Any]
+- `agent\src\ppt_master_pipeline_runtime.py` — function main: () -> int
+- `agent\src\ppt_master_service.py` — function generate_ppt_from_prompt: (prompt, total_pages, style, **kwargs) -> Dict[str, Any], class PPTMasterService
+- `agent\src\ppt_master_skill_adapter.py`
+  - function execution_profile: (requested) -> str
+  - function is_dev_strict_profile: (requested) -> bool
+  - function should_force_ppt_master_hit: (*, requested_execution_profile, requested_force_flag, quality_profile, purpose, topic) -> bool
+  - function resolve_ppt_master_skill_spec_path: () -> str
+  - function is_ppt_master_candidate: (slide, Any], state, Any] | None) -> bool
+  - function execute_ppt_master_skill: (*, slide, Any], deck, Any], state, Any]) -> Dict[str, Any]
+- `agent\src\ppt_master_web_adapter.py` — function main: () -> int
+- `agent\src\ppt_outline_builder.py` — function build_research_storyline_notes: (*, topic, total_pages, data_points, page_anchors, str] | None) -> List[StickyNote]
+- `agent\src\ppt_palette_catalog.py`
+  - function list_supported_palettes: () -> list[str]
+  - function suggest_palette_from_context: (*parts) -> str
+  - function canonicalize_palette_key: (palette_key, *, context_text, fallback) -> str
+- `agent\src\ppt_patch_merge.py` — function merge_slides: (base, Any]], patch, Any]]) -> List[Dict[str, Any]], function merge_render_spec: (base_render_spec, Any], patch_render_spec, Any]) -> Dict[str, Any]
+- `agent\src\ppt_pipeline_graph.py`
+  - function build_stage13_graph: (*, research_builder, outline_builder, presentation_builder)
+  - function run_stage13_graph: (*, request, research_builder, outline_builder, presentation_builder) -> PPTPipelineState
+  - class PPTPipelineState
+- `agent\src\ppt_planning.py`
+  - function recommend_layout: (note, position_in_deck, total_pages) -> LayoutType
+  - function density_level_for_layout: (layout) -> str
+  - function enforce_density_rhythm: (layouts, *, max_consecutive_high, window_size, require_low_or_breathing_per_window) -> List[LayoutType]
+  - function build_slide_content_strategy: (note, *, is_zh, research_points) -> SlideContentStrategy
+  - function enforce_layout_diversity: (layouts, *, max_type_ratio, max_top2_ratio, abab_max_run, min_layout_variety_for_long) -> List[LayoutType]
+  - function enforce_template_family_cohesion: (families, *, locked_mask, max_type_ratio, max_top2_ratio, max_switch_ratio, abab_max_run) -> List[str]
+  - _...2 more_
+- `agent\src\ppt_quality_checkers.py`
+  - class TechnicalConstraintChecker
+  - class ContentQualityChecker
+  - class VisualConsistencyChecker
+  - class QualityGateOrchestrationResult
+  - class QualityGateOrchestrator
+- `agent\src\ppt_quality_gate.py`
+  - function validate_slide: (slide, Any], index, *, profile, Any]]) -> QualityResult
+  - function validate_deck: (slides, Any]], *, profile, Any]]) -> QualityResult
+  - function validate_layout_diversity: (render_spec, Any], *, profile, Any]], max_type_ratio, max_top2_ratio, max_adjacent_repeat, abab_max_run, min_slide_count, min_layout_variety, enforce_terminal_slide_types, template_family_max_type_ratio, template_family_max_top2_ratio, template_family_max_switch_ratio, template_family_abab_max_run, template_family_min_slide_count) -> QualityResult
+  - function validate_visual_audit: (*, visual_audit, Any]], slides, Any]], profile, Any]], layout_diversity_ok) -> QualityResult
+  - function score_deck_quality: (*, slides, Any]], render_spec, Any]], profile, Any]], content_issues, layout_issues, visual_audit, Any]], enforce_visual_audit_presence) -> QualityScoreResult
+  - function score_visual_professional_metrics: (*, slides, Any]]], quality_score, issue_codes, text_issue_codes, visual_audit, Any]], profile, Any]]) -> VisualProfessionalScoreResult
+  - _...4 more_
+- `agent\src\ppt_quality_service.py` — class PPTQualityEvaluation, class PPTQualityService
+- `agent\src\ppt_reference_contract.py`
+  - function derive_anchors_from_slides: (slides, *, limit) -> List[str]
+  - function derive_required_facts_from_slides: (slides, *, limit) -> List[str]
+  - function audit_reference_contract: (*, reference_desc, Any] | None, required_facts, anchors, strict) -> ReferenceContractAudit
+  - class ReferenceContractAudit
+- `agent\src\ppt_reference_parser.py` — function parse_reference_ppt: (pptx_path, output_json) -> Dict[str, Any], class PPTParser
+- `agent\src\ppt_reference_service.py` — function reconstruct_ppt_from_reference: (reference_ppt_path, target_audience, style_objective) -> Dict[str, Any], class PPTReferenceReconstructionService
+- `agent\src\ppt_reference_strategist.py` — function generate_design_spec_from_reference: (parsed_ppt, Any], project_path, target_audience, style_objective) -> Dict[str, Any], class Strategist
+- `agent\src\ppt_render_path_policy.py`
+  - function classify_render_path: (slide, Any], *, svg_mode) -> Dict[str, Any]
+  - function choose_render_path_by_policy: (slide, Any], *, svg_mode) -> str
+  - function allow_visual_critic_svg_fallback: (slide, Any], issue_codes) -> bool
+- `agent\src\ppt_retry_orchestrator.py`
+  - function should_retry: (code, attempt, max_attempts) -> bool
+  - function compute_backoff_ms: (*, base_delay_ms, attempt, max_backoff_ms) -> int
+  - function make_retry_decision: (*, code, attempt, max_attempts, base_delay_ms) -> RetryDecision
+  - function build_retry_hint: (*, failure_code, failure_detail, attempt, retry_scope, target_ids) -> str
+  - function compute_render_path_downgrade: (current_render_path, *, failure_code, attempt) -> str
+  - class RetryDecision
+  - _...2 more_
+- `agent\src\ppt_retry_service.py` — class PPTRetryService
+- `agent\src\ppt_routes.py` — class TTSRequest, class EnhanceRequest
+- `agent\src\ppt_route_strategy.py`
+  - function normalize_route_mode: (value) -> str
+  - function recommend_route_mode: (*, slide_count, constraint_count, quality_profile, has_explicit_template, visual_density) -> str
+  - function resolve_route_policy: (value, *, slide_count, constraint_count, quality_profile, has_explicit_template, visual_density) -> RoutePolicy
+  - class RoutePolicy
+- `agent\src\ppt_scene_rulebook.py`
+  - function normalize_scene_rule_profile: (value) -> str
+  - function get_scene_rulebook: () -> Dict[str, Any]
+  - function scene_rule: (profile) -> Dict[str, Any]
+  - function scene_prompt_directives: (profile, *, slide_type) -> List[str]
+  - function scene_hard_fail_rules: (profile) -> List[Dict[str, Any]]
+  - function scene_advisory_rules: (profile) -> List[Dict[str, Any]]
+- `agent\src\ppt_semantic_expander.py` — function expand_semantic_support_points: (*, core_message, related_points) -> List[str]
+- `agent\src\ppt_service_v2.py` — class PPTService
+- `agent\src\ppt_storyline_planning.py`
+  - function is_instructional_context: (_) -> bool
+  - function build_instructional_topic_points: (topic, *, prefer_zh) -> List[str]
+  - function build_research_storyline_notes: (*, topic, total_pages, data_points, page_anchors, str] | None, instructional_context, # kept for compatibility) -> List[StickyNote]
+  - function expand_semantic_support_points: (*, core_message, related_points, instructional_context, # kept for compatibility) -> List[str]
+- `agent\src\ppt_strategist_service.py` — class PPTStrategistService
+- `agent\src\ppt_subagent_executor.py`
+  - function recommend_render_path: (slide_type, current_render_path) -> str
+  - function recommend_layout_grid: (slide_type, layout_grid) -> str
+  - function build_subagent_graph: (model_invoke)
+  - function execute_subagent_task: (task_payload, Any], model_invoke) -> Dict[str, Any]
+  - function main: () -> int
+  - class SubagentState
+- `agent\src\ppt_svg_finalizer.py` — class SVGFinalizationResult, class PPTSvgFinalizer
+- `agent\src\ppt_svg_renderer.py` — function resolve_slide_svg_markup: (slide, Any]) -> str, function render_slide_svg_markup: (*, slide, Any], slide_index, slide_count, deck_title, design_spec, Any] | None) -> str
+- `agent\src\ppt_templates.py`
+  - function gradient_bg: (colors, Any]], rotate) -> SlideBackground
+  - function solid_bg: (color) -> SlideBackground
+  - function make_cover_elements: (title, subtitle, template) -> List[SlideElement]
+  - function make_title_content_layout: (title, points, template, has_chart) -> List[SlideElement]
+  - function make_comparison_layout: (title, left_title, left_points, right_title, right_points, template) -> List[SlideElement]
+  - function make_table_layout: (title, headers, rows, template) -> List[SlideElement]
+  - _...3 more_
+- `agent\src\ppt_template_catalog.py`
+  - function get_template_catalog: () -> Dict[str, Any]
+  - function list_template_ids: () -> List[str]
+  - function default_template_id: () -> str
+  - function template_profiles: (template_id) -> Dict[str, str]
+  - function default_template_for_layout: (layout_grid) -> str
+  - function contract_profile: (contract_id) -> Dict[str, Any]
+  - _...5 more_
+- `agent\src\ppt_template_export_service.py` — class PPTTemplateExportFlowResult, class PPTTemplateExportService
+- `agent\src\ppt_v2_pipeline.py` — class PPTV2Pipeline
+- `agent\src\ppt_visual_critic.py` — function build_visual_critic_patch: (*, visual_audit, Any], gate_issues, slides, Any]], max_target_slides) -> Dict[str, Any], function apply_visual_critic_patch: (*, slides, Any]], patch, Any]) -> Dict[str, Any]
+- `agent\src\ppt_visual_identity.py`
+  - function default_theme_recipe: () -> str
+  - function normalize_tone: (value, fallback) -> str
+  - function canonicalize_theme_recipe: (value, *, fallback) -> str
+  - function get_theme_recipe: (value, *, fallback) -> dict[str, Any]
+  - function resolve_style_variant: (style_variant, *, theme_recipe, fallback) -> str
+  - function style_variant_for_theme_recipe: (theme_recipe, *, fallback) -> str
+  - _...2 more_
+- `agent\src\ppt_visual_qa.py`
+  - function extract_text_with_markitdown: (pptx_bytes, *, timeout_sec) -> Dict[str, Any]
+  - function summarize_markitdown_text: (markdown_text) -> Dict[str, Any]
+  - function run_markitdown_text_qa: (pptx_bytes, *, timeout_sec) -> Dict[str, Any]
+  - function audit_textual_slides: (slides, Any]], *, render_spec, Any] | None) -> Dict[str, Any]
+  - function audit_rendered_slides: (png_bytes_list, *, deck_title, route_mode, enable_multimodal, multimodal_model) -> Dict[str, Any]
+- `agent\src\premium_generator.py` — function generate: (requirement, num_slides, language, ai_call)
+- `agent\src\premium_generator_v7.py` — function generate_v7: (requirement, num_slides, language, ai_call) -> Dict[str, Any]
+- `agent\src\project_service.py` — class ProjectService
+- `agent\src\providers.py`
+  - function get_image_provider: () -> ImageProvider
+  - function get_video_provider: () -> VideoProvider
+  - class ImageProvider
+  - class VideoProvider
+- `agent\src\providers_image_nanobanana.py` — class NanoBananaImageProvider
+- `agent\src\providers_image_scene_runninghub.py` — class SceneRunningHubImageProvider
+- `agent\src\providers_image_seedream.py` — class SeedreamImageProvider
+- `agent\src\providers_video_pixverse.py` — class PixVerseVideoProvider
+- `agent\src\providers_video_runninghub.py` — class RunningHubVideoProvider
+- `agent\src\providers_video_runninghub_sora2.py` — class RunningHubSora2VideoProvider
+- `agent\src\qwen_product_pipeline.py` — function batch_t2i: (product_image_url, prompt, timeout)
+- `agent\src\r2.py`
+  - function get_r2_client: ()
+  - function presign_put_url: (key, bucket, content_type, expires) -> dict
+  - function upload_url_to_r2: (url, key, bucket) -> str
+  - function upload_bytes_to_r2: (data, key, content_type, bucket) -> str
+- `agent\src\rate_limiter.py` — class RateLimitMiddleware
+- `agent\src\runninghub_client.py` — class RunningHubError, class RunningHubClient
+- `agent\src\schemas\ppt.py`
+  - class SlideOutline
+  - class PresentationOutline
+  - class SlideElement
+  - class SlideBackground
+  - class SlideContent
+  - class ParsedDocument
+  - _...8 more_
+- `agent\src\schemas\ppt_ai_prompt.py` — class AIPromptPPTRequest, class AIPromptPPTResult
+- `agent\src\schemas\ppt_marp.py`
+  - class DialogueLine
+  - class SlideData
+  - class PresentationMarp
+  - class GenerateRequest
+  - class ExportRequest
+  - class TTSRequestMarp
+  - _...1 more_
+- `agent\src\schemas\ppt_outline.py`
+  - class StickyNote
+  - class OutlinePlan
+  - class OutlinePlanRequest
+- `agent\src\schemas\ppt_pipeline.py`
+  - class PPTPipelineRequest
+  - class PPTPipelineStageStatus
+  - class PPTPipelineArtifacts
+  - class PPTPipelineResult
+- `agent\src\schemas\ppt_plan.py`
+  - class ContentBlock
+  - class SlideContentStrategy
+  - class SlidePlan
+  - class PresentationPlan
+  - class PresentationPlanRequest
+- `agent\src\schemas\ppt_policy.py`
+  - class RoutePolicyConfig
+  - class RouteRecommendationConfig
+  - class DenseLayoutRemapPolicy
+  - class FamilyConvergencePolicy
+  - class ThemeCohesionPolicy
+  - class QualityOrchestrationPolicy
+- `agent\src\schemas\ppt_reference.py` — class ReferenceReconstructionRequest, class ReferenceReconstructionResult
+- `agent\src\schemas\ppt_research.py`
+  - class ResearchQuestion
+  - class ResearchEvidence
+  - class ResearchGap
+  - class ResearchRequest
+  - class ResearchContext
+- `agent\src\schemas\ppt_v3.py`
+  - class DialogueLine
+  - class ComparisonData
+  - class BigNumberData
+  - class VisualContent
+  - class SlideContentV3
+  - class SlideOutlineV3
+  - _...4 more_
+- `agent\src\schemas\ppt_v7.py`
+  - class DialogueLine
+  - class SlideAction
+  - class SlideData
+  - class PresentationData
+- `agent\src\schemas\slide_v5.py`
+  - class ComparisonData
+  - class BigNumberData
+  - class VisualContent
+  - class SlideContentV5
+  - class SlideOutline
+  - class PresentationOutline
+  - _...4 more_
+- `agent\src\screenshot_engine.py` — function render_slides_to_images: (slides, output_dir) -> List[str], function images_to_pptx: (image_paths, output_path, title)
+- `agent\src\skills\adapters\mock.py` — class MockAdapter
+- `agent\src\skills\adapters\runninghub.py` — class RunningHubAdapter
+- `agent\src\skills\base.py` — class SkillAdapter, class BaseSkillAdapter
+- `agent\src\skills\models.py`
+  - class SkillCategory
+  - class SkillProvider
+  - class SkillCapabilities
+  - class SkillMetrics
+  - class Skill
+  - class Pipeline
+  - _...3 more_
+- `agent\src\skills\registry.py`
+  - function reset_skills_registry: () -> None
+  - function get_skills_registry: () -> SkillsRegistry
+  - class SkillsRegistry
+- `agent\src\skills\selector.py`
+  - function reset_skill_selector: () -> None
+  - function get_skill_selector: () -> SkillSelector
+  - class SkillSelector
+- `agent\src\svg_to_pptx\drawingml_context.py` — class ConvertContext
+- `agent\src\svg_to_pptx\drawingml_converter.py`
+  - function parse_transform: (transform_str) -> tuple[float, float, float, float]
+  - function convert_g: (elem, ctx) -> str
+  - function collect_defs: (root) -> dict[str, ET.Element]
+  - function convert_element: (elem, ctx) -> str
+  - function convert_svg_to_slide_shapes: (svg_path, slide_num, verbose) -> tuple[str, dict[str, bytes], list[dict[str, str]]]
+- `agent\src\svg_to_pptx\drawingml_elements.py`
+  - function convert_rect: (elem, ctx) -> str
+  - function convert_circle: (elem, ctx) -> str
+  - function convert_line: (elem, ctx) -> str
+  - function convert_path: (elem, ctx) -> str
+  - function convert_polygon: (elem, ctx) -> str
+  - function convert_polyline: (elem, ctx) -> str
+  - _...3 more_
+- `agent\src\svg_to_pptx\drawingml_paths.py`
+  - function parse_svg_path: (d) -> list[PathCommand]
+  - function svg_path_to_absolute: (commands) -> list[PathCommand]
+  - function normalize_path_commands: (commands) -> list[PathCommand]
+  - function path_commands_to_drawingml: (commands, offset_x, offset_y, scale_x, scale_y) -> tuple[str, float, float, float, float]
+  - class PathCommand
+- `agent\src\svg_to_pptx\drawingml_styles.py`
+  - function build_solid_fill: (color, opacity) -> str
+  - function build_gradient_fill: (grad_elem, opacity) -> str
+  - function build_fill_xml: (elem, ctx, opacity) -> str
+  - function build_stroke_xml: (elem, ctx, opacity) -> str
+  - function build_shadow_xml: (filter_elem) -> str
+  - function build_glow_xml: (filter_elem) -> str
+  - _...4 more_
+- `agent\src\svg_to_pptx\drawingml_utils.py`
+  - function px_to_emu: (px) -> int
+  - function ctx_x: (val, ctx) -> float
+  - function ctx_y: (val, ctx) -> float
+  - function ctx_w: (val, ctx) -> float
+  - function ctx_h: (val, ctx) -> float
+  - function parse_hex_color: (color_str) -> str | None
+  - _...6 more_
+- `agent\src\svg_to_pptx\pptx_builder.py` — function create_pptx_with_native_svg: (svg_files, output_path, canvas_format, verbose, transition, transition_duration, auto_advance, use_compat_mode, notes, str] | None, enable_notes, use_native_shapes) -> bool
+- `agent\src\svg_to_pptx\pptx_cli.py` — function main: () -> None
+- `agent\src\svg_to_pptx\pptx_dimensions.py`
+  - function get_slide_dimensions: (canvas_format, custom_pixels, int] | None) -> tuple[int, int]
+  - function get_pixel_dimensions: (canvas_format, custom_pixels, int] | None) -> tuple[int, int]
+  - function get_viewbox_dimensions: (svg_path) -> tuple[int, int] | None
+  - function detect_format_from_svg: (svg_path) -> str | None
+- `agent\src\svg_to_pptx\pptx_discovery.py` — function find_svg_files: (project_path, source) -> tuple[list[Path], str], function find_notes_files: (project_path, svg_files) -> dict[str, str]
+- `agent\src\svg_to_pptx\pptx_media.py` — function get_png_renderer_info: () -> tuple[str | None, str, str | None], function convert_svg_to_png: (svg_path, png_path, width, height) -> bool
+- `agent\src\svg_to_pptx\pptx_notes.py`
+  - function markdown_to_plain_text: (md_content) -> str
+  - function create_notes_slide_xml: (slide_num, notes_text) -> str
+  - function create_notes_slide_rels_xml: (slide_num) -> str
+- `agent\src\svg_to_pptx\pptx_slide_xml.py` — function create_slide_xml_with_svg: (slide_num, png_rid, svg_rid, width_emu, height_emu, transition, transition_duration, auto_advance, use_compat_mode) -> str, function create_slide_rels_xml: (png_rid, png_filename, svg_rid, svg_filename, use_compat_mode) -> str
+- `agent\src\test_qwen_product_pipeline.py`
+  - function parse_batch_t2i_outputs: (outputs, Any]]) -> Tuple[List[str], Optional[str]]
+  - function pair_images_as_first_last: (image_urls) -> List[Dict[str, str]]
+  - function extract_video_url_from_outputs: (outputs, Any]], pair_idx) -> str
+  - function parse_descriptions: (desc_text, num_pairs) -> List[str]
+  - function upload_image: (client, url_or_path) -> str
+  - function poll_task: (client, task_id, timeout) -> List[Dict[str, Any]]
+  - _...6 more_
+- `agent\src\test_skills.py`
+  - function test_skills_loading: ()
+  - function test_runninghub_sora2_skill: ()
+  - function test_skill_selection: ()
+  - function main: ()
+- `agent\src\tts_synthesizer.py` — function synthesize_single: (text, voice_style, scene_index) -> tuple[str, float], function synthesize_batch: (texts, voice_style, max_concurrency) -> tuple[List[str], List[float]]
+- `agent\src\util.py` — function should_route_to_tool_node: (tool_calls, fe_tools)
+- `agent\src\video_stitcher.py`
+  - function stitch_video_segments_sync: (segment_urls, run_id, output_key) -> str
+  - function stitch_video_segments: (segment_urls, run_id, output_key) -> str
+  - function stitch_videos_for_run: (run_id) -> str
+- `agent\src\video_task_queue_supabase.py`
+  - function get_supabase_queue: () -> Optional[SupabaseVideoTaskQueue]
+  - function start_supabase_queue_worker: ()
+  - function ensure_supabase_queue_worker: (reason) -> Dict[str, Any]
+  - class SupabaseVideoTaskQueue
+- `agent\src\_ppt_storyline_core.py` — function build_research_storyline_notes: (*, topic, total_pages, data_points, page_anchors, str] | None) -> List[StickyNote], function expand_semantic_support_points: (*, core_message, related_points) -> List[str]
+- `agent\tests\test_audio_splitter.py`
+  - class TestSegmentInfo
+  - class TestConstants
+  - class TestFindBestSplitPoint
+  - class TestGetAudioDuration
+  - class TestSplitAudioShort
+  - class TestSplitAudioLong
+  - _...2 more_
+- `agent\tests\test_auth.py`
+  - class TestVerifyToken
+  - class TestAuthUser
+  - class TestDevMode
+- `agent\tests\test_build_archetype_slot_clusters.py`
+  - function test_clusters_prefer_phase_artifacts_render_json: (tmp_path)
+  - function test_clusters_fallback_to_phase_render_file: (tmp_path)
+  - function test_clusters_fallback_to_input_json_when_render_has_no_slide_rows: (tmp_path)
+- `agent\tests\test_check_and_trigger_stitch.py`
+  - class TestCheckAndTriggerStitchNoTasks
+  - class TestCheckAndTriggerStitchNotAllSucceeded
+  - class TestCheckAndTriggerStitchSingleSegment
+  - class TestCheckAndTriggerStitchMultiSegment
+  - class TestCheckAndTriggerStitchFailure
+  - class TestCheckAndTriggerStitchNonDigitalHuman
+  - _...2 more_
+- `agent\tests\test_cors.py` — class TestCORS
+- `agent\tests\test_digital_human_long_audio.py`
+  - function test_create_project: (client) -> str
+  - function test_submit_digital_human: (client, run_id) -> dict
+  - function test_verify_db_tasks: (client, run_id, expected_segments)
+  - function test_poll_progress: (client, run_id, max_polls, # 15 分钟（180 * 5s）
+    poll_interval) -> dict
+  - function test_verify_auto_stitch: (client, run_id)
+  - function test_verify_session_status: (client, run_id)
+  - _...3 more_
+- `agent\tests\test_e2e_lingchuang_ppt_mainflow.py`
+  - function test_outline_request_uses_full_requirement_text: ()
+  - function test_export_request_enables_mainflow_quality_controls: ()
+  - function test_script_no_longer_direct_calls_node_generator: ()
+  - function test_call_api_decodes_utf8_output_even_on_windows_locale: (monkeypatch)
+  - function test_call_api_honors_custom_timeout: (monkeypatch)
+- `agent\tests\test_error_handling.py` — class TestErrorHandling
+- `agent\tests\test_exporter_official_mode.py`
+  - function test_exporter_default_mode_is_official: ()
+  - function test_exporter_payload_includes_design_spec_contract: ()
+  - function test_original_style_forces_disable_local_rewrite: ()
+  - function test_exporter_channel_auto_defaults_to_local: ()
+  - function test_exporter_route_mode_passthrough: ()
+  - function test_exporter_rewrites_duplicate_non_title_text_without_dropping_visual_anchor: ()
+  - _...6 more_
+- `agent\tests\test_input_validation.py`
+  - class TestCreateProjectRequest
+  - class TestURLValidation
+  - class TestBatchCreateRequest
+  - class TestAIAssistantRequest
+  - class TestSceneAndRegenerateRequests
+- `agent\tests\test_installed_skill_executor.py`
+  - function test_execute_installed_skill_request_returns_results_for_all_requested_skills: (monkeypatch)
+  - function test_execute_installed_skill_request_emits_theme_recipe_and_tone: (monkeypatch)
+  - function test_resolve_template_plan_is_independent_of_style_variant_for_same_layout: ()
+  - function test_execute_installed_skill_request_unknown_skill_is_noop: (monkeypatch)
+  - function test_execute_installed_skill_request_supports_ppt_editing_skill: (monkeypatch)
+  - function test_execute_installed_skill_request_emits_page_skill_directives: (monkeypatch)
+  - _...16 more_
+- `agent\tests\test_minimax_exporter_module_retry.py`
+  - function test_exporter_always_uses_drawingml_engine: ()
+  - function test_exporter_remote_channel_fails_explicitly: ()
+  - function test_exporter_reports_svg_source_stats: ()
+  - function test_exporter_repairs_invalid_provided_svg_and_still_exports: ()
+  - function test_exporter_enables_notes_when_slide_contains_narration: ()
+- `agent\tests\test_openrouter_fallback.py`
+  - function test_fallback_to_openrouter_when_primary_aiberm_fails: (monkeypatch)
+  - function test_fallback_to_aiberm_when_primary_openrouter_fails: (monkeypatch)
+  - function test_raise_combined_error_when_primary_and_fallback_both_fail: (monkeypatch)
+  - function test_openrouter_fallback_swaps_banned_author_model: (monkeypatch)
+  - function test_fallback_when_primary_returns_empty_content: (monkeypatch)
+  - function test_stream_fallback_on_aiberm_empty_content: (monkeypatch)
+  - _...2 more_
+- `agent\tests\test_pptx_engine_template_fill.py`
+  - function test_fill_template_pptx_replaces_placeholders: (monkeypatch)
+  - function test_fill_template_pptx_defaults_to_xml_edit_engine: (monkeypatch)
+  - function test_fill_template_pptx_replaces_image_placeholder: (monkeypatch)
+  - function test_fill_template_xml_cleans_orphan_media: (monkeypatch)
+  - function test_fill_template_uses_markitdown_structure_for_replacements: (monkeypatch)
+- `agent\tests\test_pptx_theme_patch.py` — function test_patch_pptx_theme_colors_updates_office_classic_scheme: ()
+- `agent\tests\test_ppt_archetype_selector.py`
+  - function test_archetype_selector_returns_top3_and_confidence: ()
+  - function test_archetype_selector_respects_explicit_archetype_priority: ()
+  - function test_archetype_catalog_has_expected_keys: ()
+- `agent\tests\test_ppt_codex_cli_ppt_parity_live.py` — function test_codex_cli_vs_project_ppt_parity_live: (tmp_path)
+- `agent\tests\test_ppt_content_layout_profiles.py` — function test_content_layout_plan_prefers_comparison_archetype_for_vs_signal: (), function test_content_layout_plan_prefers_dashboard_for_metric_signal: ()
+- `agent\tests\test_ppt_contract.py`
+  - function test_export_request_has_retry_scope_fields: ()
+  - function test_slide_and_block_ids_are_stable_defaults: ()
+  - function test_slide_content_preserves_extra_render_contract_fields: ()
+  - function test_export_request_template_file_url_validation: ()
+  - function test_minimax_payload_contains_theme_contract: ()
+  - function test_minimax_payload_normalizes_slide_contract_fields: ()
+  - _...26 more_
+- `agent\tests\test_ppt_critic_repair_loop.py` — function test_visual_critic_patch_applies_before_retry: (monkeypatch)
+- `agent\tests\test_ppt_design_constraints.py`
+  - function test_design_constraints_detect_terminal_title_echo_and_generic_copy: ()
+  - function test_design_constraints_pass_for_clean_payload: ()
+  - function test_design_constraints_ignore_narration_only_title_echo_on_terminal_slide: ()
+  - function test_design_constraints_detect_color_whitespace_and_font_violations: ()
+- `agent\tests\test_ppt_design_contract_v2.py`
+  - function test_apply_visual_orchestration_emits_presentation_contract_v2: ()
+  - function test_apply_visual_orchestration_preserves_explicit_archetype_when_allowed: ()
+  - function test_presentation_contract_v2_has_minimum_archetype_coverage_for_20_slides: ()
+- `agent\tests\test_ppt_design_decision.py`
+  - function test_build_design_decision_v1_contains_deck_and_slide_rows: ()
+  - function test_apply_design_decision_to_slides_fills_auto_fields: ()
+  - function test_freeze_retry_visual_identity_keeps_deck_visual_contract: ()
+  - function test_attach_design_decision_v1_adds_payload_field: ()
+  - function test_build_design_decision_v1_writes_owner_trace_metadata: ()
+  - function test_freeze_retry_visual_identity_applies_slide_level_render_contract: ()
+- `agent\tests\test_ppt_direct_skill_runtime.py`
+  - function test_execute_direct_skill_runtime_resolves_requested_skills: ()
+  - function test_execute_direct_skill_runtime_handles_unknown_skill_as_noop: ()
+  - function test_execute_direct_skill_runtime_cover_prefers_hero_template_when_generic_input: ()
+  - function test_execute_direct_skill_runtime_injects_scene_rule_guidance: ()
+  - function test_execute_direct_skill_runtime_rotates_content_layout_with_history: ()
+  - function test_execute_direct_skill_runtime_avoids_repeating_same_template_when_candidates_exist: ()
+  - _...5 more_
+- `agent\tests\test_ppt_e2e.py`
+  - class TestDataModels
+  - class TestJsonExtraction
+  - class TestSSRFProtection
+  - class TestElementDefaults
+  - class TestSanitization
+  - class TestAPIEndpoints
+  - _...6 more_
+- `agent\tests\test_ppt_export_contract_service.py` — function test_build_final_slide_contract_normalizes_fields: ()
+- `agent\tests\test_ppt_export_decision_service.py` — function test_build_decision_returns_expected_profiles_and_meta: ()
+- `agent\tests\test_ppt_export_failure_service.py`
+  - function test_build_retry_target_ids_uses_block_targets_for_block_scope: ()
+  - function test_persist_retry_event_records_common_fields: ()
+  - function test_persist_failed_observability_limits_diagnostics_to_last_20: ()
+  - function test_persist_observability_event_supports_success_and_extra_fields: ()
+- `agent\tests\test_ppt_export_media_service.py`
+  - function test_media_service_uses_png_upload_and_builds_image_slideshow: ()
+  - function test_media_service_falls_back_to_render_spec_video_slides: ()
+  - function test_media_service_handles_rasterize_failure_gracefully: ()
+- `agent\tests\test_ppt_export_observability_utils.py`
+  - function test_merge_strict_blockers_into_alerts_dedupes_by_code: ()
+  - function test_build_persisted_diagnostics_keeps_last_20_and_appends_summaries: ()
+  - function test_build_strict_failure_detail_limits_items_and_length: ()
+- `agent\tests\test_ppt_export_pipeline.py` — function test_export_pipeline_timeline_stage_context_records_duration: (), function test_export_pipeline_timeline_record_supports_instant_events: ()
+- `agent\tests\test_ppt_export_reorchestrate_service.py` — function test_reorchestrate_returns_not_updated_when_no_repaired_slides: (), function test_reorchestrate_preserves_critic_repair_and_builds_missing_decision: ()
+- `agent\tests\test_ppt_export_report_service.py`
+  - function test_build_observability_report_includes_core_fields: ()
+  - function test_build_observability_report_merges_text_issue_codes_and_dedupes: ()
+  - function test_build_observability_report_without_optional_sections: ()
+- `agent\tests\test_ppt_export_retry_flow.py`
+  - function test_collect_strict_quality_blockers_detects_core_failures: ()
+  - function test_build_image_video_slides_presigns_r2_public_urls: (monkeypatch)
+  - function test_presign_allows_known_domain_without_r2_public_base: (monkeypatch)
+  - function test_presign_skips_existing_signed_url: (monkeypatch)
+  - function test_fetch_image_data_uri_sync_remote_disconnect_returns_empty: (monkeypatch)
+  - function test_quality_gate_triggers_slide_retry_and_persists_diagnostics: (monkeypatch)
+  - _...11 more_
+- `agent\tests\test_ppt_export_retry_utils.py` — function test_degrade_render_paths_for_retry_updates_non_svg_paths: (), function test_collect_issue_retry_target_slides_dedupes_and_skips_deck: ()
+- `agent\tests\test_ppt_export_text_qa_service.py`
+  - function test_text_qa_service_skips_markitdown_when_disabled: (monkeypatch)
+  - function test_text_qa_service_markitdown_exception_is_degraded: (monkeypatch)
+  - function test_text_qa_service_merges_markitdown_issue_codes: (monkeypatch)
+- `agent\tests\test_ppt_failure_classifier.py`
+  - function test_timeout_is_retryable: ()
+  - function test_auth_invalid_is_terminal: ()
+  - function test_quality_score_low_is_retryable: ()
+- `agent\tests\test_ppt_layout_solver.py` — function test_layout_solver_balanced_slide_has_no_ladder_actions: (), function test_layout_solver_unknown_archetype_uses_default_spec: ()
+- `agent\tests\test_ppt_master_blackbox_local.py` — function test_run_blackbox_request_local_runtime: (monkeypatch, tmp_path) -> None, function test_pipeline_scripts_no_codex_command: (monkeypatch, tmp_path) -> None
+- `agent\tests\test_ppt_master_design_spec.py`
+  - function test_choose_render_path_uses_svg_for_complex_layouts_after_structural_failure_marker: ()
+  - function test_choose_render_path_uses_svg_for_complex_chart_subtypes: ()
+  - function test_choose_render_path_uses_svg_for_semantic_complex_slide_type: ()
+  - function test_choose_render_path_uses_svg_for_data_visualization_semantics: ()
+  - function test_choose_render_path_uses_svg_for_infographic_semantics: ()
+  - function test_choose_render_path_uses_svg_for_extended_chart_subtype: ()
+  - _...7 more_
+- `agent\tests\test_ppt_master_pipeline_runtime.py` — function test_run_passthrough_to_local_blackbox: (monkeypatch) -> None, function test_read_stdin_payload_invalid_json_returns_empty: (monkeypatch) -> None
+- `agent\tests\test_ppt_master_service_short_path.py`
+  - function test_build_skill_runtime_request_defaults: (monkeypatch) -> None
+  - function test_build_skill_runtime_request_timeout_override: (monkeypatch) -> None
+  - function test_runtime_command_defaults: (monkeypatch) -> None
+  - function test_ensure_runtime_env_no_codex_defaults: (monkeypatch) -> None
+  - function test_run_skill_runtime_inproc: (monkeypatch) -> None
+- `agent\tests\test_ppt_master_template_catalog.py` — function test_ppt_master_templates_are_registered: (), function test_ppt_master_template_profiles_have_catalog_contract: ()
+- `agent\tests\test_ppt_master_web_adapter.py` — function test_extract_plain_text_strips_tags: () -> None, function test_extract_title: () -> None
+- `agent\tests\test_ppt_overflow_ladder.py` — function test_layout_solver_overflow_triggers_compress_and_density_downgrade_actions: ()
+- `agent\tests\test_ppt_patch_merge.py` — function test_only_failed_slide_is_replaced: (), function test_merge_render_spec_keeps_other_slides: ()
+- `agent\tests\test_ppt_pipeline.py`
+  - function test_resolve_quality_profile_auto_mapping: ()
+  - function test_pipeline_export_timeout_default_cap: (monkeypatch)
+  - function test_run_ppt_pipeline_without_export: (monkeypatch)
+  - function test_run_ppt_pipeline_quality_gate_fails_when_plan_is_empty: (monkeypatch)
+  - function test_run_ppt_pipeline_research_timeout: (monkeypatch)
+- `agent\tests\test_ppt_pipeline_contract_inputs.py` — function test_prepare_pipeline_contract_inputs_fails_fast_when_reference_contract_missing_fields: (), function test_prepare_pipeline_contract_inputs_derives_and_persists_contract_fields: ()
+- `agent\tests\test_ppt_pipeline_graph.py` — function test_stage13_graph_runs_in_strict_serial_order: ()
+- `agent\tests\test_ppt_planning.py`
+  - function test_recommend_layout_cover_and_summary_positions: ()
+  - function test_recommend_layout_prefers_data_dense_grid: ()
+  - function test_recommend_layout_detects_timeline_keywords: ()
+  - function test_enforce_layout_diversity_removes_adjacent_repeats: ()
+  - function test_enforce_layout_diversity_caps_dominant_ratio: ()
+  - function test_enforce_layout_diversity_requires_variety_for_long_deck: ()
+  - _...10 more_
+- `agent\tests\test_ppt_policy_catalog.py` — function test_quality_profile_exposes_orchestration_policy: (), function test_route_policy_and_recommendation_are_catalog_driven: ()
+- `agent\tests\test_ppt_prompt_direct_routes.py` — function test_legacy_pipeline_route_removed: () -> None, function test_prompt_direct_route_present: () -> None
+- `agent\tests\test_ppt_quality_checkers.py` — function test_quality_gate_orchestrator_filters_relaxed_issue_codes: (monkeypatch)
+- `agent\tests\test_ppt_quality_gate.py`
+  - function test_detect_blank_or_garbled_slide: ()
+  - function test_detect_mojibake_in_block_text_as_encoding_invalid: ()
+  - function test_valid_chinese_block_text_not_flagged_as_encoding_invalid: ()
+  - function test_detect_placeholder_pollution: ()
+  - function test_detect_placeholder_pollution_for_writing_instruction_text: ()
+  - function test_placeholder_term_definition_is_not_misclassified: ()
+  - _...38 more_
+- `agent\tests\test_ppt_reference_contract.py`
+  - function test_reference_contract_derives_anchors_and_required_facts: ()
+  - function test_reference_contract_strict_missing_media_manifest_fails_fast: ()
+  - function test_reference_contract_non_strict_theme_missing_key_reports_warning: ()
+  - function test_reference_contract_non_strict_missing_media_manifest_is_warning: ()
+- `agent\tests\test_ppt_render_path_policy.py`
+  - function test_policy_uses_svg_for_terminal_pages: ()
+  - function test_policy_keeps_dense_text_signal_but_routes_svg: ()
+  - function test_policy_marks_forbidden_triggers_for_technical_theme_only: ()
+  - function test_policy_keeps_split_continuation_signal_but_routes_svg: ()
+  - function test_policy_allows_svg_after_split_merge_only_with_explicit_exception_marker: ()
+  - function test_policy_allows_svg_for_structural_exception_page: ()
+  - _...6 more_
+- `agent\tests\test_ppt_research_flow.py`
+  - function test_content_block_rejects_placeholder_content: ()
+  - function test_profile_field_ownership_overrides_slide_level_profile_drift: ()
+  - function test_research_outline_plan_flow_contract: ()
+  - function test_research_uses_serper_when_key_is_configured: (monkeypatch)
+  - function test_outline_uses_generic_storyline_defaults: ()
+  - function test_presentation_plan_preserves_storyline_titles: ()
+  - _...5 more_
+- `agent\tests\test_ppt_retry_budget.py`
+  - function test_normalize_retry_scope_defaults_to_deck: ()
+  - function test_resolve_retry_budget_respects_phase_caps: ()
+  - function test_resolve_export_channel_rejects_remote: (monkeypatch)
+- `agent\tests\test_ppt_retry_orchestrator.py`
+  - function test_non_retryable_fails_fast: ()
+  - function test_retry_decision_for_timeout: ()
+  - function test_build_retry_hint_contains_scope: ()
+  - function test_retry_policy_supports_deterministic_no_jitter_backoff: ()
+- `agent\tests\test_ppt_retry_persistence.py` — function test_persist_failure_code_and_scope: (monkeypatch)
+- `agent\tests\test_ppt_retry_scope_consistency.py`
+  - function test_export_request_rejects_non_deck_retry_scope: ()
+  - function test_export_request_rejects_remote_export_channel: ()
+  - function test_pipeline_request_rejects_remote_export_channel: ()
+  - function test_export_pptx_normalizes_retry_scope_to_deck: (monkeypatch)
+- `agent\tests\test_ppt_route_strategy.py`
+  - function test_route_strategy_normalizes_unknown_to_standard: (monkeypatch)
+  - function test_route_strategy_keeps_auto: (monkeypatch)
+  - function test_resolve_route_policy_fast: ()
+  - function test_recommend_route_mode_by_complexity: ()
+  - function test_resolve_route_policy_auto_uses_recommendation: (monkeypatch)
+  - function test_route_strategy_uses_catalog_recommendation: (monkeypatch)
+  - _...1 more_
+- `agent\tests\test_ppt_scene_rulebook.py`
+  - function test_scene_rulebook_supports_three_target_profiles: ()
+  - function test_scene_rulebook_exposes_machine_checkable_hard_fail_rules: ()
+  - function test_scene_rulebook_formats_weighted_prompt_directives: ()
+- `agent\tests\test_ppt_service_skill_path.py`
+  - function test_relaxed_quality_issue_codes_keep_accuracy_hard_fails_strict: ()
+  - function test_relaxed_quality_issue_codes_disabled_in_dev_strict: ()
+  - function test_relaxed_quality_issue_codes_export_mode_keeps_previous_scope: ()
+  - function test_requested_skills_for_slide_uses_deck_template_family_when_slide_missing: ()
+  - function test_requested_skills_for_slide_forces_ppt_master_in_dev_strict: ()
+  - function test_apply_skill_planning_requests_template_editing_skill_from_deck_context: (monkeypatch)
+  - _...36 more_
+- `agent\tests\test_ppt_service_visual_ownership.py` — function test_collect_visual_owner_conflicts_detects_mismatch: (), function test_collect_visual_owner_conflicts_ignores_auto_values: ()
+- `agent\tests\test_ppt_skill_effect_equivalence_live.py` — function test_project_and_direct_skill_loading_build_identical_messages: (monkeypatch, label, skill_root, skill_names), function test_live_model_effect_consistent_between_project_and_direct_skill_loading: (monkeypatch, label, skill_root, skill_names)
+- `agent\tests\test_ppt_skill_prompt_equivalence.py` — function test_skill_prompt_block_matches_direct_skill_markdown: (monkeypatch, label, skill_root, skill_names)
+- `agent\tests\test_ppt_stage_services.py` — function test_stage_services_delegate_calls: ()
+- `agent\tests\test_ppt_storyline_modules.py`
+  - function test_outline_builder_matches_legacy_behavior: ()
+  - function test_semantic_expander_matches_legacy_behavior: ()
+  - function test_storyline_modules_are_directly_available: ()
+- `agent\tests\test_ppt_storyline_planning.py` — function test_semantic_support_points_avoid_title_echo_and_boilerplate: (), function test_instructional_context_detection_is_disabled: ()
+- `agent\tests\test_ppt_subagent_executor.py`
+  - function test_subagent_executor_applies_llm_patch_and_merges_skills: (monkeypatch)
+  - function test_subagent_executor_skips_when_no_model_credentials: (monkeypatch)
+  - function test_subagent_executor_uses_installed_skill_executor_chain: (monkeypatch)
+  - function test_subagent_executor_uses_default_installed_executor_on_worker: (monkeypatch)
+  - function test_subagent_executor_uses_installed_executor_by_default_on_web_role: (monkeypatch)
+  - function test_subagent_executor_loads_skill_markdown_into_prompt: (monkeypatch)
+  - _...6 more_
+- `agent\tests\test_ppt_svg_finalizer.py`
+  - function test_finalize_svg_files_disabled_returns_skipped: (tmp_path)
+  - function test_finalize_project_missing_helpers_is_non_fatal_by_default: (tmp_path)
+  - function test_finalize_project_missing_helpers_can_fail_in_strict_mode: (tmp_path)
+- `agent\tests\test_ppt_template_export_service.py` — function test_template_export_flow_returns_expected_payload: (monkeypatch), function test_template_export_flow_enforce_runtime_raises: (monkeypatch)
+- `agent\tests\test_ppt_template_routing.py`
+  - function test_template_routing_prefers_data_capability_for_dense_data_slide: ()
+  - function test_template_routing_weak_keyword_does_not_force_architecture: ()
+  - function test_template_capabilities_and_contract_profile_loaded_from_catalog: ()
+  - function test_template_routing_avoids_image_required_template_when_image_asset_missing: ()
+  - function test_template_routing_avoids_contract_infeasible_templates_on_split_layout: ()
+- `agent\tests\test_ppt_underflow_ladder.py` — function test_layout_solver_underflow_triggers_visual_anchor_action: ()
+- `agent\tests\test_ppt_v2_pipeline.py`
+  - function test_v2_pipeline_adds_export_metadata: ()
+  - function test_v2_pipeline_rejects_non_serial_stage_order: ()
+  - function test_service_routes_between_v1_and_v2_by_env: (monkeypatch)
+- `agent\tests\test_ppt_v7_generator.py` — function test_generate_v7_enforces_layout_and_schema: (), class FakeClient
+- `agent\tests\test_ppt_v7_routes.py` — function test_align_highlight_action_to_keyword: (), function test_align_non_highlight_defaults: ()
+- `agent\tests\test_ppt_v7_schema.py`
+  - function test_presentation_schema_accepts_valid_layout: ()
+  - function test_markdown_requires_mark_tag: ()
+  - function test_dialogue_rejects_banned_prefix: ()
+  - function test_presentation_rejects_adjacent_same_type: ()
+  - function test_markdown_visible_text_limit_is_configurable: (monkeypatch)
+- `agent\tests\test_ppt_visual_critic.py`
+  - function test_build_visual_critic_patch_collects_targets_and_actions: ()
+  - function test_apply_visual_critic_patch_mutates_slide_payload: ()
+  - function test_build_visual_critic_patch_routes_structural_exception_slide_to_svg: ()
+  - function test_build_visual_critic_patch_routes_svg_from_storyline_intent_only_in_svg_only_mode: ()
+- `agent\tests\test_ppt_visual_professional_score.py` — function test_visual_professional_score_generates_expected_fields: (), function test_visual_professional_score_marks_accuracy_gate_failed_for_hard_codes: ()
+- `agent\tests\test_ppt_visual_qa.py`
+  - function test_textual_qa_detects_placeholder_and_page_number_gap: ()
+  - function test_summarize_markitdown_text_detects_placeholder: ()
+  - function test_run_markitdown_text_qa_propagates_extraction_failure: (monkeypatch)
+  - function test_visual_qa_empty_input: ()
+  - function test_visual_qa_returns_expected_keys: ()
+  - function test_visual_qa_local_issue_ratios_present: ()
+  - _...1 more_
+- `agent\tests\test_project_history_api.py` — function test_list_projects_includes_task_summary_and_result_video_url: (), function test_get_project_status_returns_frontend_compatible_summary_shape: ()
+- `agent\tests\test_project_status_recovery.py` — function test_get_project_status_triggers_stitch_self_heal: ()
+- `agent\tests\test_queue_full_retry.py` — function test_queue_full_is_requeued_while_under_retry_budget: (), function test_queue_full_fails_after_retry_budget_is_exhausted: ()
+- `agent\tests\test_rate_limiter.py` — class TestRateLimiter
+- `agent\tests\test_runninghub_webhook.py` — function test_webhook_success_triggers_stitch_check: ()
+- `agent\tests\test_run_reference_regression_nightly.py`
+  - function test_parse_scenarios_defaults: ()
+  - function test_parse_scenarios_invalid_raises: ()
+  - function test_build_phase_tag_and_date_tag: ()
+  - function test_score_stats_and_flaky_detection: ()
+  - function test_build_once_command_includes_critic_and_focus: ()
+  - function test_build_cluster_command_writes_default_cluster_output: ()
+- `agent\tests\test_run_reference_regression_phase.py`
+  - function test_phase_artifact_paths_are_normalized: ()
+  - function test_publish_phase_artifacts_and_append_fix_record: (tmp_path)
+  - function test_build_compare_cmd_respects_allow_warnings: ()
+  - function test_resolve_quality_bar_high_raises_gate: ()
+  - function test_resolve_reconstruct_switches_high_defaults_to_on: ()
+  - function test_resolve_reconstruct_switches_zero_create_forces_off: ()
+  - _...31 more_
+- `agent\tests\test_submit_digital_human_background.py` — function test_submit_digital_human_persists_tasks_before_response: ()
+- `agent\tests\test_svg_drawingml_renderer.py`
+  - function test_resolve_slide_svg_markup_prefers_direct_key: ()
+  - function test_resolve_slide_svg_markup_accepts_xml_declaration: ()
+  - function test_render_slide_svg_markup_generates_layout_when_missing_svg: ()
+  - function test_exporter_generates_drawingml_pptx_without_node_runtime: ()
+- `agent\tests\test_svg_to_pptx_notes.py` — function test_markdown_to_plain_text_preserves_list_items_with_ascii_prefix: ()
+- `agent\tests\test_task_cleanup.py` — class TestStuckTaskCleanup
+- `agent\tests\test_template_preservation.py` — function test_no_local_style_override_when_original_mode_enabled: ()
+- `agent\tests\test_tutorial_template.py`
+  - class TestTutorialNarrativeStructure
+  - class TestTutorialTemplateConfig
+  - class TestTutorialPipelineConfig
+  - class TestTutorialPlannerPrompt
+- `agent\tests\test_upload_security.py` — class TestUploadPresign
+- `agent\tests\test_v7_export_submit_status.py`
+  - function test_v7_export_submit_and_status_success_local_background: (monkeypatch)
+  - function test_v7_export_sync_is_disabled_by_default_on_web_role: (monkeypatch)
+  - function test_v7_export_submit_uses_worker_proxy_when_configured: (monkeypatch)
+  - function test_v7_export_submit_requires_signature_on_worker_when_enabled: (monkeypatch)
+  - function test_v7_export_task_can_be_loaded_from_supabase_when_memory_miss: (monkeypatch)
+  - function test_v7_execute_export_forces_deck_scope_and_local_channel: (monkeypatch)
+- `agent\tests\test_v7_routes_presign.py`
+  - function test_v7_presign_r2_get_url_if_needed: (monkeypatch)
+  - function test_v7_build_image_video_slides_presigns_image_and_audio: (monkeypatch)
+  - function test_v7_presign_video_slides: (monkeypatch)
+- `agent\test_api_auth.py` — function test_api: ()
+- `agent\test_dh_30s.py` — function log: (msg), function main: ()
+- `agent\test_dh_4min_api.py` — function log: (msg), function main: ()
+- `agent\test_dh_poll.py` — function main: ()
+- `agent\test_dh_public_api.py` — function log: (msg), function main: ()
+- `agent\test_dh_quick.py` — function log: (msg), function main: ()
+- `agent\test_dh_short.py` — function log: (msg), function main: ()
+- `agent\test_digital_human.py` — function main: ()
+- `scripts\build_archetype_slot_clusters.py` — function build_clusters_for_directory: (nightly_dir) -> Dict[str, Any], function main: () -> int
+- `scripts\check_encoding_hygiene.py`
+  - function should_skip: (path) -> bool
+  - function iter_candidate_files: (root, paths) -> list[Path]
+  - function scan_file: (path) -> list[str]
+  - function main: () -> int
+- `scripts\compare_codex_cli_vs_project_ppt.py` — function main: () -> int, class SkillCase
+- `scripts\compare_ppt_visual.py`
+  - function rasterize_pptx: (pptx_path)
+  - function calculate_image_similarity: (img1_bytes, img2_bytes)
+  - function compare_structural: (reference_ppt, generated_ppt)
+  - function compare_psnr: (reference_ppt, generated_ppt, output_dir)
+  - function merge_structural_and_psnr: (structural_report, psnr_report)
+  - function main: ()
+- `scripts\create_simple_input.py` — function create_simple_input: ()
+- `scripts\e2e_lingchuang_ppt.py`
+  - function call_api: (method, path, body, Any] | None, *, timeout_sec) -> Dict[str, Any]
+  - function expect_success: (resp, Any], stage) -> Dict[str, Any]
+  - function build_outline_request: (requirement, num_slides) -> Dict[str, Any]
+  - function build_export_request: (slides, Any]], title, *, route_mode, quality_profile) -> Dict[str, Any]
+  - function download_file: (url, output_path) -> bool
+  - function write_render_surrogate: (output_dir, *, outline_data, Any], slides, Any]], export_data, Any]) -> Path
+  - _...1 more_
+- `scripts\e2e_lingchuang_ppt_quality.py` — function evaluate_quality: (slides, Any]], keywords, min_slides, *, quality_profile) -> Dict[str, Any], function main: () -> int
+- `scripts\e2e_lingchuang_v3.py` — function call_api: (method, path, body), function main: ()
+- `scripts\e2e_lingchuang_v5.py`
+  - function call_api: (method, path, body)
+  - function get_audio_duration: (url)
+  - function main: ()
+- `scripts\e2e_marp_lingchuang.py` — function call_api: (method, path, body), function main: ()
+- `scripts\e2e_premium_lingchuang.py` — function call_api: (method, path, body), function main: ()
+- `scripts\e2e_process_utils.py`
+  - function wait_for_port: (port, timeout_seconds) -> None
+  - function start_process: (command, cwd, extra_env, str]) -> subprocess.Popen
+  - function stop_process: (proc) -> None
+- `scripts\evaluate_ppt_quality.py` — function evaluate_ppt: (pptx_path), function main: ()
+- `scripts\evaluate_ppt_visual.py` — function evaluate_ppt: (pptx_path), function main: ()
+- `scripts\extract_ppt.py`
+  - function extract_slide_data: (slide, page_number)
+  - function infer_layout_grid: (all_texts, image_count, element_count)
+  - function get_template_info: (slide_type)
+  - function generate_blocks: (all_texts, slide_type, image_count)
+  - function generate_narration: (all_texts, slide_type)
+- `scripts\extract_to_minimax_json.py`
+  - function parse_hex_color: (value) -> str
+  - function emu_to_inches: (emu) -> float
+  - function emu_to_points: (emu) -> float
+  - function color_distance: (c1, c2) -> float
+  - function compare_minimax_json: (ref_json, gen_json) -> Dict
+  - function main: ()
+  - _...7 more_
+- `scripts\fix_input_json.py` — function fix_slide: (blocks, slide_number), function main: ()
+- `scripts\fix_input_json_add_chart.py` — function add_chart_kpi_blocks: (slide, page_number), function main: ()
+- `scripts\fix_input_json_all_slides.py` — function add_chart_kpi_blocks: (slide, page_number), function main: ()
+- `scripts\fix_input_json_final.py` — function ensure_min_text_blocks: (slide, min_text_blocks), function main: ()
+- `scripts\fix_input_json_smart.py` — function add_required_blocks: (slide, contract_profile), function main: ()
+- `scripts\fix_input_json_v2.py` — function main: ()
+- `scripts\generate_hormuz_classroom_deck.py`
+  - function add_full_bg: (slide, color) -> None
+  - function add_rect: (slide, x, y, w, h, color) -> None
+  - function add_text: (slide, text, x, y, w, h, size, bold, color, align, wrap, font_name) -> None
+  - function add_page_no: (slide, page_no) -> None
+  - function add_common_frame: (slide, page_no) -> None
+  - function slide_cover: (slide, page_no) -> None
+  - _...12 more_
+- `scripts\generate_ppt_from_desc.py`
+  - function generate_via_api: (desc, Any], api_url, output_path, render_output_path, execution_profile, strict_no_fallback, creation_mode, focus_cluster, diagnostics, Any]]) -> bool
+  - function generate_via_local: (desc, Any], output_path, render_output_path, local_strategy, reconstruct_use_template_shell, reconstruct_source_aligned, strict_no_fallback, diagnostics, Any]]) -> bool
+  - function main: ()
+- `scripts\generate_ppt_v4.py` — function create_ppt: ()
+- `scripts\gen_lingchuang_full.py` — function call_api: (method, path, body), function main: ()
+- `scripts\gen_ppt_video.py` — function call_api: (path, body), function main: ()
+- `scripts\gen_premium_ppt.py` — function call_api: (method, path, body), function main: ()
+- `scripts\gen_v6.py` — function call_api: (path, body), function main: ()
+- `scripts\pptx_extractor.py`
+  - function parse_hex_color: (value) -> Optional[str]
+  - function parseEMU: (value) -> float
+  - function compare_decks: (ref, gen, max_slides) -> dict
+  - function main: ()
+  - class ThemeColor
+  - class FontInfo
+  - _...5 more_
+- `scripts\qa_compare_render_payload.py` — function main: () -> None
+- `scripts\run_ppt_e2e.py` — function main: () -> int
+- `scripts\run_ppt_generation.py` — function main: ()
+- `scripts\run_ppt_v6.py` — function call_api: (path, body)
+- `scripts\run_reference_regression_nightly.py` — function main: () -> int, class NightlyScenario
+- `scripts\run_reference_regression_once.py` — function main: () -> int
+- `scripts\run_ui_openclaw_e2e.py` — function main: () -> int
+- `scripts\run_ui_ppt_v7_e2e.py` — function main: () -> int
+- `scripts\run_ui_ppt_v7_real_e2e.py` — function main: () -> int
+- `scripts\run_v7.py` — function call_api: (path, body)
+- `scripts\sync_ppt_master_templates.py` — function main: () -> None
+- `scripts\take_ppt_screenshots.py` — function main: ()
+- `scripts\tests\ppt-commercial-baseline.py` — function main: () -> int
+- `scripts\tests\ppt-observability-report.py` — function main: () -> int
+- `scripts\tests\ppt-preview-visual-review.py` — function main: () -> int
+- `scripts\test_color_compare.py` — function color_distance: (c1, c2) -> float
+- `scripts\ui_openclaw_remotion_e2e.py`
+  - function wait_for_render: (page, job_id, timeout_seconds) -> dict
+  - function probe_output_video: (output_path) -> dict
+  - function verify_output_url: (page, output_url) -> dict
+  - function main: () -> int
+- `scripts\ui_ppt_e2e.py`
+  - function save_screenshot: (page, name) -> None
+  - function api_call: (page, method, path, body) -> dict
+  - function check: (page, name, condition, detail)
+  - function test_ppt_generation_flow: (page) -> dict
+  - function test_ppt_editing: (page) -> dict
+  - function test_ppt_video_generation: (page) -> dict
+  - _...4 more_
+- `scripts\ui_ppt_v7_workspace_e2e.py` — function assert_true: (condition, message) -> None, function main: () -> int
+- `scripts\ui_ppt_v7_workspace_real_e2e.py`
+  - function assert_true: (condition, message) -> None
+  - function safe_print: (message) -> None
+  - function parse_run_id_and_link: (page) -> tuple[str | None, str | None]
+  - function extract_slide_image_urls: (page, run_id) -> list[str]
+  - function wait_for_export_payload: (export_payloads, dict], run_id, page, timeout_seconds) -> dict
+  - function wait_for_completion: (page, previous_run_id) -> tuple[str, str]
+  - _...8 more_
+- `src\app\api\agent\regenerate\[run_id]\route.ts` — function POST: (request, context) => void
+- `src\app\api\agent\retry\[run_id]\route.ts` — function POST: (request, context) => void
+- `src\app\api\agent\session\[run_id]\route.ts` — function GET
+- `src\app\api\agent\sessions\route.ts` — function GET
+- `src\app\api\agent\stitch\[run_id]\route.ts` — function POST: (request, context) => void
+- `src\app\api\agent\tasks\[run_id]\route.ts` — function GET: (request, context) => void
+- `src\app\api\auth\api-token\route.ts` — function POST: () => void
+- `src\app\api\auth\forgot-password\route.ts` — function POST: (req) => void
+- `src\app\api\auth\reset-password\route.ts` — function POST: (req) => void
+- `src\app\api\paypal\create-subscription\route.ts` — function POST: (request) => void, const dynamic
+- `src\app\api\paypal\subscription-status\route.ts` — function GET: () => void, const dynamic
+- `src\app\api\paypal\webhook\route.ts` — function POST: (request) => void, const dynamic
+- `src\app\api\projects\[...path]\route.ts`
+  - function GET: (request, context) => void
+  - function POST: (request, context) => void
+  - function PUT: (request, context) => void
+  - function DELETE: (request, context) => void
+- `src\app\api\quota\route.ts` — function GET: () => void
+- `src\app\api\render\jobs\route.ts` — function POST: (req) => void
+- `src\app\api\upload\presign\route.ts` — function POST
+- `src\lib\actions.ts` — function checkUserAuthorization: (email) => void, function registerUser: (email, password) => void
+- `src\lib\errors.ts` — function getErrorMessage: (error, fallback) => string
+- `src\lib\export\html-parser.ts`
+  - function toAST: (html) => AST[]
+  - function formatHTML: (html, ratioPx2Pt, defaults) => TextSlice[]
+  - interface AST
+- `src\lib\export\latex-to-omml.ts` — function latexToOmml: (latex, fontSize?) => Promise<string | null>, function latexToHtml: (latex, displayMode) => string | null
+- `src\lib\generation\json-repair.ts` — function parseJsonResponse: (response) => T | null, interface ParseResult
+- `src\lib\paypal.ts`
+  - function createSubscription: (planKey, returnUrl, cancelUrl) => void
+  - function getSubscriptionDetails: (subscriptionId) => void
+  - function cancelSubscription: (subscriptionId, reason) => void
+  - interface PlanConfig
+  - const PLANS: Record<string, PlanConfig>
+- `src\lib\project-client.ts`
+  - function clearApiToken: () => void
+  - interface ProjectParams
+  - interface Project
+  - interface ProjectTaskSummary
+  - interface StoryboardScene
+  - interface StoryboardData
+  - _...4 more_
+- `src\lib\quota.ts`
+  - function checkQuota: (userId) => Promise<QuotaInfo>
+  - function consumeQuota: (userId) => Promise<boolean>
+  - function resetMonthlyQuota: (userId, plan?) => Promise<void>
+  - interface QuotaInfo
+- `src\lib\render\remotion-mapper.ts`
+  - function toRemotionComposition: (project) => RemotionCompositionPayload
+  - function buildRenderJobRequest: (project, options) => RenderJobRequest
+  - function summarizeRenderJob: (request) => RenderJobSummary
+- `src\lib\render\types.ts`
+  - function getProjectFps: (project) => number
+  - function secondsToFrames: (seconds, fps) => number
+  - type RenderEngine
+  - type RenderLayerType
+  - type RenderLayer
+  - type RenderAudioTrack
+  - _...5 more_
+- `src\lib\runtime-env.ts`
+  - function isProductionDeployment: () => void
+  - function getAuthSecret: () => void
+  - function getAgentServiceUrl: () => void
+  - function getAppOrigin: () => void
+  - function getPublicAgentBaseUrl: () => void
+- `src\lib\saleagent-client.ts`
+  - function uuidv4: () => void
+  - function getBaseUrl: (base?) => void
+  - function postJson: (url, body, init?) => Promise<T>
+  - function getAgentSession: (run_id) => void
+  - function listWorkflows: (limit) => void
+  - function uploadFile: (file) => Promise<string>
+  - _...16 more_
+- `src\lib\sentry.ts`
+  - function initSentry: () => void
+  - function captureException: (error, context?, unknown>) => void
+  - function captureMessage: (message, level) => void
+- `src\lib\types\chat.ts`
+  - function createSceneOutline: (partial) => SceneOutline
+  - function createScene: (outline, content, actions) => Scene
+  - interface ChatSession
+  - interface SceneOutline
+  - interface MediaGenerationRequest
+  - interface Scene
+  - _...7 more_
+- `src\proxy.ts` — function proxy: (request) => void, const config
+- `test_commercial_release.py`
+  - function log: (msg)
+  - function test_tc001_homepage_load: (page)
+  - function test_tc002_templates: (page)
+  - function test_tc010_product_ad: (page)
+  - function test_tc011_digital_human: (page)
+  - function test_tc012_knowledge_edu: (page)
+  - _...9 more_
+- `test_digital_human_10min.py`
+  - function start_file_server: (port)
+  - function get_file_urls: (port)
+  - function wait_for_server: (url, timeout)
+  - function main: ()
+  - class FileServerHandler
+- `test_digital_human_10min_v2.py`
+  - function start_file_server: (port)
+  - function get_file_urls: (port)
+  - function log_step: (step_num, message)
+  - function log_substep: (message)
+  - function check_prerequisites: ()
+  - function select_digital_human_template: (page)
+  - _...5 more_
+- `test_digital_human_api.py`
+  - function start_file_server: (port)
+  - function get_file_urls: (port)
+  - function log: (msg, level)
+  - function check_files: ()
+  - function create_project: (client, file_urls)
+  - function submit_digital_human: (client, run_id)
+  - _...3 more_
+- `test_full_v2.py` — function log: (msg), function test_full_video_generation_v2: ()
+- `test_full_video_generation.py`
+  - function log: (msg)
+  - function test_full_video_generation: ()
+  - function test_web_ui_generation: ()
+- `test_full_web_generation.py` — function log: (msg), function test_web_ui_full_generation: ()
+- `test_ppt_master_integration.py`
+  - function test_generate_from_prompt: ()
+  - function test_list_templates: ()
+  - function main: ()

@@ -745,7 +745,7 @@ class TestPlanCompleteness:
         "agent/src/document_parser.py",
         "agent/src/tts_synthesizer.py",
         "agent/src/lambda_renderer.py",
-        "agent/src/ppt_service_v2.py",
+        "agent/src/ppt_service_v2/__init__.py",
         "agent/src/ppt_routes.py",
         # TypeScript
         "src/lib/types/ppt.ts",

@@ -1,13 +1,14 @@
 """
-AI Prompt-based PPT Generation Schemas
+AI Prompt-based PPT generation schemas.
 """
 
-from typing import Optional, Dict, Any, List
+from typing import Any, Dict, Optional
+
 from pydantic import BaseModel, Field
 
 
 class AIPromptPPTRequest(BaseModel):
-    """Request for AI prompt-based PPT generation"""
+    """Request for AI prompt-based PPT generation."""
 
     prompt: str = Field(
         ..., description="AI prompt describing the PPT content", min_length=10
@@ -26,23 +27,31 @@ class AIPromptPPTRequest(BaseModel):
     include_images: bool = Field(
         default=False, description="Whether to generate AI images"
     )
+    web_enrichment: bool = Field(
+        default=True, description="Enable web research enrichment"
+    )
+    image_asset_enrichment: bool = Field(
+        default=True, description="Enable image asset enrichment"
+    )
     template_family: Optional[str] = Field(None, description="Template family to use")
 
     class Config:
         json_schema_extra = {
             "example": {
-                "prompt": "创建一份关于人工智能发展历程的演示文稿，包括AI的起源、重要里程碑、当前应用和未来展望",
+                "prompt": "Create a university class presentation on the Strait of Hormuz crisis and its impact on international relations.",
                 "total_pages": 12,
                 "style": "professional",
                 "color_scheme": "blue",
                 "language": "zh-CN",
                 "include_images": False,
+                "web_enrichment": True,
+                "image_asset_enrichment": True,
             }
         }
 
 
 class AIPromptPPTResult(BaseModel):
-    """Result of AI prompt-based PPT generation"""
+    """Result of AI prompt-based PPT generation."""
 
     success: bool
     project_name: str
@@ -62,8 +71,13 @@ class AIPromptPPTResult(BaseModel):
                 "project_path": "output/ai_generation/ai_gen_20260408_120000",
                 "total_slides": 12,
                 "generated_content": {
-                    "title": "人工智能发展历程",
-                    "outline": ["AI起源", "重要里程碑", "当前应用", "未来展望"],
+                    "title": "The Strait of Hormuz Crisis",
+                    "outline": [
+                        "Geostrategic background",
+                        "Escalation timeline",
+                        "International relations impact",
+                        "Risk scenarios",
+                    ],
                 },
                 "design_spec": {
                     "primary_color": "#4472C4",

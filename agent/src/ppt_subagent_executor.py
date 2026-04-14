@@ -18,6 +18,7 @@ from typing import Any, Callable, Dict, List, Optional, TypedDict
 from langchain_core.tools import tool
 from langgraph.graph import END, START, StateGraph
 from openai import OpenAI
+from src.openrouter_client import OpenRouterClient, _DEFAULT_PROVIDER_MODEL_ALIASES
 
 
 def _strip_surrogate_chars(text: str) -> str:
@@ -58,6 +59,27 @@ def _normalize_openai_model_id(model_id: str) -> str:
         _, tail = model.split("/", 1)
         return _normalize_text(tail, model)
     return model
+
+
+def _resolve_model_for_provider(model_id: str, provider: str) -> str:
+    model = _normalize_text(model_id, "")
+    if not model:
+        return model
+    env_name_by_provider = {
+        "openrouter": "OPENROUTER_MODEL_ALIAS_MAP_JSON",
+        "aiberm": "AIBERM_MODEL_ALIAS_MAP_JSON",
+        "crazyroute": "CRAZYROUTE_MODEL_ALIAS_MAP_JSON",
+    }
+    mapped = OpenRouterClient._resolve_alias(
+        model,
+        OpenRouterClient._load_aliases_from_env("LLM_MODEL_ALIAS_MAP_JSON"),
+    )
+    provider_aliases = dict(_DEFAULT_PROVIDER_MODEL_ALIASES.get(provider, {}))
+    provider_env_name = env_name_by_provider.get(provider)
+    if provider_env_name:
+        provider_aliases.update(OpenRouterClient._load_aliases_from_env(provider_env_name))
+    mapped = OpenRouterClient._resolve_alias(mapped, provider_aliases)
+    return _normalize_text(mapped, model)
 
 
 def _dedupe_skills(values: Any) -> List[str]:
@@ -316,16 +338,35 @@ def _create_openai_client() -> tuple[Optional[OpenAI], str, str]:
     aiberm_base = _normalize_text(os.getenv("AIBERM_API_BASE", ""), "")
     aiberm_key = _normalize_text(os.getenv("AIBERM_API_KEY", ""), "")
     if aiberm_base and aiberm_key:
-        model = _resolve_content_model("openai/gpt-4.1-mini")
+        model = _resolve_model_for_provider(
+            _resolve_content_model("openai/gpt-4.1-mini"),
+            "aiberm",
+        )
         client = OpenAI(
             api_key=aiberm_key,
             base_url=aiberm_base,
         )
         return client, model, "aiberm"
 
+    crazyroute_base = _normalize_text(os.getenv("CRAZYROUTE_API_BASE", ""), "")
+    crazyroute_key = _normalize_text(os.getenv("CRAZYROUTE_API_KEY", ""), "")
+    if crazyroute_base and crazyroute_key:
+        model = _resolve_model_for_provider(
+            _resolve_content_model("openai/gpt-4.1-mini"),
+            "crazyroute",
+        )
+        client = OpenAI(
+            api_key=crazyroute_key,
+            base_url=crazyroute_base,
+        )
+        return client, model, "crazyroute"
+
     openrouter_key = _normalize_text(os.getenv("OPENROUTER_API_KEY", ""), "")
     if openrouter_key:
-        model = _resolve_content_model("openai/gpt-4.1-mini")
+        model = _resolve_model_for_provider(
+            _resolve_content_model("openai/gpt-4.1-mini"),
+            "openrouter",
+        )
         client = OpenAI(
             api_key=openrouter_key,
             base_url=_normalize_text(os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"), "https://openrouter.ai/api/v1"),
