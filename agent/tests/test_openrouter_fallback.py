@@ -4,6 +4,15 @@ from src.openrouter_client import OpenRouterClient, OpenRouterError
 from src import openrouter_client as openrouter_module
 
 
+@pytest.fixture(autouse=True)
+def _reset_openrouter_runtime_state(monkeypatch):
+    OpenRouterClient._reset_runtime_state_for_tests()
+    monkeypatch.delenv("LLM_PROVIDER_FAILURE_THRESHOLD", raising=False)
+    monkeypatch.delenv("LLM_PROVIDER_COOLDOWN_SECONDS", raising=False)
+    yield
+    OpenRouterClient._reset_runtime_state_for_tests()
+
+
 class _FakeResponse:
     def __init__(self, status_code: int, *, text: str = "", json_data=None):
         self.status_code = status_code
@@ -203,9 +212,9 @@ async def test_fallback_to_aiberm_when_primary_openrouter_fails(monkeypatch):
 
     assert result == "fallback-aiberm-ok"
     assert len(_StubAsyncClient.calls) == 2
-    assert _StubAsyncClient.calls[0]["url"] == "https://openrouter.ai/api/v1/chat/completions"
-    assert _StubAsyncClient.calls[1]["url"] == "https://aiberm.example/v1/chat/completions"
-    assert _StubAsyncClient.calls[1]["headers"]["Authorization"] == "Bearer sk-aiberm"
+    assert _StubAsyncClient.calls[0]["url"] == "https://aiberm.example/v1/chat/completions"
+    assert _StubAsyncClient.calls[1]["url"] == "https://openrouter.ai/api/v1/chat/completions"
+    assert _StubAsyncClient.calls[0]["headers"]["Authorization"] == "Bearer sk-aiberm"
 
 
 @pytest.mark.asyncio
@@ -235,13 +244,13 @@ async def test_fallback_to_crazyroute_when_primary_openrouter_fails(monkeypatch)
 
     assert result == "fallback-crazyroute-from-openrouter"
     assert len(_StubAsyncClient.calls) == 2
-    assert _StubAsyncClient.calls[0]["url"] == "https://openrouter.ai/api/v1/chat/completions"
-    assert _StubAsyncClient.calls[1]["url"] == "https://crazyroute.example/v1/chat/completions"
-    assert _StubAsyncClient.calls[1]["headers"]["Authorization"] == "Bearer sk-crazyroute"
+    assert _StubAsyncClient.calls[0]["url"] == "https://crazyroute.example/v1/chat/completions"
+    assert _StubAsyncClient.calls[1]["url"] == "https://openrouter.ai/api/v1/chat/completions"
+    assert _StubAsyncClient.calls[0]["headers"]["Authorization"] == "Bearer sk-crazyroute"
 
 
 @pytest.mark.asyncio
-async def test_chain_fallback_order_openrouter_to_aiberm_to_crazyroute(monkeypatch):
+async def test_chain_fallback_order_stays_aiberm_to_crazyroute_to_openrouter_even_with_openrouter_api_base(monkeypatch):
     monkeypatch.setenv("AIBERM_API_BASE", "https://aiberm.example/v1")
     monkeypatch.setenv("AIBERM_API_KEY", "sk-aiberm")
     monkeypatch.setenv("CRAZYROUTE_API_BASE", "https://crazyroute.example/v1")
@@ -269,12 +278,12 @@ async def test_chain_fallback_order_openrouter_to_aiberm_to_crazyroute(monkeypat
 
     assert result == "openrouter-chain-ok"
     assert len(_StubAsyncClient.calls) == 3
-    assert _StubAsyncClient.calls[0]["url"] == "https://openrouter.ai/api/v1/chat/completions"
-    assert _StubAsyncClient.calls[1]["url"] == "https://aiberm.example/v1/chat/completions"
-    assert _StubAsyncClient.calls[2]["url"] == "https://crazyroute.example/v1/chat/completions"
-    assert _StubAsyncClient.calls[0]["headers"]["Authorization"] == "Bearer sk-openrouter"
-    assert _StubAsyncClient.calls[1]["headers"]["Authorization"] == "Bearer sk-aiberm"
-    assert _StubAsyncClient.calls[2]["headers"]["Authorization"] == "Bearer sk-crazyroute"
+    assert _StubAsyncClient.calls[0]["url"] == "https://aiberm.example/v1/chat/completions"
+    assert _StubAsyncClient.calls[1]["url"] == "https://crazyroute.example/v1/chat/completions"
+    assert _StubAsyncClient.calls[2]["url"] == "https://openrouter.ai/api/v1/chat/completions"
+    assert _StubAsyncClient.calls[0]["headers"]["Authorization"] == "Bearer sk-aiberm"
+    assert _StubAsyncClient.calls[1]["headers"]["Authorization"] == "Bearer sk-crazyroute"
+    assert _StubAsyncClient.calls[2]["headers"]["Authorization"] == "Bearer sk-openrouter"
 
 
 @pytest.mark.asyncio
@@ -300,8 +309,8 @@ async def test_raise_combined_error_when_primary_and_fallback_both_fail(monkeypa
 
     message = str(exc_info.value)
     assert "All LLM endpoints failed" in message
-    assert "primary HTTP 503" in message
-    assert "provider_fallback HTTP 403" in message
+    assert "aiberm:round_robin HTTP 503" in message
+    assert "openrouter:round_robin HTTP 403" in message
 
 
 @pytest.mark.asyncio
@@ -601,3 +610,108 @@ async def test_remap_claude_model_for_crazyroute(monkeypatch):
     assert result == "ok"
     assert len(_StubAsyncClient.calls) == 1
     assert _StubAsyncClient.calls[0]["json"]["model"] == "claude-sonnet-4-6"
+
+
+@pytest.mark.asyncio
+async def test_last_success_provider_priority(monkeypatch):
+    monkeypatch.setenv("AIBERM_API_BASE", "https://aiberm.example/v1")
+    monkeypatch.setenv("AIBERM_API_KEY", "sk-aiberm")
+    monkeypatch.setenv("CRAZYROUTE_API_BASE", "https://crazyroute.example/v1")
+    monkeypatch.setenv("CRAZYROUTE_API_KEY", "sk-crazyroute")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-openrouter")
+
+    _StubAsyncClient.calls = []
+    _StubAsyncClient.responses = [
+        _FakeResponse(503, text="aiberm timeout"),
+        _FakeResponse(200, json_data={"choices": [{"message": {"content": "ok-1"}}]}),
+        _FakeResponse(200, json_data={"choices": [{"message": {"content": "ok-2"}}]}),
+    ]
+    monkeypatch.setattr(openrouter_module.httpx, "AsyncClient", _StubAsyncClient)
+
+    client = OpenRouterClient()
+    assert await client.chat_completions(
+        model="claude-sonnet-4-6",
+        messages=[{"role": "user", "content": "hello"}],
+    ) == "ok-1"
+    assert await client.chat_completions(
+        model="claude-sonnet-4-6",
+        messages=[{"role": "user", "content": "hello again"}],
+    ) == "ok-2"
+
+    assert [call["url"] for call in _StubAsyncClient.calls] == [
+        "https://aiberm.example/v1/chat/completions",
+        "https://crazyroute.example/v1/chat/completions",
+        "https://crazyroute.example/v1/chat/completions",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_circuit_breaker_cooldown_skips_provider(monkeypatch):
+    monkeypatch.setenv("AIBERM_API_BASE", "https://aiberm.example/v1")
+    monkeypatch.setenv("AIBERM_API_KEY", "sk-aiberm")
+    monkeypatch.setenv("CRAZYROUTE_API_BASE", "https://crazyroute.example/v1")
+    monkeypatch.setenv("CRAZYROUTE_API_KEY", "sk-crazyroute")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-openrouter")
+    monkeypatch.setenv("LLM_PROVIDER_FAILURE_THRESHOLD", "1")
+    monkeypatch.setenv("LLM_PROVIDER_COOLDOWN_SECONDS", "120")
+
+    _StubAsyncClient.calls = []
+    _StubAsyncClient.responses = [
+        _FakeResponse(503, text="aiberm timeout"),
+        _FakeResponse(200, json_data={"choices": [{"message": {"content": "ok-1"}}]}),
+        _FakeResponse(200, json_data={"choices": [{"message": {"content": "ok-2"}}]}),
+    ]
+    monkeypatch.setattr(openrouter_module.httpx, "AsyncClient", _StubAsyncClient)
+
+    client = OpenRouterClient()
+    assert await client.chat_completions(
+        model="claude-sonnet-4-6",
+        messages=[{"role": "user", "content": "hello"}],
+    ) == "ok-1"
+    aiberm_state = client._provider_runtime("aiberm")
+    assert aiberm_state["state"] == "open"
+    assert float(aiberm_state["cooldown_until"]) > 0
+
+    assert await client.chat_completions(
+        model="claude-sonnet-4-6",
+        messages=[{"role": "user", "content": "hello again"}],
+    ) == "ok-2"
+    assert _StubAsyncClient.calls[2]["url"] == "https://crazyroute.example/v1/chat/completions"
+
+
+@pytest.mark.asyncio
+async def test_recovery_probe_after_cooldown(monkeypatch):
+    clock = {"ts": 1000.0}
+    monkeypatch.setattr(openrouter_module.time, "monotonic", lambda: clock["ts"])
+
+    monkeypatch.setenv("AIBERM_API_BASE", "https://aiberm.example/v1")
+    monkeypatch.setenv("AIBERM_API_KEY", "sk-aiberm")
+    monkeypatch.setenv("CRAZYROUTE_API_BASE", "https://crazyroute.example/v1")
+    monkeypatch.setenv("CRAZYROUTE_API_KEY", "sk-crazyroute")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-openrouter")
+    monkeypatch.setenv("LLM_PROVIDER_FAILURE_THRESHOLD", "1")
+    monkeypatch.setenv("LLM_PROVIDER_COOLDOWN_SECONDS", "30")
+
+    _StubAsyncClient.calls = []
+    _StubAsyncClient.responses = [
+        _FakeResponse(503, text="aiberm timeout"),
+        _FakeResponse(200, json_data={"choices": [{"message": {"content": "ok-1"}}]}),
+        _FakeResponse(200, json_data={"choices": [{"message": {"content": "ok-probe"}}]}),
+    ]
+    monkeypatch.setattr(openrouter_module.httpx, "AsyncClient", _StubAsyncClient)
+
+    client = OpenRouterClient()
+    assert await client.chat_completions(
+        model="claude-sonnet-4-6",
+        messages=[{"role": "user", "content": "hello"}],
+    ) == "ok-1"
+
+    clock["ts"] += 31.0
+    assert await client.chat_completions(
+        model="claude-sonnet-4-6",
+        messages=[{"role": "user", "content": "hello again"}],
+    ) == "ok-probe"
+
+    assert _StubAsyncClient.calls[2]["url"] == "https://aiberm.example/v1/chat/completions"
+    assert OpenRouterClient._runtime_state["last_success_provider"] == "aiberm"
+    assert client._provider_runtime("aiberm")["state"] == "closed"

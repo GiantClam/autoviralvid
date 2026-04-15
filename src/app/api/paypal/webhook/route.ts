@@ -1,2 +1,3 @@
-export { POST, dynamic } from "@/app/api/billing/webhook/paypal/route";
+export const dynamic = "force-dynamic";
 
+export { POST } from "@/app/api/billing/webhook/paypal/route";

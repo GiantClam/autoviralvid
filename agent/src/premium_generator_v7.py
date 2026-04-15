@@ -347,6 +347,7 @@ def _normalize_actions(
     data_points: List[str],
 ) -> List[Dict[str, Any]]:
     out: List[Dict[str, Any]] = []
+    allowed_types = {"highlight", "circle", "appear_items", "zoom_in"}
     if isinstance(mapped_actions, list):
         for action in mapped_actions:
             if not isinstance(action, dict):
@@ -356,21 +357,38 @@ def _normalize_actions(
                 t = "circle"
             elif t in {"spotlight", "underline"}:
                 t = "highlight"
+            if t not in allowed_types:
+                continue
             payload: Dict[str, Any] = {"type": t}
             if "startFrame" in action:
                 payload["startFrame"] = max(0, int(action.get("startFrame") or 0))
             if t == "highlight":
-                payload["keyword"] = str(action.get("keyword") or _find_mark_keyword(markdown)).strip()
+                keyword = str(action.get("keyword") or _find_mark_keyword(markdown)).strip()
+                if not keyword:
+                    continue
+                payload["keyword"] = keyword
             if t == "circle":
-                payload["x"] = float(action.get("x") or 960)
-                payload["y"] = float(action.get("y") or 430)
-                payload["r"] = float(action.get("r") or 110)
+                try:
+                    payload["x"] = float(action.get("x") or 960)
+                    payload["y"] = float(action.get("y") or 430)
+                    payload["r"] = float(action.get("r") or 110)
+                except Exception:
+                    continue
             if t == "appear_items":
                 items = action.get("items")
-                if isinstance(items, list):
-                    payload["items"] = [str(i).strip() for i in items if str(i).strip()][:5]
+                parsed_items = (
+                    [str(i).strip() for i in items if str(i).strip()][:5]
+                    if isinstance(items, list)
+                    else []
+                )
+                if not parsed_items:
+                    continue
+                payload["items"] = parsed_items
             if t == "zoom_in":
-                payload["region"] = str(action.get("region") or "center")
+                region = str(action.get("region") or "center").strip()
+                if not region:
+                    continue
+                payload["region"] = region
             out.append(payload)
 
     if not out:

@@ -66,11 +66,11 @@ export async function runBillingReconcile(
   let failedWebhookEvents = 0;
   let negativeBalances = 0;
 
-  if (!process.env.DATABASE_URL) {
+  if (!process.env.SUPABASE_URL && !process.env.DATABASE_URL) {
     mismatches.push({
       code: "table_missing",
       severity: "warning",
-      detail: "DATABASE_URL is not configured. Reconcile checks are skipped.",
+      detail: "SUPABASE_URL is not configured. Reconcile checks are skipped.",
     });
     return {
       generatedAt: now.toISOString(),

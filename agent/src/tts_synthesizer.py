@@ -8,6 +8,7 @@ import json
 import logging
 import os
 import re
+import shutil
 from typing import List, Optional
 
 import httpx
@@ -190,8 +191,11 @@ async def _get_audio_duration(audio_bytes: bytes) -> float:
         tmp_path = f.name
 
     try:
+        ffprobe_bin = shutil.which("ffprobe")
+        if not ffprobe_bin:
+            raise FileNotFoundError("ffprobe not found in PATH")
         proc = await asyncio.create_subprocess_exec(
-            "ffprobe",
+            ffprobe_bin,
             "-v",
             "quiet",
             "-show_entries",
@@ -202,11 +206,16 @@ async def _get_audio_duration(audio_bytes: bytes) -> float:
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
-        stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=10)
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=10)
         if proc.returncode == 0:
-            return float(stdout.decode().strip())
+            duration_text = stdout.decode(errors="ignore").strip()
+            if duration_text:
+                return float(duration_text)
+            raise RuntimeError("ffprobe returned empty duration output")
+        stderr_text = (stderr.decode(errors="ignore") if stderr else "").strip()
+        raise RuntimeError(f"ffprobe returncode={proc.returncode} stderr={stderr_text[:200]}")
     except Exception as e:
-        logger.warning(f"[tts] ffprobe failed: {e}, estimating from file size")
+        logger.warning("[tts] ffprobe failed (%r), estimating from file size", e)
     finally:
         try:
             os.unlink(tmp_path)

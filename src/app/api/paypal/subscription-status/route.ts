@@ -1,2 +1,3 @@
-export { GET, dynamic } from "@/app/api/billing/subscription/route";
+export const dynamic = "force-dynamic";
 
+export { GET } from "@/app/api/billing/subscription/route";

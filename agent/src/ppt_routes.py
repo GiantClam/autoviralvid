@@ -6,7 +6,7 @@ import logging
 import json
 import re
 import uuid
-from typing import List, Optional
+from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import FileResponse
@@ -28,7 +28,6 @@ from src.schemas.ppt_plan import PresentationPlanRequest
 from src.schemas.ppt_research import ResearchRequest
 from src.schemas.ppt_ai_prompt import (
     AIPromptPPTRequest,
-    AIPromptPPTResult,
 )
 
 logger = logging.getLogger("ppt_routes")
@@ -325,11 +324,18 @@ async def start_render(
             return ApiResponse(success=True, data=cached["result"])
 
     try:
+        slide_count = len(req.slides or [])
+        has_pptx = bool(str(req.pptx_url or "").strip())
         logger.info(
-            f"[ppt_routes:{rid}] render start user={user.id} slides={len(req.slides)}"
+            f"[ppt_routes:{rid}] render start user={user.id} slides={slide_count} has_pptx={has_pptx}"
         )
         svc = _get_service()
-        job = await svc.start_video_render(req.slides, req.config)
+        job = await svc.start_video_render(
+            req.slides or [],
+            req.config,
+            pptx_url=req.pptx_url,
+            audio_urls=req.audio_urls,
+        )
         result = job.model_dump()
 
         if req.idempotency_key:

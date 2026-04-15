@@ -134,6 +134,19 @@ class TestDataModels:
         )
         assert r.idempotency_key == "img123"
 
+    def test_video_render_request_accepts_pptx_url(self):
+        r = VideoRenderRequest(
+            pptx_url="https://example.com/presentation.pptx",
+            audio_urls=["https://example.com/a1.mp3"],
+            idempotency_key="pptx123",
+        )
+        assert r.pptx_url == "https://example.com/presentation.pptx"
+        assert len(r.audio_urls) == 1
+
+    def test_video_render_request_requires_source(self):
+        with pytest.raises(Exception):
+            VideoRenderRequest(idempotency_key="missing-source")
+
     def test_api_response(self):
         r = ApiResponse(success=True, data={"key": "value"})
         assert r.success is True

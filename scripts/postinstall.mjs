@@ -35,4 +35,4 @@ if (skipAgentInstall) {
 }
 
 console.log("[postinstall] Generating Prisma client.");
-run("npx", ["prisma", "generate"]);
+run("node", ["scripts/prisma-generate-safe.mjs"]);

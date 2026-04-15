@@ -15,6 +15,7 @@ const zh = {
   nav: {
     features: "功能",
     showcase: "案例",
+    pricing: "Pricing",
     getAccess: "获取体验资格",
     platform: "AI 视频创作平台",
   },
@@ -55,6 +56,20 @@ const zh = {
     ctaDesc: "现在加入等候名单，首月可享 5 折优惠。",
     ctaButton: "获取早期体验资格",
     footerCopyright: "© 2026 AutoViralVid. 保留所有权利。",
+    pricingTitle: "Pricing & Subscription",
+    pricingDesc:
+      "PayPal subscription is enabled. Pick a plan and upgrade in one click after sign-in.",
+    pricingMostPopular: "Most Popular",
+    pricingUnlimitedVideos: "Unlimited videos",
+    pricingVideosPerMonth: "{count} videos per month",
+    pricingPaypal: "PayPal",
+    pricingStripe: "Stripe",
+    pricingStatusReady: "Ready",
+    pricingStatusUnavailable: "Unavailable",
+    pricingStartFree: "Start Free",
+    pricingSubscribe: "Subscribe",
+    pricingLoading: "Loading latest pricing...",
+
     authCreateAccount: "创建账号",
     authWelcomeBack: "欢迎回来",
     authSignUpDesc: "注册后即可开始创作视频",

@@ -20,7 +20,7 @@ Notes:
 Set these vars in production (primarily on Vercel).
 
 Required (Vercel):
-- `DATABASE_URL`
+- `SUPABASE_URL`
 - `AUTH_SECRET` (or `NEXTAUTH_SECRET`)
 - `NEXTAUTH_URL`
 - `AGENT_URL` (Railway backend URL)
@@ -79,4 +79,3 @@ Minimal production smoke checks:
 - One successful `/api/ppt/generate-from-prompt` call consumes quota.
 - One forced downstream failure triggers automatic refund.
 - `/api/internal/billing/reconcile` (with token) returns `ok: true`.
-

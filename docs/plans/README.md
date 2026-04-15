@@ -107,6 +107,7 @@ Required Vercel env vars:
 - `AUTH_SECRET` or `NEXTAUTH_SECRET`
 - `NEXTAUTH_URL` or `NEXT_PUBLIC_SITE_URL`
 - `AGENT_URL` or `NEXT_PUBLIC_AGENT_URL`
+- `SUPABASE_URL`
 
 Optional but commonly needed:
 

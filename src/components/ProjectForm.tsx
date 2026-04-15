@@ -165,6 +165,9 @@ async function callV7Api<T>(
   }
 
   if (!res.ok) {
+    if (res.status === 401) {
+      throw new Error(t("settings.loginRequired"));
+    }
     throw new Error(
       json?.error || json?.detail || t("form.v7RequestFailedWithStatus", { status: res.status }),
     );

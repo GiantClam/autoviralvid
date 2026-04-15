@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Zap, Crown, Sparkles } from "lucide-react";
 import { useT } from "@/lib/i18n";
 import PricingModal from "./PricingModal";
@@ -15,7 +15,20 @@ interface QuotaInfo {
 
 interface BillingMeInfo {
     plan: string;
+    planName?: string;
+    price?: number;
     quota: QuotaInfo;
+    primarySubscription?: {
+        provider?: "paypal" | "stripe" | "legacy";
+        status?: string;
+        currentPeriodEnd?: string | null;
+    } | null;
+}
+
+function formatPlanName(planCode: string | undefined): string {
+    if (planCode === "enterprise") return "Enterprise";
+    if (planCode === "pro") return "Pro";
+    return "Free";
 }
 
 export default function QuotaBar({
@@ -26,7 +39,20 @@ export default function QuotaBar({
     const t = useT();
     const [quota, setQuota] = useState<QuotaInfo | null>(null);
     const [plan, setPlan] = useState<string>("free");
+    const [planName, setPlanName] = useState<string>("Free");
+    const [planPrice, setPlanPrice] = useState<number>(0);
+    const [primarySubscription, setPrimarySubscription] = useState<
+        BillingMeInfo["primarySubscription"]
+    >(null);
     const [showPricing, setShowPricing] = useState(false);
+
+    const openUpgrade = () => {
+        if (onUpgrade) {
+            onUpgrade();
+            return;
+        }
+        setShowPricing(true);
+    };
 
     useEffect(() => {
         let cancelled = false;
@@ -39,6 +65,11 @@ export default function QuotaBar({
                     if (!cancelled && data?.quota) {
                         setQuota(data.quota);
                         setPlan(data.plan || data.quota.plan || "free");
+                        setPlanName(
+                            data.planName || formatPlanName(data.plan || data.quota.plan || "free"),
+                        );
+                        setPlanPrice(typeof data.price === "number" ? data.price : 0);
+                        setPrimarySubscription(data.primarySubscription ?? null);
                         return;
                     }
                 }
@@ -53,6 +84,9 @@ export default function QuotaBar({
                 if (!cancelled && data) {
                     setQuota(data);
                     setPlan(data.plan || "free");
+                    setPlanName(formatPlanName(data.plan));
+                    setPlanPrice(0);
+                    setPrimarySubscription(null);
                 }
             } catch {
                 // noop
@@ -65,19 +99,75 @@ export default function QuotaBar({
         };
     }, []);
 
+    const renewalDate = useMemo(() => {
+        const value = primarySubscription?.currentPeriodEnd;
+        if (!value) return "";
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return "";
+        return date.toLocaleDateString();
+    }, [primarySubscription?.currentPeriodEnd]);
+
     if (!quota) return null;
+
+    const pct = quota.total > 0 ? Math.min(100, Math.round((quota.used / quota.total) * 100)) : 0;
+    const isLow = quota.total > 0 && quota.remaining <= 1;
+    const isEmpty = quota.total > 0 && quota.remaining === 0;
+
+    const subscriptionProvider = (() => {
+        const provider = primarySubscription?.provider;
+        if (provider === "paypal") return "PayPal";
+        if (provider === "stripe") return "Stripe";
+        if (provider === "legacy") return "Legacy";
+        return "No Provider";
+    })();
+
+    const subscriptionStatus = (() => {
+        const status = String(primarySubscription?.status || "").toLowerCase();
+        if (!status) return "Not Subscribed";
+        if (status === "active") return "Active";
+        if (status === "cancelled") return "Cancelled";
+        if (status === "suspended") return "Suspended";
+        if (status === "trialing") return "Trialing";
+        return status.charAt(0).toUpperCase() + status.slice(1);
+    })();
+
+    const subscriptionSummary = primarySubscription
+        ? renewalDate
+            ? `${subscriptionProvider} · ${subscriptionStatus} · Renews ${renewalDate}`
+            : `${subscriptionProvider} · ${subscriptionStatus}`
+        : "No active paid subscription";
+
+    const priceLabel = planPrice > 0 ? `$${planPrice}/mo` : "$0/mo";
 
     if (quota.total === -1) {
         return (
             <>
-                <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-gradient-to-r from-emerald-500/10 to-emerald-500/5 border border-emerald-500/20">
-                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center">
-                        <Crown className="w-4 h-4 text-white" />
+                <div className="space-y-2.5">
+                    <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-gradient-to-r from-emerald-500/10 to-emerald-500/5 border border-emerald-500/20">
+                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center">
+                            <Crown className="w-4 h-4 text-white" />
+                        </div>
+                        <div>
+                            <span className="text-xs font-bold text-emerald-400">{t("quota.unlimited")}</span>
+                            <p className="text-[10px] text-emerald-500/60">Premium Plan</p>
+                        </div>
                     </div>
-                    <div>
-                        <span className="text-xs font-bold text-emerald-400">{t("quota.unlimited")}</span>
-                        <p className="text-[10px] text-emerald-500/60">Premium Plan</p>
+
+                    <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-2">
+                        <div className="flex items-center justify-between text-[11px]">
+                            <span className="font-semibold text-gray-200">{planName}</span>
+                            <span className="text-gray-400">{priceLabel}</span>
+                        </div>
+                        <p className="mt-1 text-[10px] text-gray-500">{subscriptionSummary}</p>
                     </div>
+
+                    <button
+                        onClick={openUpgrade}
+                        className="w-full group flex items-center justify-center gap-2 py-2 rounded-xl border border-white/[0.08] bg-white/[0.03] text-[11px] font-semibold text-gray-300 hover:bg-white/[0.06] hover:text-white transition-all duration-300 cursor-pointer"
+                    >
+                        <Sparkles className="w-3.5 h-3.5 text-[#E11D48]" />
+                        Manage Subscription
+                    </button>
                 </div>
                 <PricingModal
                     isOpen={showPricing}
@@ -89,17 +179,6 @@ export default function QuotaBar({
             </>
         );
     }
-
-    const pct = quota.total > 0 ? Math.min(100, Math.round((quota.used / quota.total) * 100)) : 0;
-    const isLow = quota.remaining <= 1;
-    const isEmpty = quota.remaining === 0;
-    const openUpgrade = () => {
-        if (onUpgrade) {
-            onUpgrade();
-            return;
-        }
-        setShowPricing(true);
-    };
 
     return (
         <>
@@ -157,24 +236,25 @@ export default function QuotaBar({
                     />
                 </div>
 
-                {isEmpty && (
-                    <button
-                        onClick={openUpgrade}
-                        className="w-full group flex items-center justify-center gap-2 py-2.5 rounded-xl bg-gradient-to-r from-[#E11D48]/10 to-purple-500/10 border border-[#E11D48]/20 text-xs font-semibold text-[#E11D48] hover:from-[#E11D48]/20 hover:to-purple-500/20 hover:border-[#E11D48]/40 transition-all duration-300 cursor-pointer"
-                    >
-                        <Sparkles className="w-3.5 h-3.5 group-hover:scale-110 transition-transform" />
-                        {t("quota.exhausted")}
-                    </button>
-                )}
-                {!isEmpty && plan === "free" && (
-                    <button
-                        onClick={openUpgrade}
-                        className="w-full group flex items-center justify-center gap-2 py-2 rounded-xl border border-white/[0.08] bg-white/[0.03] text-[11px] font-semibold text-gray-300 hover:bg-white/[0.06] hover:text-white transition-all duration-300 cursor-pointer"
-                    >
-                        <Sparkles className="w-3.5 h-3.5 text-[#E11D48]" />
-                        Upgrade
-                    </button>
-                )}
+                <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-2">
+                    <div className="flex items-center justify-between text-[11px]">
+                        <span className="font-semibold text-gray-200">{planName}</span>
+                        <span className="text-gray-400">{priceLabel}</span>
+                    </div>
+                    <p className="mt-1 text-[10px] text-gray-500">{subscriptionSummary}</p>
+                </div>
+
+                <button
+                    onClick={openUpgrade}
+                    className={`w-full group flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-semibold transition-all duration-300 cursor-pointer ${
+                        isEmpty
+                            ? "bg-gradient-to-r from-[#E11D48]/10 to-purple-500/10 border border-[#E11D48]/20 text-[#E11D48] hover:from-[#E11D48]/20 hover:to-purple-500/20 hover:border-[#E11D48]/40"
+                            : "border border-white/[0.08] bg-white/[0.03] text-gray-300 hover:bg-white/[0.06] hover:text-white"
+                    }`}
+                >
+                    <Sparkles className="w-3.5 h-3.5 text-[#E11D48] group-hover:scale-110 transition-transform" />
+                    {isEmpty ? t("quota.exhausted") : plan === "free" ? "View Pricing" : "Manage Subscription"}
+                </button>
             </div>
             <PricingModal
                 isOpen={showPricing}

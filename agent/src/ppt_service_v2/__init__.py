@@ -8,9 +8,13 @@ import logging
 import os
 import re
 import subprocess
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
+from urllib.parse import unquote, urlparse
+
+import httpx
 
 from src.minimax_exporter import export_minimax_pptx
 from src.schemas.ppt import (
@@ -374,6 +378,7 @@ class PPTService:
         self.repo_root = Path(__file__).resolve().parents[3]
         self.output_base = self.repo_root / "output" / "ppt_master_projects"
         self.output_base.mkdir(parents=True, exist_ok=True)
+        self._render_jobs: Dict[str, Dict[str, Any]] = {}
 
     def _real_flow_enabled(self) -> bool:
         if not _env_flag("PPT_V2_REAL_FLOW_ENABLED", True):
@@ -604,17 +609,185 @@ class PPTService:
         _ = language, enhance_narration, generate_tts, voice_style
         return slides
 
-    async def start_video_render(self, slides: List[Dict[str, Any]], config: VideoRenderConfig) -> RenderJob:
-        _ = slides, config
-        raise RuntimeError("video_render_removed_from_prompt_direct_flow")
+    async def _read_binary_source(self, source: str) -> bytes:
+        ref = _text(source)
+        if not ref:
+            raise ValueError("empty media source")
+
+        if ref.startswith("http://") or ref.startswith("https://"):
+            async with httpx.AsyncClient(timeout=180) as client:
+                response = await client.get(ref)
+                response.raise_for_status()
+                return bytes(response.content)
+
+        local_path = ref
+        if ref.startswith("file://"):
+            parsed = urlparse(ref)
+            local_path = unquote(parsed.path or "")
+            if local_path.startswith("/") and len(local_path) >= 3 and local_path[2] == ":":
+                local_path = local_path.lstrip("/")
+        path = Path(local_path)
+        if not path.exists() or not path.is_file():
+            raise FileNotFoundError(f"source not found: {ref}")
+        return path.read_bytes()
+
+    async def _estimate_audio_duration_secs(self, source: str, fallback: float) -> float:
+        ref = _text(source)
+        if not ref:
+            return max(2.0, float(fallback))
+        try:
+            from src.tts_synthesizer import _get_audio_duration
+
+            audio_bytes = await self._read_binary_source(ref)
+            duration = float(await _get_audio_duration(audio_bytes))
+            if duration > 0:
+                return max(2.0, duration + 0.4)
+        except Exception as exc:
+            logger.warning("estimate audio duration failed (%s): %s", ref, exc)
+        return max(2.0, float(fallback))
+
+    async def _build_video_slides_from_pptx(
+        self,
+        *,
+        pptx_url: str,
+        audio_urls: List[str],
+        default_duration: float,
+    ) -> List[Dict[str, Any]]:
+        from src.pptx_rasterizer import rasterize_pptx_bytes_to_png_bytes
+        from src.r2 import upload_bytes_to_r2
+
+        pptx_bytes = await self._read_binary_source(pptx_url)
+        png_bytes_list = await asyncio.to_thread(rasterize_pptx_bytes_to_png_bytes, pptx_bytes)
+        if not png_bytes_list:
+            raise RuntimeError("pptx_rasterization_failed")
+
+        run_id = uuid.uuid4().hex[:12]
+        slides: List[Dict[str, Any]] = []
+        for idx, png_bytes in enumerate(png_bytes_list):
+            image_url = await upload_bytes_to_r2(
+                png_bytes,
+                key=f"projects/ppt-render/{run_id}/slides/slide_{idx + 1:03d}.png",
+                content_type="image/png",
+            )
+            duration = max(2.0, float(default_duration))
+            item: Dict[str, Any] = {"imageUrl": image_url, "duration": duration}
+            if idx < len(audio_urls):
+                audio_url = _text(audio_urls[idx])
+                if audio_url:
+                    item["audioUrl"] = audio_url
+                    item["duration"] = await self._estimate_audio_duration_secs(
+                        audio_url, duration
+                    )
+            slides.append(item)
+        return slides
+
+    async def start_video_render(
+        self,
+        slides: List[Dict[str, Any]],
+        config: VideoRenderConfig,
+        *,
+        pptx_url: Optional[str] = None,
+        audio_urls: Optional[List[str]] = None,
+    ) -> RenderJob:
+        from src.lambda_renderer import start_render
+
+        normalized_slides = [dict(item) for item in (slides or []) if isinstance(item, dict)]
+        source_type = "slides"
+        if _text(pptx_url):
+            source_type = "pptx"
+            normalized_slides = await self._build_video_slides_from_pptx(
+                pptx_url=_text(pptx_url),
+                audio_urls=[_text(item) for item in (audio_urls or []) if _text(item)],
+                default_duration=6.0,
+            )
+        if not normalized_slides:
+            raise RuntimeError("video_render_requires_valid_media_slides")
+
+        render_config = (
+            config.model_dump(mode="json")
+            if hasattr(config, "model_dump")
+            else dict(config or {})
+        )
+        prefer_local = _env_flag("PPT_RENDER_PREFER_LOCAL", True)
+        started_at = _utc_now()
+        result = await start_render(
+            normalized_slides,
+            render_config,
+            prefer_local=prefer_local,
+        )
+        job_id = _text(result.get("render_id"), f"render_{_new_id()}")
+        output_url = _text(result.get("video_url"))
+        status = "done" if output_url else "rendering"
+
+        job = RenderJob(
+            id=job_id,
+            project_id="",
+            status=status,
+            progress=1.0 if status == "done" else 0.1,
+            lambda_job_id=job_id,
+            output_url=output_url or None,
+            error=None,
+            created_at=started_at,
+            updated_at=_utc_now(),
+        )
+        self._render_jobs[job_id] = {
+            **job.model_dump(mode="json"),
+            "mode": _text(result.get("mode"), "local"),
+            "cost": float(result.get("cost") or 0.0),
+            "source_type": source_type,
+            "slides_count": len(normalized_slides),
+        }
+        return job
 
     async def get_render_status(self, job_id: str) -> Dict[str, Any]:
-        _ = job_id
-        return {"status": "not_found"}
+        from src.lambda_renderer import get_render_progress
+
+        key = _text(job_id)
+        if not key:
+            return {"status": "not_found"}
+        cached = dict(self._render_jobs.get(key) or {})
+        if cached.get("status") in {"done", "failed"}:
+            return cached
+
+        progress = await get_render_progress(key)
+        raw_status = _text(progress.get("status"), "unknown").lower()
+        output_url = _text(progress.get("output_url")) or _text(cached.get("output_url"))
+
+        if raw_status in {"done", "completed", "succeeded", "success"}:
+            status = "done"
+            progress_value = 1.0
+        elif raw_status in {"failed", "error", "invalid"}:
+            status = "failed"
+            progress_value = float(progress.get("progress") or cached.get("progress") or 0.0)
+        elif raw_status in {"unknown", "not_found"} and not cached:
+            return {"status": "not_found"}
+        else:
+            status = "rendering"
+            progress_value = float(progress.get("progress") or cached.get("progress") or 0.1)
+
+        merged = {
+            **cached,
+            "id": key,
+            "lambda_job_id": _text(cached.get("lambda_job_id"), key),
+            "status": status,
+            "progress": max(0.0, min(1.0, progress_value)),
+            "output_url": output_url or None,
+            "error": _text(progress.get("error")) or _text(cached.get("error")) or None,
+            "updated_at": _utc_now(),
+        }
+        if not merged.get("created_at"):
+            merged["created_at"] = _utc_now()
+        self._render_jobs[key] = merged
+        return merged
 
     async def get_download_url(self, job_id: str) -> Dict[str, Any]:
-        _ = job_id
-        raise LookupError("job not found")
+        status = await self.get_render_status(job_id)
+        if status.get("status") == "not_found":
+            raise LookupError("job not found")
+        output_url = _text(status.get("output_url"))
+        if not output_url:
+            raise RuntimeError("render output not ready")
+        return {"job_id": _text(job_id), "output_url": output_url}
 
     async def generate_research_context(self, req: ResearchRequest) -> ResearchContext:
         topic = _text(req.topic)

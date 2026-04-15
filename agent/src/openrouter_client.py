@@ -1,6 +1,7 @@
 ﻿import json
 import logging
 import os
+import time
 from typing import Any, Dict, List, Optional, Tuple
 
 import httpx
@@ -16,6 +17,7 @@ _DEFAULT_OPENROUTER_FALLBACK_MODEL = os.getenv(
     ),
 )
 _FAILOVER_STATUS_CODES = {401, 403, 404, 408, 409, 425, 429, 500, 502, 503, 504}
+_PROVIDER_CYCLE: Tuple[str, str, str] = ("aiberm", "crazyroute", "openrouter")
 _AIBERM_LIKE_MODEL_ALIASES: Dict[str, str] = {
     "anthropic/claude-sonnet-4.6": "claude-sonnet-4-6",
     "anthropic/claude-sonnet-4.5": "claude-sonnet-4-5",
@@ -43,6 +45,12 @@ class OpenRouterError(RuntimeError):
 
 
 class OpenRouterClient:
+    _runtime_state: Dict[str, Any] = {
+        "last_success_provider": None,
+        "round_robin_cursor": 0,
+        "providers": {},
+    }
+
     def __init__(
         self,
         api_base: Optional[str] = None,
@@ -59,11 +67,207 @@ class OpenRouterClient:
         https_proxy = os.getenv("OPENROUTER_HTTPS_PROXY") or os.getenv("HTTPS_PROXY")
         self.proxy: Optional[str] = proxy or https_proxy or http_proxy
 
+        self._failure_threshold = max(
+            1, int(str(os.getenv("LLM_PROVIDER_FAILURE_THRESHOLD", "2")).strip() or "2")
+        )
+        self._cooldown_seconds = max(
+            1, int(str(os.getenv("LLM_PROVIDER_COOLDOWN_SECONDS", "90")).strip() or "90")
+        )
+
         self._endpoints = self._build_endpoints(api_base=api_base, api_key=api_key)
+        self._endpoint_by_provider: Dict[str, Dict[str, str]] = {
+            endpoint["provider"]: endpoint
+            for endpoint in self._endpoints
+            if endpoint.get("provider") in _PROVIDER_CYCLE
+        }
+        self._extra_endpoints: List[Dict[str, str]] = [
+            endpoint for endpoint in self._endpoints if endpoint.get("provider") not in _PROVIDER_CYCLE
+        ]
         self.api_base = self._endpoints[0]["base"]
         self.api_key = self._endpoints[0]["key"]
         self._global_model_aliases = self._load_aliases_from_env("LLM_MODEL_ALIAS_MAP_JSON")
         self._provider_model_aliases = self._build_provider_alias_maps()
+        self._ensure_provider_runtime_slots()
+
+    @classmethod
+    def _reset_runtime_state_for_tests(cls) -> None:
+        cls._runtime_state = {
+            "last_success_provider": None,
+            "round_robin_cursor": 0,
+            "providers": {},
+        }
+
+    @staticmethod
+    def _now() -> float:
+        return time.monotonic()
+
+    @staticmethod
+    def _is_provider_cycle_member(provider: str) -> bool:
+        return provider in _PROVIDER_CYCLE
+
+    def _ensure_provider_runtime_slots(self) -> None:
+        providers_state = self.__class__._runtime_state.setdefault("providers", {})
+        for provider in _PROVIDER_CYCLE:
+            providers_state.setdefault(
+                provider,
+                {
+                    "state": "closed",  # closed | open
+                    "consecutive_failures": 0,
+                    "cooldown_until": 0.0,
+                    "probe_pending": False,
+                },
+            )
+
+    def _provider_runtime(self, provider: str) -> Dict[str, Any]:
+        self._ensure_provider_runtime_slots()
+        providers_state = self.__class__._runtime_state["providers"]
+        return providers_state[provider]
+
+    def _mark_provider_success(self, provider: str) -> None:
+        if not self._is_provider_cycle_member(provider):
+            return
+        state = self._provider_runtime(provider)
+        state["state"] = "closed"
+        state["consecutive_failures"] = 0
+        state["cooldown_until"] = 0.0
+        state["probe_pending"] = False
+        self.__class__._runtime_state["last_success_provider"] = provider
+        logger.info("[OpenRouterClient] provider %s marked healthy (last-success updated)", provider)
+
+    def _mark_provider_failure(self, provider: str, detail: str = "") -> None:
+        if not self._is_provider_cycle_member(provider):
+            return
+        state = self._provider_runtime(provider)
+        now = self._now()
+        if state.get("state") == "open":
+            state["cooldown_until"] = now + float(self._cooldown_seconds)
+            state["consecutive_failures"] = max(
+                int(state.get("consecutive_failures", 0)),
+                self._failure_threshold,
+            )
+            state["probe_pending"] = True
+            logger.warning(
+                "[OpenRouterClient] provider %s probe failed, extend cooldown %.1fs detail=%s",
+                provider,
+                float(self._cooldown_seconds),
+                detail,
+            )
+            return
+
+        failures = int(state.get("consecutive_failures", 0)) + 1
+        state["consecutive_failures"] = failures
+        if failures >= self._failure_threshold:
+            state["state"] = "open"
+            state["cooldown_until"] = now + float(self._cooldown_seconds)
+            state["probe_pending"] = True
+            logger.warning(
+                "[OpenRouterClient] provider %s circuit opened after %s failures, cooldown %.1fs detail=%s",
+                provider,
+                failures,
+                float(self._cooldown_seconds),
+                detail,
+            )
+        else:
+            logger.warning(
+                "[OpenRouterClient] provider %s failure %s/%s detail=%s",
+                provider,
+                failures,
+                self._failure_threshold,
+                detail,
+            )
+
+    def _provider_in_cooldown(self, provider: str, now: Optional[float] = None) -> bool:
+        if not self._is_provider_cycle_member(provider):
+            return False
+        state = self._provider_runtime(provider)
+        if state.get("state") != "open":
+            return False
+        check_ts = self._now() if now is None else now
+        return check_ts < float(state.get("cooldown_until", 0.0))
+
+    def _provider_probe_ready(self, provider: str, now: Optional[float] = None) -> bool:
+        if not self._is_provider_cycle_member(provider):
+            return False
+        state = self._provider_runtime(provider)
+        if state.get("state") != "open":
+            return False
+        check_ts = self._now() if now is None else now
+        return check_ts >= float(state.get("cooldown_until", 0.0)) and bool(
+            state.get("probe_pending", False)
+        )
+
+    def _ordered_endpoints_for_request(self) -> List[Dict[str, Any]]:
+        now = self._now()
+        cursor = int(self.__class__._runtime_state.get("round_robin_cursor", 0)) % len(_PROVIDER_CYCLE)
+        cycle = list(_PROVIDER_CYCLE[cursor:]) + list(_PROVIDER_CYCLE[:cursor])
+        self.__class__._runtime_state["round_robin_cursor"] = (cursor + 1) % len(_PROVIDER_CYCLE)
+
+        healthy: Dict[str, Dict[str, str]] = {}
+        probe_ready: Dict[str, Dict[str, str]] = {}
+        for provider in cycle:
+            endpoint = self._endpoint_by_provider.get(provider)
+            if not endpoint:
+                continue
+            if self._provider_in_cooldown(provider, now=now):
+                continue
+            if self._provider_probe_ready(provider, now=now):
+                probe_ready[provider] = endpoint
+                continue
+            healthy[provider] = endpoint
+
+        ordered: List[Dict[str, Any]] = []
+        used: set[str] = set()
+        for provider in cycle:
+            endpoint = probe_ready.get(provider)
+            if not endpoint:
+                continue
+            row = dict(endpoint)
+            row["attempt_mode"] = "recovery_probe"
+            ordered.append(row)
+            used.add(provider)
+            state = self._provider_runtime(provider)
+            state["probe_pending"] = False
+            break
+
+        last_success = self.__class__._runtime_state.get("last_success_provider")
+        if (
+            isinstance(last_success, str)
+            and last_success in healthy
+            and last_success not in used
+        ):
+            endpoint = dict(healthy[last_success])
+            endpoint["attempt_mode"] = "last_success"
+            ordered.append(endpoint)
+            used.add(last_success)
+
+        for provider in cycle:
+            if provider in used:
+                continue
+            endpoint = healthy.get(provider)
+            if not endpoint:
+                continue
+            row = dict(endpoint)
+            row["attempt_mode"] = "round_robin"
+            ordered.append(row)
+            used.add(provider)
+
+        if not ordered:
+            # All providers are cooling down. Force one probe to avoid total outage.
+            for provider in cycle:
+                endpoint = self._endpoint_by_provider.get(provider)
+                if not endpoint:
+                    continue
+                row = dict(endpoint)
+                row["attempt_mode"] = "forced_probe"
+                ordered.append(row)
+                break
+
+        for endpoint in self._extra_endpoints:
+            row = dict(endpoint)
+            row["attempt_mode"] = "extra_fallback"
+            ordered.append(row)
+
+        return ordered
 
     @staticmethod
     def _load_aliases_from_env(env_name: str) -> Dict[str, str]:
@@ -182,8 +386,7 @@ class OpenRouterClient:
         aiberm_key = os.getenv("AIBERM_API_KEY")
         crazyroute_key = os.getenv("CRAZYROUTE_API_KEY") or os.getenv("CRAZYROUTER_API_KEY")
 
-        def _pick_key_for_base(base: str) -> Optional[str]:
-            provider = self._provider_from_base(base)
+        def _pick_key_for_provider(provider: str) -> Optional[str]:
             if provider == "aiberm":
                 return aiberm_key or crazyroute_key or openrouter_key
             if provider == "crazyroute":
@@ -192,57 +395,93 @@ class OpenRouterClient:
                 return openrouter_key or aiberm_key or crazyroute_key
             return openrouter_key or aiberm_key or crazyroute_key
 
-        primary_key = api_key or _pick_key_for_base(primary_base)
-        if not primary_key:
+        default_any_key = openrouter_key or aiberm_key or crazyroute_key
+        if not (api_key or default_any_key):
             raise OpenRouterError(
                 "missing OPENROUTER_API_KEY/LLM_API_KEY or AIBERM_API_KEY or CRAZYROUTE_API_KEY"
             )
 
-        provider_cycle = ["aiberm", "crazyroute", "openrouter"]
-        provider_bases = {
+        provider_bases: Dict[str, str] = {
             "aiberm": aiberm_base,
             "crazyroute": crazyroute_base,
             "openrouter": openrouter_base,
         }
+        provider_keys: Dict[str, Optional[str]] = {
+            provider: _pick_key_for_provider(provider)
+            for provider in _PROVIDER_CYCLE
+        }
+
         primary_provider = self._provider_from_base(primary_base)
+        extra_endpoints: List[Dict[str, str]] = []
+        if primary_provider in _PROVIDER_CYCLE:
+            provider_bases[primary_provider] = primary_base
+            if api_key:
+                provider_keys[primary_provider] = api_key
+        elif primary_base:
+            extra_endpoints.append(
+                {
+                    "name": "primary_custom",
+                    "provider": "default",
+                    "base": primary_base,
+                    "key": api_key or default_any_key or "",
+                }
+            )
 
-        def _rotated_cycle(start_provider: str) -> List[str]:
-            if start_provider not in provider_cycle:
-                return list(provider_cycle)
-            idx = provider_cycle.index(start_provider)
-            return provider_cycle[idx:] + provider_cycle[:idx]
-
-        ordered_bases: List[str] = []
-        seen_bases: set[str] = set()
-
-        def _push_base(base: str) -> None:
-            normalized = self._normalize_base(base)
-            if not normalized or normalized in seen_bases:
-                return
-            seen_bases.add(normalized)
-            ordered_bases.append(normalized)
-
-        _push_base(primary_base)
         explicit_fallback_base = self._normalize_base(os.getenv("OPENROUTER_FALLBACK_API_BASE"))
-        for provider in _rotated_cycle(primary_provider):
-            _push_base(provider_bases.get(provider, ""))
-        if explicit_fallback_base:
-            _push_base(explicit_fallback_base)
-
         explicit_fallback_key = os.getenv("OPENROUTER_FALLBACK_API_KEY")
-        endpoints: List[Dict[str, str]] = []
-        for idx, base in enumerate(ordered_bases):
-            name = "primary" if idx == 0 else ("provider_fallback" if idx == 1 else f"provider_fallback_{idx}")
-            key: Optional[str]
-            if idx == 0:
-                key = primary_key
-            elif explicit_fallback_base and base == explicit_fallback_base and explicit_fallback_key:
-                key = explicit_fallback_key
+        if explicit_fallback_base:
+            fallback_provider = self._provider_from_base(explicit_fallback_base)
+            if fallback_provider in _PROVIDER_CYCLE:
+                provider_bases[fallback_provider] = explicit_fallback_base
+                if explicit_fallback_key:
+                    provider_keys[fallback_provider] = explicit_fallback_key
             else:
-                key = _pick_key_for_base(base) or primary_key
-            if key:
-                endpoints.append({"name": name, "base": base, "key": key})
+                extra_endpoints.append(
+                    {
+                        "name": "explicit_fallback",
+                        "provider": "default",
+                        "base": explicit_fallback_base,
+                        "key": explicit_fallback_key or default_any_key or "",
+                    }
+                )
+
+        endpoints: List[Dict[str, str]] = []
+        for provider in _PROVIDER_CYCLE:
+            base = self._normalize_base(provider_bases.get(provider, ""))
+            key = (provider_keys.get(provider) or default_any_key or "").strip()
+            if not base or not key:
+                continue
+            endpoints.append(
+                {
+                    "name": provider,
+                    "provider": provider,
+                    "base": base,
+                    "key": key,
+                }
+            )
+
+        seen_bases = {endpoint["base"] for endpoint in endpoints}
+        for endpoint in extra_endpoints:
+            base = self._normalize_base(endpoint.get("base", ""))
+            key = str(endpoint.get("key", "") or "").strip()
+            if not base or not key or base in seen_bases:
+                continue
+            seen_bases.add(base)
+            endpoints.append(
+                {
+                    "name": endpoint.get("name", "extra_fallback"),
+                    "provider": endpoint.get("provider", "default"),
+                    "base": base,
+                    "key": key,
+                }
+            )
+
+        if not endpoints:
+            raise OpenRouterError(
+                "No LLM endpoints configured. Set AIBERM_API_BASE/KEY, CRAZYROUTE_API_BASE/KEY, or OPENROUTER_API_KEY."
+            )
         return endpoints
+
     def _headers(self, *, api_base: str, api_key: str) -> Dict[str, str]:
         headers = {
             "Authorization": f"Bearer {api_key}",
@@ -455,11 +694,14 @@ class OpenRouterClient:
 
     async def _post_chat_json(self, request_payload: Dict[str, Any]) -> Dict[str, Any]:
         attempt_errors: List[str] = []
+        request_endpoints = self._ordered_endpoints_for_request()
         async with httpx.AsyncClient(timeout=60, proxy=self.proxy) as client:
-            for idx, endpoint in enumerate(self._endpoints):
+            for idx, endpoint in enumerate(request_endpoints):
                 api_base = endpoint["base"]
                 api_key = endpoint["key"]
-                endpoint_name = endpoint.get("name") or f"endpoint-{idx + 1}"
+                provider = endpoint.get("provider") or self._provider_from_base(api_base)
+                attempt_mode = endpoint.get("attempt_mode") or "fallback"
+                endpoint_name = f"{provider}:{attempt_mode}" if provider else (endpoint.get("name") or f"endpoint-{idx + 1}")
                 effective_payload = dict(request_payload)
                 effective_payload["model"] = self._resolve_model_for_endpoint(
                     requested_model=str(request_payload.get("model") or ""),
@@ -491,6 +733,7 @@ class OpenRouterClient:
                             payload=effective_payload,
                         )
                         if stream_data is not None:
+                            self._mark_provider_success(str(provider))
                             logger.info(
                                 "[OpenRouterClient] stream fallback succeeded on %s after transport error",
                                 endpoint_name,
@@ -499,7 +742,8 @@ class OpenRouterClient:
                         if stream_error:
                             attempt_errors.append(stream_error)
                             logger.warning("[OpenRouterClient] %s", stream_error)
-                    if idx < len(self._endpoints) - 1:
+                    self._mark_provider_failure(str(provider), detail=error_msg)
+                    if idx < len(request_endpoints) - 1:
                         logger.warning("[OpenRouterClient] switching to fallback endpoint after transport error")
                         continue
                     if len(attempt_errors) > 1:
@@ -513,12 +757,13 @@ class OpenRouterClient:
                     error_text = response.text[:1000]
                     error_msg = f"{endpoint_name} HTTP {response.status_code}: {error_text}"
                     attempt_errors.append(error_msg)
+                    self._mark_provider_failure(str(provider), detail=error_msg)
                     logger.error("[OpenRouterClient] %s", error_msg)
-                    if idx < len(self._endpoints) - 1 and self._is_failover_status(response.status_code, error_text):
+                    if idx < len(request_endpoints) - 1 and self._is_failover_status(response.status_code, error_text):
                         logger.warning(
                             "[OpenRouterClient] switching to fallback endpoint (%s -> %s)",
                             endpoint_name,
-                            self._endpoints[idx + 1].get("name", "fallback"),
+                            request_endpoints[idx + 1].get("name", "fallback"),
                         )
                         continue
                     if len(attempt_errors) > 1:
@@ -531,8 +776,9 @@ class OpenRouterClient:
                     raw_text = response.text[:2000]
                     error_msg = f"{endpoint_name} invalid JSON response: {exc}; raw={raw_text}"
                     attempt_errors.append(error_msg)
+                    self._mark_provider_failure(str(provider), detail=error_msg)
                     logger.error("[OpenRouterClient] %s", error_msg)
-                    if idx < len(self._endpoints) - 1:
+                    if idx < len(request_endpoints) - 1:
                         logger.warning("[OpenRouterClient] switching to fallback endpoint after invalid JSON")
                         continue
                     if len(attempt_errors) > 1:
@@ -552,6 +798,7 @@ class OpenRouterClient:
                             payload=effective_payload,
                         )
                         if stream_data is not None:
+                            self._mark_provider_success(str(provider))
                             logger.info(
                                 "[OpenRouterClient] stream fallback succeeded on %s",
                                 endpoint_name,
@@ -560,17 +807,19 @@ class OpenRouterClient:
                         if stream_error:
                             attempt_errors.append(stream_error)
                             logger.warning("[OpenRouterClient] %s", stream_error)
-                    if idx < len(self._endpoints) - 1:
+                    self._mark_provider_failure(str(provider), detail=error_msg)
+                    if idx < len(request_endpoints) - 1:
                         logger.warning(
                             "[OpenRouterClient] switching to fallback endpoint (%s -> %s) after empty content",
                             endpoint_name,
-                            self._endpoints[idx + 1].get("name", "fallback"),
+                            request_endpoints[idx + 1].get("name", "fallback"),
                         )
                         continue
                     if len(attempt_errors) > 1:
                         raise OpenRouterError(f"All LLM endpoints failed: {' | '.join(attempt_errors)}")
                     raise OpenRouterError(error_msg)
 
+                self._mark_provider_success(str(provider))
                 return data
 
         raise OpenRouterError(f"All LLM endpoints failed: {' | '.join(attempt_errors)}")

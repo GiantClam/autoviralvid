@@ -242,13 +242,19 @@ class VideoRenderRequest(BaseModel):
     # If we use `SlideContent | Dict[...]`, pydantic may partially coerce
     # some semantic slides into SlideContent and drop `markdown`, causing
     # "undefined" frames during Marp rendering.
-    slides: List[Dict[str, Any]] = Field(..., min_length=1, max_length=50)
+    slides: Optional[List[Dict[str, Any]]] = Field(default=None, min_length=1, max_length=50)
+    pptx_url: Optional[str] = Field(default=None, max_length=4096)
+    audio_urls: List[str] = Field(default_factory=list, max_length=50)
     config: VideoRenderConfig = Field(default_factory=VideoRenderConfig)
     idempotency_key: Optional[str] = Field(default=None, max_length=64)
 
     @field_validator("slides")
     @classmethod
-    def validate_render_slides(cls, value: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def validate_render_slides(
+        cls, value: Optional[List[Dict[str, Any]]]
+    ) -> Optional[List[Dict[str, Any]]]:
+        if value is None:
+            return None
         for idx, slide in enumerate(value):
             if not isinstance(slide, dict):
                 raise ValueError(f"slides[{idx}] must be an object")
@@ -264,6 +270,49 @@ class VideoRenderRequest(BaseModel):
                     f"slides[{idx}] must contain markdown (semantic), elements (layout), or imageUrl (ppt image)"
                 )
         return value
+
+    @field_validator("pptx_url")
+    @classmethod
+    def validate_pptx_url(cls, value: Optional[str]) -> Optional[str]:
+        text = str(value or "").strip()
+        if not text:
+            return None
+        if text.startswith("http://") or text.startswith("https://") or text.startswith("file://"):
+            return text
+        # Allow local absolute paths for internal/local render workers.
+        if ":" in text or text.startswith("/") or text.startswith("\\"):
+            return text
+        raise ValueError("pptx_url must be http(s), file://, or a local absolute path")
+
+    @field_validator("audio_urls")
+    @classmethod
+    def validate_audio_urls(cls, value: List[str]) -> List[str]:
+        out: List[str] = []
+        for idx, item in enumerate(value or []):
+            url = str(item or "").strip()
+            if not url:
+                continue
+            if (
+                not url.startswith("http://")
+                and not url.startswith("https://")
+                and not url.startswith("file://")
+                and ":" not in url
+                and not url.startswith("/")
+                and not url.startswith("\\")
+            ):
+                raise ValueError(f"audio_urls[{idx}] must be http(s), file://, or a local absolute path")
+            out.append(url)
+            if len(out) >= 50:
+                break
+        return out
+
+    @model_validator(mode="after")
+    def validate_render_source(self) -> "VideoRenderRequest":
+        has_slides = bool(self.slides)
+        has_pptx = bool(str(self.pptx_url or "").strip())
+        if not (has_slides or has_pptx):
+            raise ValueError("render request requires either slides or pptx_url")
+        return self
 
 
 class ApiResponse(BaseModel):

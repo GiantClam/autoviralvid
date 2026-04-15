@@ -223,6 +223,71 @@ def _sanitize_svg_markup(svg_markup: str) -> str:
     return text
 
 
+def _extract_svg_document(svg_markup: str) -> str:
+    text = _text(svg_markup, "")
+    if not text:
+        return ""
+    start = re.search(r"(?is)<svg\b", text)
+    if not start:
+        return ""
+    candidate = text[start.start() :]
+    end = re.search(r"(?is)</svg\s*>", candidate)
+    if end:
+        candidate = candidate[: end.end()]
+    else:
+        candidate = candidate.rstrip() + "\n</svg>"
+    return _text(candidate, "")
+
+
+def _is_valid_xml(xml_markup: str) -> bool:
+    xml_text = _text(xml_markup, "")
+    if not xml_text:
+        return False
+    try:
+        ET.fromstring(xml_text)
+        return True
+    except Exception:
+        return False
+
+
+def _repair_svg_xml_with_llm(
+    *,
+    invalid_svg: str,
+    page_no: int,
+    timeout_sec: int,
+) -> str:
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "You are an XML repair engine.\n"
+                "Fix malformed SVG XML and return ONLY one complete valid <svg>...</svg> document.\n"
+                "Do not use markdown fences.\n"
+                "Do not explain anything."
+            ),
+        },
+        {
+            "role": "user",
+            "content": (
+                f"Page: {page_no}\n"
+                "Repair this SVG so it becomes valid XML while preserving original visual intent:\n\n"
+                f"{_text(invalid_svg, '')[:120000]}"
+            ),
+        },
+    ]
+    repaired_raw = _call_chat_text(
+        messages=messages,
+        max_tokens=12000,
+        timeout_sec=max(30, min(timeout_sec, 600)),
+        temperature=0.0,
+    )
+    # Some models may still wrap inside fences.
+    fenced = _strip_code_fence(repaired_raw, "svg")
+    candidate = fenced or repaired_raw
+    candidate = _extract_svg_document(candidate)
+    return _sanitize_svg_markup(candidate)
+
+
 def _build_strategist_confirmations(
     *,
     strategist_doc: str,
@@ -991,7 +1056,7 @@ def run_native_pipeline(
             encoding="utf-8",
         )
         svg_markup, speaker_notes = _parse_executor_output(llm_raw)
-        svg_markup = _sanitize_svg_markup(svg_markup)
+        svg_markup = _sanitize_svg_markup(_extract_svg_document(svg_markup) or svg_markup)
         used_fallback_svg = False
         if "<svg" not in _text(svg_markup, "").lower():
             llm_raw_retry = _executor_render_page(
@@ -1016,9 +1081,11 @@ def run_native_pipeline(
                 encoding="utf-8",
             )
             svg_markup, speaker_notes = _parse_executor_output(llm_raw_retry)
-            svg_markup = _sanitize_svg_markup(svg_markup)
+            svg_markup = _sanitize_svg_markup(_extract_svg_document(svg_markup) or svg_markup)
             if "<svg" not in _text(svg_markup, "").lower():
-                fallback_svg = _sanitize_svg_markup(template_svg_text)
+                fallback_svg = _sanitize_svg_markup(
+                    _extract_svg_document(template_svg_text) or template_svg_text
+                )
                 if "<svg" in _text(fallback_svg, "").lower():
                     svg_markup = fallback_svg
                     speaker_notes = (
@@ -1033,10 +1100,53 @@ def run_native_pipeline(
                     )
                 else:
                     raise RuntimeError(f"llm_stage_failed:executor_svg_page_{page_no}:missing_svg_root")
-        try:
-            ET.fromstring(svg_markup)
-        except Exception:
-            raise RuntimeError(f"llm_stage_failed:executor_svg_page_{page_no}:invalid_xml")
+        if not _is_valid_xml(svg_markup):
+            (debug_dir / f"page_{page_no:02d}_render_invalid_xml.txt").write_text(
+                _text(svg_markup, ""),
+                encoding="utf-8",
+            )
+            repaired_svg = ""
+            try:
+                repaired_svg = _repair_svg_xml_with_llm(
+                    invalid_svg=svg_markup,
+                    page_no=page_no,
+                    timeout_sec=max(30, min(timeout_sec, 600)),
+                )
+            except Exception as exc:
+                _record(
+                    f"step6_executor_page_{page_no}_xml_repair",
+                    True,
+                    f"repair_attempt_failed:{_text(exc, 'unknown')[:120]}",
+                )
+            if repaired_svg and _is_valid_xml(repaired_svg):
+                svg_markup = repaired_svg
+                (debug_dir / f"page_{page_no:02d}_render_xml_repaired.txt").write_text(
+                    svg_markup,
+                    encoding="utf-8",
+                )
+                _record(
+                    f"step6_executor_page_{page_no}_xml_repair",
+                    True,
+                    "repaired_by_llm",
+                )
+            else:
+                fallback_svg = _sanitize_svg_markup(
+                    _extract_svg_document(template_svg_text) or template_svg_text
+                )
+                if _is_valid_xml(fallback_svg):
+                    svg_markup = fallback_svg
+                    speaker_notes = (
+                        _text(speaker_notes, "").strip()
+                        or f"Fallback slide content for page {page_no} due to invalid SVG XML."
+                    )
+                    used_fallback_svg = True
+                    _record(
+                        f"step6_executor_page_{page_no}",
+                        True,
+                        "fallback_template_svg_used:invalid_xml",
+                    )
+                else:
+                    raise RuntimeError(f"llm_stage_failed:executor_svg_page_{page_no}:invalid_xml")
         if used_fallback_svg:
             _record(
                 f"step6_executor_page_{page_no}_xml",

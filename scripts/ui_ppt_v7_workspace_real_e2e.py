@@ -268,9 +268,19 @@ def submit_video_render(page: Page, run_id: str, image_urls: list[str]) -> str:
     return str(job_id)
 
 
-def submit_ppt_video_render(page: Page, run_id: str, video_slides: list[dict]) -> dict:
+def submit_ppt_video_render(
+    page: Page,
+    run_id: str,
+    pptx_url: str,
+    audio_urls: list[str] | None = None,
+) -> dict:
+    source = str(pptx_url or "").strip()
+    if not source:
+        raise RuntimeError("pptx_url is empty, cannot submit PPT render")
+    cleaned_audio_urls = [str(item).strip() for item in (audio_urls or []) if str(item).strip()]
     payload = {
-        "slides": video_slides,
+        "pptx_url": source,
+        "audio_urls": cleaned_audio_urls,
         "config": {
             "width": 1280,
             "height": 720,
@@ -519,25 +529,34 @@ def main() -> int:
                 json.dumps(export_payload, indent=2, ensure_ascii=False),
                 encoding="utf-8",
             )
-        video_slides = export_payload.get("video_slides") if isinstance(export_payload, dict) else None
+        pptx_url = ""
+        if isinstance(export_payload, dict):
+            pptx_url = str(export_payload.get("pptx_url") or "").strip()
+        if not pptx_url:
+            pptx_url = str(href2 or "").strip()
+        assert_true(bool(pptx_url), "Export payload missing pptx_url")
 
-        if isinstance(video_slides, list) and video_slides:
-            render_submit = submit_ppt_video_render(page, run2, video_slides)
-            render_job_id = str(render_submit.get("id"))
-            render_status = str(render_submit.get("status", "")).lower()
-            if render_status in ("done", "completed") and render_submit.get("output_url"):
-                render_payload = render_submit
-            else:
-                render_payload = wait_for_ppt_render_completion(page, render_job_id)
-            output_url = get_ppt_download_url(page, render_job_id, render_payload)
-            video_source = download_video(page, {"output_url": output_url}, video_path)
-            render_mode = "ppt_render_video_slides"
+        audio_urls: list[str] = []
+        if isinstance(export_payload, dict):
+            video_slides = export_payload.get("video_slides")
+            if isinstance(video_slides, list):
+                for row in video_slides:
+                    if not isinstance(row, dict):
+                        continue
+                    audio_url = str(row.get("audioUrl") or "").strip()
+                    if audio_url:
+                        audio_urls.append(audio_url)
+
+        render_submit = submit_ppt_video_render(page, run2, pptx_url, audio_urls)
+        render_job_id = str(render_submit.get("id"))
+        render_status = str(render_submit.get("status", "")).lower()
+        if render_status in ("done", "completed") and render_submit.get("output_url"):
+            render_payload = render_submit
         else:
-            image_urls = extract_slide_image_urls(page, run2)
-            render_job_id = submit_video_render(page, run2, image_urls)
-            render_payload = wait_for_render_completion(page, render_job_id)
-            video_source = download_video(page, render_payload, video_path)
-            render_mode = "legacy_image_track"
+            render_payload = wait_for_ppt_render_completion(page, render_job_id)
+        output_url = get_ppt_download_url(page, render_job_id, render_payload)
+        video_source = download_video(page, {"output_url": output_url}, video_path)
+        render_mode = "ppt_render_pptx"
 
         assert_true(video_path.exists() and video_path.stat().st_size > 0, "Video file was not downloaded")
         page.screenshot(path=str(OUTPUT_DIR / "03-video-render.png"), full_page=True)
@@ -555,7 +574,8 @@ def main() -> int:
                 "mode": render_mode,
                 "export_payload_run_id": export_payload.get("run_id") if isinstance(export_payload, dict) else None,
                 "export_payload_keys": sorted(list(export_payload.keys())) if isinstance(export_payload, dict) else [],
-                "export_payload_video_slides_count": len(video_slides) if isinstance(video_slides, list) else 0,
+                "render_input_pptx_url": pptx_url,
+                "render_input_audio_urls_count": len(audio_urls),
                 "source": video_source,
                 "downloaded_path": str(video_path),
                 "size_bytes": video_path.stat().st_size,

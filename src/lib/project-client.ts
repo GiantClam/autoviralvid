@@ -31,9 +31,15 @@ function getApiBase() {
 // ---------------------------------------------------------------------------
 let _cachedToken: string | null = null;
 let _tokenExpiresAt = 0; // ms since epoch
+let _tokenUnavailableUntil = 0; // ms since epoch
+const TOKEN_UNAVAILABLE_COOLDOWN_MS = 30_000;
 
 async function getApiToken(): Promise<string | null> {
   if (process.env.NEXT_PUBLIC_DISABLE_API_TOKEN === '1') {
+    return null;
+  }
+
+  if (Date.now() < _tokenUnavailableUntil) {
     return null;
   }
 
@@ -45,14 +51,17 @@ async function getApiToken(): Promise<string | null> {
   try {
     const res = await fetch('/api/auth/api-token', { method: 'POST' });
     if (!res.ok) {
-      // Not logged in or auth disabled — clear cache and proceed without token
       _cachedToken = null;
       _tokenExpiresAt = 0;
+      if (res.status === 401 || res.status === 403) {
+        _tokenUnavailableUntil = Date.now() + TOKEN_UNAVAILABLE_COOLDOWN_MS;
+      }
       return null;
     }
     const data = await res.json();
     _cachedToken = data.token ?? null;
     _tokenExpiresAt = Date.now() + (data.expires_in ?? 3600) * 1000;
+    _tokenUnavailableUntil = 0;
     return _cachedToken;
   } catch {
     // Network error / auth not available — proceed without token
@@ -66,6 +75,7 @@ async function getApiToken(): Promise<string | null> {
 export function clearApiToken() {
   _cachedToken = null;
   _tokenExpiresAt = 0;
+  _tokenUnavailableUntil = 0;
 }
 
 // ---------------------------------------------------------------------------

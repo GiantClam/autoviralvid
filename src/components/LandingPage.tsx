@@ -5,12 +5,68 @@ import {
     Play, ArrowRight, Menu, X, Sparkles,
     Layers, Zap, MonitorPlay, UserCircle,
     Film, Wand2, Mic2, ChevronRight,
-    Star, TrendingUp, Users, Clock,
+    Star, TrendingUp, Users, Clock, Check,
 } from 'lucide-react';
 import { signIn } from 'next-auth/react';
 import { registerUser } from '@/lib/actions';
 import { useT } from '@/lib/i18n';
 import LanguageSwitcher from './LanguageSwitcher';
+
+type BillingPlan = {
+    key: string;
+    name: string;
+    price: number;
+    quotaTotal: number;
+    features: string[];
+    providers?: {
+        paypal?: boolean;
+        stripe?: boolean;
+    };
+};
+
+const FALLBACK_BILLING_PLANS: BillingPlan[] = [
+    {
+        key: "free",
+        name: "Free",
+        price: 0,
+        quotaTotal: 3,
+        features: ["3 videos / month", "720p quality", "Community support"],
+        providers: { paypal: false, stripe: false },
+    },
+    {
+        key: "pro",
+        name: "Pro",
+        price: 9.9,
+        quotaTotal: 30,
+        features: ["30 videos / month", "1080p quality", "Priority rendering", "Email support"],
+        providers: { paypal: true, stripe: true },
+    },
+    {
+        key: "enterprise",
+        name: "Enterprise",
+        price: 29.9,
+        quotaTotal: -1,
+        features: [
+            "Unlimited videos",
+            "4K quality",
+            "Priority rendering",
+            "Custom branding",
+            "Dedicated support",
+        ],
+        providers: { paypal: true, stripe: true },
+    },
+];
+
+function orderBillingPlans(plans: BillingPlan[]): BillingPlan[] {
+    const order = ["free", "pro", "enterprise"];
+    return [...plans].sort((a, b) => {
+        const ai = order.indexOf(a.key);
+        const bi = order.indexOf(b.key);
+        const ap = ai === -1 ? 999 : ai;
+        const bp = bi === -1 ? 999 : bi;
+        return ap - bp;
+    });
+}
 
 const LandingPage: React.FC = () => {
     const t = useT();
@@ -22,6 +78,8 @@ const LandingPage: React.FC = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
     const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+    const [pricingPlans, setPricingPlans] = useState<BillingPlan[]>(() => orderBillingPlans(FALLBACK_BILLING_PLANS));
+    const [pricingLoading, setPricingLoading] = useState(true);
 
     useEffect(() => {
         const handleMouseMove = (e: MouseEvent) => {
@@ -29,6 +87,43 @@ const LandingPage: React.FC = () => {
         };
         window.addEventListener('mousemove', handleMouseMove);
         return () => window.removeEventListener('mousemove', handleMouseMove);
+    }, []);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        async function loadPricingPlans() {
+            setPricingLoading(true);
+            try {
+                const res = await fetch("/api/billing/plans", { cache: "no-store" });
+                if (!res.ok) {
+                    if (!cancelled) {
+                        setPricingPlans(orderBillingPlans(FALLBACK_BILLING_PLANS));
+                    }
+                    return;
+                }
+                const data = (await res.json()) as { plans?: BillingPlan[] };
+                const plans = Array.isArray(data.plans) && data.plans.length > 0
+                    ? data.plans
+                    : FALLBACK_BILLING_PLANS;
+                if (!cancelled) {
+                    setPricingPlans(orderBillingPlans(plans));
+                }
+            } catch {
+                if (!cancelled) {
+                    setPricingPlans(orderBillingPlans(FALLBACK_BILLING_PLANS));
+                }
+            } finally {
+                if (!cancelled) {
+                    setPricingLoading(false);
+                }
+            }
+        }
+
+        void loadPricingPlans();
+        return () => {
+            cancelled = true;
+        };
     }, []);
 
     const FEATURES = [
@@ -127,6 +222,7 @@ const LandingPage: React.FC = () => {
                     <div className="hidden md:flex items-center gap-6 text-sm font-medium text-gray-400">
                         <button onClick={() => scrollToSection('features')} className="hover:text-white transition-colors cursor-pointer underline-animated">{t("nav.features")}</button>
                         <button onClick={() => scrollToSection('showcase')} className="hover:text-white transition-colors cursor-pointer underline-animated">{t("nav.showcase")}</button>
+                        <button onClick={() => scrollToSection('pricing')} className="hover:text-white transition-colors cursor-pointer underline-animated">{t("nav.pricing")}</button>
                         <LanguageSwitcher />
                         <button
                             onClick={() => setIsModalOpen(true)}
@@ -146,6 +242,7 @@ const LandingPage: React.FC = () => {
                     <div className="md:hidden border-t border-white/[0.08] px-6 py-4 space-y-3 bg-black/60 backdrop-blur-xl rounded-b-2xl">
                         <button onClick={() => scrollToSection('features')} className="block text-sm text-gray-400 hover:text-white transition-colors cursor-pointer">{t("nav.features")}</button>
                         <button onClick={() => scrollToSection('showcase')} className="block text-sm text-gray-400 hover:text-white transition-colors cursor-pointer">{t("nav.showcase")}</button>
+                        <button onClick={() => scrollToSection('pricing')} className="block text-sm text-gray-400 hover:text-white transition-colors cursor-pointer">{t("nav.pricing")}</button>
                         <LanguageSwitcher className="w-full justify-center" />
                         <button onClick={() => { setIsModalOpen(true); setIsMobileMenuOpen(false); }} className="w-full px-5 py-2.5 bg-gradient-to-r from-[#E11D48] to-[#BE123C] text-white rounded-full font-semibold text-sm">{t("nav.getAccess")}</button>
                     </div>
@@ -310,6 +407,102 @@ const LandingPage: React.FC = () => {
                             </div>
                         ))}
                     </div>
+                </div>
+            </section>
+
+            {/* Pricing & Subscription */}
+            <section id="pricing" className="py-24 px-6 relative">
+                <div className="max-w-6xl mx-auto">
+                    <div className="text-center mb-16">
+                        <h2 className="text-4xl md:text-5xl font-bold tracking-tight mb-4">
+                            {t("landing.pricingTitle")}
+                        </h2>
+                        <p className="text-gray-400 text-lg max-w-2xl mx-auto">
+                            {t("landing.pricingDesc")}
+                        </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        {pricingPlans.map((plan) => {
+                            const isPopular = plan.key === "pro";
+                            const paypalAvailable = Boolean(plan.providers?.paypal);
+                            const stripeAvailable = Boolean(plan.providers?.stripe);
+                            return (
+                                <div
+                                    key={plan.key}
+                                    className={`relative rounded-3xl border p-8 transition-all duration-500 ${
+                                        isPopular
+                                            ? "border-[#E11D48]/45 bg-gradient-to-b from-[#E11D48]/10 to-[#0f0915] shadow-[0_0_50px_rgba(225,29,72,0.18)]"
+                                            : "border-white/[0.08] bg-white/[0.02] hover:border-white/[0.16]"
+                                    }`}
+                                >
+                                    {isPopular && (
+                                        <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-[#E11D48] px-3 py-1 text-[11px] font-semibold text-white">
+                                            {t("landing.pricingMostPopular")}
+                                        </span>
+                                    )}
+
+                                    <div className="mb-6">
+                                        <p className="text-sm font-semibold text-gray-300">{plan.name}</p>
+                                        <div className="mt-2 flex items-end gap-2">
+                                            <span className="text-4xl font-bold text-white">
+                                                {plan.price === 0 ? "Free" : `$${plan.price}`}
+                                            </span>
+                                            {plan.price > 0 && (
+                                                <span className="pb-1 text-sm text-gray-500">/ month</span>
+                                            )}
+                                        </div>
+                                        <p className="mt-2 text-xs text-gray-500">
+                                            {plan.quotaTotal === -1
+                                                ? t("landing.pricingUnlimitedVideos")
+                                                : t("landing.pricingVideosPerMonth", { count: plan.quotaTotal })}
+                                        </p>
+                                    </div>
+
+                                    <ul className="space-y-2.5">
+                                        {plan.features.map((feature) => (
+                                            <li key={`${plan.key}-${feature}`} className="flex items-start gap-2 text-sm text-gray-300">
+                                                <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
+                                                <span>{feature}</span>
+                                            </li>
+                                        ))}
+                                    </ul>
+
+                                    <div className="mt-6 flex items-center gap-2 text-[11px]">
+                                        <span className={`rounded-full border px-2 py-1 ${
+                                            paypalAvailable
+                                                ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+                                                : "border-gray-600/50 bg-white/[0.02] text-gray-500"
+                                        }`}>
+                                            {t("landing.pricingPaypal")} {paypalAvailable ? t("landing.pricingStatusReady") : t("landing.pricingStatusUnavailable")}
+                                        </span>
+                                        <span className={`rounded-full border px-2 py-1 ${
+                                            stripeAvailable
+                                                ? "border-cyan-500/30 bg-cyan-500/10 text-cyan-300"
+                                                : "border-gray-600/50 bg-white/[0.02] text-gray-500"
+                                        }`}>
+                                            {t("landing.pricingStripe")} {stripeAvailable ? t("landing.pricingStatusReady") : t("landing.pricingStatusUnavailable")}
+                                        </span>
+                                    </div>
+
+                                    <button
+                                        onClick={() => setIsModalOpen(true)}
+                                        className={`mt-7 w-full rounded-xl py-3 text-sm font-semibold transition-all cursor-pointer ${
+                                            isPopular
+                                                ? "bg-gradient-to-r from-[#E11D48] to-[#BE123C] text-white hover:shadow-[0_0_30px_rgba(225,29,72,0.35)]"
+                                                : "border border-white/[0.12] bg-white/[0.03] text-gray-200 hover:bg-white/[0.08]"
+                                        }`}
+                                    >
+                                        {plan.price === 0 ? t("landing.pricingStartFree") : t("landing.pricingSubscribe")}
+                                    </button>
+                                </div>
+                            );
+                        })}
+                    </div>
+
+                    {pricingLoading && (
+                        <p className="mt-6 text-center text-xs text-gray-500">{t("landing.pricingLoading")}</p>
+                    )}
                 </div>
             </section>
 
