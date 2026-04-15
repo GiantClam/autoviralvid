@@ -498,7 +498,10 @@ export default function ProjectForm({ onTemplateChange, initialTemplateId, onPpt
   const Divider = () => <div className="border-t border-white/[0.04] my-4" />;
 
   return (
-    <aside className="flex flex-col h-full w-full md:max-w-[400px] bg-[#0a0a12]/80 backdrop-blur-xl">
+    <aside
+      data-testid="project-form"
+      className="flex flex-col h-full w-full md:max-w-[400px] bg-[#0a0a12]/80 backdrop-blur-xl"
+    >
       <div className="flex items-center gap-3 px-5 py-4 border-b border-white/[0.06] bg-gradient-to-r from-[#E11D48]/5 to-transparent">
         <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#E11D48] to-[#9333EA] flex items-center justify-center shadow-lg shadow-[#E11D48]/20">
           <Clapperboard className="w-4 h-4 text-white" />
@@ -516,6 +519,7 @@ export default function ProjectForm({ onTemplateChange, initialTemplateId, onPpt
           <Label icon={Clapperboard}>{t("form.template")}</Label>
           <div className="relative">
               <select
+                data-testid="template-select"
                 value={templateId}
                 onChange={(e) => handleTemplateChange(e.target.value)}
                 className={inp + " appearance-none pr-8 cursor-pointer"}
@@ -533,6 +537,7 @@ export default function ProjectForm({ onTemplateChange, initialTemplateId, onPpt
         <section>
           <Label icon={Sparkles}>{t("form.themeDesc")}</Label>
           <textarea
+            data-testid="theme-textarea"
             value={theme}
             onChange={(e) => setTheme(e.target.value)}
             placeholder={t("form.themePlaceholder")}
@@ -548,6 +553,7 @@ export default function ProjectForm({ onTemplateChange, initialTemplateId, onPpt
               <div>
                 <div className="text-[11px] text-gray-500 mb-1">{t("form.slideCount")}</div>
                 <input
+                  data-testid="ppt-v7-slide-count"
                   type="number"
                   min={3}
                   max={30}
@@ -843,6 +849,7 @@ export default function ProjectForm({ onTemplateChange, initialTemplateId, onPpt
 
       <div className="px-5 py-4 border-t border-white/[0.06] bg-[#0a0a12]/50 backdrop-blur-sm">
         <button
+          data-testid="project-submit"
           type="button"
           onClick={handleSubmit}
           disabled={busy || !theme.trim()}

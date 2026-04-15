@@ -167,6 +167,7 @@ export function TemplateGallery({ onSelect }: TemplateGalleryProps) {
                                                 onClick={() => onSelect(tpl.id)}
                                                 onMouseEnter={() => setHoveredId(tpl.id)}
                                                 onMouseLeave={() => setHoveredId(null)}
+                                                data-testid={`template-card-${tpl.id}`}
                                                 className="group relative flex flex-col p-5 sm:p-6 rounded-2xl border border-white/[0.06] bg-gradient-to-br from-white/[0.02] to-transparent backdrop-blur-sm transition-all duration-500 text-left cursor-pointer overflow-hidden"
                                                 style={{ animationDelay: `${i * 0.05}s` }}
                                             >

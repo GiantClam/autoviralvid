@@ -94,6 +94,7 @@ function PptV7ResultPanel({
                 type="button"
                 onClick={onRetry}
                 disabled={state.busy || !state.requirement.trim()}
+                data-testid="ppt-v7-retry"
                 className="inline-flex items-center gap-1.5 rounded-full border border-white/[0.12] bg-white/[0.04] px-3 py-1 text-xs text-gray-200 transition hover:bg-white/[0.08] disabled:opacity-40"
               >
                 <RefreshCw className="h-3.5 w-3.5" />
@@ -160,7 +161,10 @@ function PptV7ResultPanel({
           </div>
 
           {state.error && (
-            <div className="mt-4 rounded-xl border border-red-500/20 bg-red-500/[0.08] px-3 py-2 text-sm text-red-300">
+            <div
+              data-testid="ppt-v7-error"
+              className="mt-4 rounded-xl border border-red-500/20 bg-red-500/[0.08] px-3 py-2 text-sm text-red-300"
+            >
               <div className="flex items-center gap-2">
                 <AlertTriangle className="h-4 w-4" />
                 <span>{state.error}</span>
@@ -174,7 +178,11 @@ function PptV7ResultPanel({
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h4 className="text-sm font-semibold text-gray-200">{t("pptV7.latestResult")}</h4>
-                <p className="mt-1 text-xs text-gray-500">
+                <p
+                  data-testid="ppt-v7-run-id"
+                  data-run-id={state.result.run_id}
+                  className="mt-1 text-xs text-gray-500"
+                >
                   {t("pptV7.resultSummary", {
                     runId: state.result.run_id,
                     slideCount: state.result.slide_count,
@@ -185,6 +193,7 @@ function PptV7ResultPanel({
                 href={state.result.pptx_url}
                 target="_blank"
                 rel="noreferrer"
+                data-testid="ppt-v7-download"
                 className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#E11D48] to-[#9333EA] px-4 py-2 text-sm font-medium text-white transition hover:from-[#F43F5E] hover:to-[#A855F7]"
               >
                 <FileDown className="h-4 w-4" />
@@ -207,7 +216,7 @@ function PptV7ResultPanel({
           </div>
         )}
 
-        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5">
+        <div data-testid="ppt-v7-recent-runs" className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5">
           <h4 className="text-sm font-semibold text-gray-200">{t("pptV7.recentRuns")}</h4>
           <div className="mt-3 space-y-2">
             {history.length === 0 ? (
@@ -353,7 +362,7 @@ function ProjectWorkspace({
 
       <div className="flex-1 hidden md:flex flex-col overflow-hidden border-l border-white/[0.06]">
         {isPptV7Mode ? (
-          <div className="shrink-0 border-b border-white/[0.06] bg-black/30 px-4 py-3">
+          <div data-testid="ppt-v7-workspace" className="shrink-0 border-b border-white/[0.06] bg-black/30 px-4 py-3">
             <p className="text-sm font-semibold text-gray-200">{t("workspace.pptV7WorkspaceTitle")}</p>
             <p className="mt-0.5 text-xs text-gray-500">{t("workspace.pptV7WorkspaceDesc")}</p>
           </div>

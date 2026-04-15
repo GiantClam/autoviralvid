@@ -39,6 +39,9 @@ def main() -> int:
                 "NEXT_PUBLIC_AGENT_URL": RENDERER_BASE,
                 "NEXT_PUBLIC_API_BASE": RENDERER_BASE,
                 "NEXT_PUBLIC_DISABLE_API_TOKEN": "1",
+                "NEXT_PUBLIC_AUTH_ENABLED": "",
+                "GENERATION_BILLING_ENABLED": "false",
+                "UI_E2E_GENERATION_BILLING_ENABLED": "false",
             },
         )
         wait_for_port(FRONTEND_PORT, 60)

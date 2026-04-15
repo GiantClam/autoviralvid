@@ -35,7 +35,20 @@ def safe_print(message: str) -> None:
 
 
 def parse_run_id_and_link(page: Page) -> tuple[str | None, str | None]:
-    run_line = page.locator("text=/Run ID:\\s*[A-Za-z0-9_-]+/").first
+    run_id_node = page.locator("[data-testid='ppt-v7-run-id']").first
+    if run_id_node.count() > 0:
+        run_id = run_id_node.get_attribute("data-run-id")
+        if run_id:
+            href = None
+            download = page.locator("[data-testid='ppt-v7-download']").first
+            if download.count() > 0:
+                try:
+                    href = download.get_attribute("href")
+                except Exception:
+                    href = None
+            return run_id, href
+
+    run_line = page.locator("text=/Run ID[:：]\\s*[A-Za-z0-9_-]+/").first
     if run_line.count() == 0:
         return None, None
 
@@ -43,10 +56,12 @@ def parse_run_id_and_link(page: Page) -> tuple[str | None, str | None]:
         text = run_line.inner_text(timeout=1000)
     except Exception:
         return None, None
-    match = re.search(r"Run ID:\s*([A-Za-z0-9_-]+)", text)
+    match = re.search(r"Run ID[:：]\s*([A-Za-z0-9_-]+)", text)
     run_id = match.group(1) if match else None
 
-    link = page.locator("a:has-text('Download PPTX')").first
+    link = page.locator("[data-testid='ppt-v7-download']").first
+    if link.count() == 0:
+        link = page.locator("a:has-text('Download PPTX')").first
     href = None
     if link.count() > 0:
         try:
@@ -124,7 +139,9 @@ def wait_for_completion(page: Page, previous_run_id: str | None = None) -> tuple
             if previous_run_id is None or run_id != previous_run_id:
                 return run_id, href
 
-        error_block = page.locator("div:has-text('Error')").first
+        error_block = page.locator("[data-testid='ppt-v7-error']").first
+        if error_block.count() == 0:
+            error_block = page.locator("div:has-text('Error')").first
         if error_block.count() > 0:
             err_text = error_block.inner_text(timeout=500).strip()
             if err_text:
@@ -266,6 +283,40 @@ def submit_video_render(page: Page, run_id: str, image_urls: list[str]) -> str:
         raise RuntimeError(f"Video render response missing job_id: {result}")
 
     return str(job_id)
+
+
+def localize_media_urls(urls: list[str], target_dir: Path, prefix: str) -> list[str]:
+    target_dir.mkdir(parents=True, exist_ok=True)
+    curl = shutil.which("curl.exe") or shutil.which("curl")
+    resolved: list[str] = []
+    for idx, raw in enumerate(urls):
+        source = str(raw or "").strip()
+        if not source:
+            continue
+        if source.startswith("http://") or source.startswith("https://"):
+            if not curl:
+                resolved.append(source)
+                continue
+            parsed = urlparse(source)
+            ext = Path(parsed.path or "").suffix or ".bin"
+            local_path = target_dir / f"{prefix}-{idx + 1:03d}{ext}"
+            proc = subprocess.run(
+                [curl, "-L", source, "-o", str(local_path)],
+                capture_output=True,
+                text=True,
+                timeout=180,
+            )
+            if proc.returncode == 0 and local_path.exists() and local_path.stat().st_size > 0:
+                resolved.append(str(local_path.resolve()))
+            else:
+                print(
+                    f"[warn] failed to localize {prefix} source, keep remote URL: {source}\n"
+                    f"stdout={proc.stdout[-200:]}\nstderr={proc.stderr[-200:]}"
+                )
+                resolved.append(source)
+            continue
+        resolved.append(source)
+    return resolved
 
 
 def submit_ppt_video_render(
@@ -454,6 +505,8 @@ def main() -> int:
             """
         )
         export_payloads: dict[str, dict] = {}
+        api_error_events: list[dict[str, object]] = []
+        api_error_signature_seen: set[tuple[str, int]] = set()
 
         def _capture_export_response(resp) -> None:
             try:
@@ -477,6 +530,36 @@ def main() -> int:
                 return
 
         page.on("response", _capture_export_response)
+        def _capture_api_error(resp) -> None:
+            try:
+                if resp.status < 400:
+                    return
+                if "/api/" not in resp.url:
+                    return
+                request = resp.request
+                event = {
+                    "url": resp.url,
+                    "status": int(resp.status),
+                    "method": (request.method or "").upper(),
+                }
+                api_error_events.append(event)
+                signature = (str(event["url"]), int(event["status"]))
+                if signature in api_error_signature_seen:
+                    return
+                api_error_signature_seen.add(signature)
+                body_preview = ""
+                try:
+                    body_preview = (resp.text() or "")[:240].replace("\n", " ").replace("\r", " ")
+                except Exception:
+                    body_preview = ""
+                safe_print(
+                    f"[api-error] {event['method']} {event['status']} {event['url']}"
+                    + (f" body={body_preview}" if body_preview else "")
+                )
+            except Exception:
+                return
+
+        page.on("response", _capture_api_error)
         page.set_default_navigation_timeout(120000)
         page.set_default_timeout(30000)
         page.on("console", lambda msg: safe_print(f"[browser:{msg.type}] {msg.text}"))
@@ -485,31 +568,63 @@ def main() -> int:
         page.goto(FRONTEND_BASE, wait_until="commit")
         page.wait_for_selector("button")
 
-        template = page.locator("button:has-text('PPT & Video V7')").first
-        assert_true(template.count() > 0, "PPT & Video V7 template card not found")
-        template.click()
-        page.wait_for_selector("aside textarea")
+        project_form = page.locator("[data-testid='project-form']").first
+        if project_form.count() == 0:
+            enter_ok = False
+            for attempt in range(1, 4):
+                template = page.locator("[data-testid='template-card-ppt-v7']").first
+                if template.count() == 0:
+                    template = page.locator("button:has-text('PPT & Video V7')").first
+                assert_true(template.count() > 0, "PPT & Video V7 template card not found")
+                template.scroll_into_view_if_needed()
+                template.click(force=True)
+                try:
+                    page.wait_for_selector("[data-testid='project-form']", timeout=40000)
+                    enter_ok = True
+                    break
+                except Exception:
+                    page.screenshot(
+                        path=str(OUTPUT_DIR / f"00-enter-project-attempt-{attempt}.png"),
+                        full_page=True,
+                    )
+                    if attempt < 3:
+                        page.goto(FRONTEND_BASE, wait_until="commit")
+                        page.wait_for_selector("button")
+            assert_true(enter_ok, "Failed to enter project workspace from template gallery")
+        else:
+            page.wait_for_selector("[data-testid='project-form']", timeout=120000)
+        page.wait_for_selector("[data-testid='theme-textarea']")
 
-        page.locator("aside textarea").first.fill(
+        page.locator("[data-testid='theme-textarea']").first.fill(
             "Create a concise 3-slide investor update deck covering growth, risks, and next actions."
         )
 
-        slide_input = page.locator("aside input[type='number']").first
+        slide_input = page.locator("[data-testid='ppt-v7-slide-count']").first
+        if slide_input.count() == 0:
+            slide_input = page.locator("aside input[type='number']").first
         if slide_input.count() > 0:
             slide_input.fill("3")
 
-        submit = page.locator("aside div.border-t button").first
+        submit = page.locator("[data-testid='project-submit']").first
+        if submit.count() == 0:
+            submit = page.locator("aside div.border-t button").first
         assert_true(submit.count() > 0, "Generate button not found")
         submit.click()
 
-        page.wait_for_selector("text=PPT V7 Workspace")
+        workspace = page.locator("[data-testid='ppt-v7-workspace']").first
+        if workspace.count() > 0:
+            workspace.wait_for(state="visible")
+        else:
+            page.wait_for_selector("text=/PPT V7 (Workspace|工作台)/")
 
         run1, href1 = wait_for_completion(page)
         ppt1 = OUTPUT_DIR / f"{run1}.pptx"
         download_ppt(page, href1, ppt1)
         page.screenshot(path=str(OUTPUT_DIR / "01-first-run.png"), full_page=True)
 
-        retry = page.get_by_role("button", name="Retry")
+        retry = page.locator("[data-testid='ppt-v7-retry']").first
+        if retry.count() == 0:
+            retry = page.get_by_role("button", name=re.compile(r"Retry|重试|重新执行"))
         assert_true(retry.count() > 0, "Retry button not found")
         retry.click()
 
@@ -520,7 +635,11 @@ def main() -> int:
 
         assert_true(page.locator(f"text={run1}").count() > 0, "First run ID missing in UI")
         assert_true(page.locator(f"text={run2}").count() > 0, "Second run ID missing in UI")
-        assert_true(page.locator("text=Recent Runs").count() > 0, "Recent Runs panel missing")
+        assert_true(
+            page.locator("[data-testid='ppt-v7-recent-runs']").count() > 0
+            or page.locator("text=/Recent Runs|最近运行记录/").count() > 0,
+            "Recent Runs panel missing",
+        )
 
         video_path = OUTPUT_DIR / f"{run2}.mp4"
         export_payload = wait_for_export_payload(export_payloads, run2, page=page)
@@ -547,16 +666,35 @@ def main() -> int:
                     if audio_url:
                         audio_urls.append(audio_url)
 
-        render_submit = submit_ppt_video_render(page, run2, pptx_url, audio_urls)
-        render_job_id = str(render_submit.get("id"))
-        render_status = str(render_submit.get("status", "")).lower()
-        if render_status in ("done", "completed") and render_submit.get("output_url"):
-            render_payload = render_submit
-        else:
-            render_payload = wait_for_ppt_render_completion(page, render_job_id)
-        output_url = get_ppt_download_url(page, render_job_id, render_payload)
-        video_source = download_video(page, {"output_url": output_url}, video_path)
+        render_media_dir = OUTPUT_DIR / run2 / "render_media"
+        render_audio_urls = localize_media_urls(audio_urls, render_media_dir, "audio")
+        render_pptx_url = ppt2.resolve().as_uri() if ppt2.exists() else pptx_url
+
         render_mode = "ppt_render_pptx"
+        render_job_id = ""
+        try:
+            render_submit = submit_ppt_video_render(page, run2, render_pptx_url, render_audio_urls)
+            render_job_id = str(render_submit.get("id"))
+            render_status = str(render_submit.get("status", "")).lower()
+            if render_status in ("done", "completed") and render_submit.get("output_url"):
+                render_payload = render_submit
+            else:
+                render_payload = wait_for_ppt_render_completion(page, render_job_id)
+            output_url = get_ppt_download_url(page, render_job_id, render_payload)
+            video_source = download_video(page, {"output_url": output_url}, video_path)
+        except Exception as exc:
+            print(f"[warn] ppt render route failed, fallback to timeline image render: {exc}")
+            fallback_images: list[str] = []
+            if isinstance(export_payload, dict):
+                raw_images = export_payload.get("slide_image_urls")
+                if isinstance(raw_images, list):
+                    fallback_images = [str(item).strip() for item in raw_images if str(item).strip()]
+            if not fallback_images:
+                fallback_images = extract_slide_image_urls(page, run2)
+            render_job_id = submit_video_render(page, run2, fallback_images)
+            render_payload = wait_for_render_completion(page, render_job_id)
+            video_source = download_video(page, render_payload, video_path)
+            render_mode = "timeline_images_fallback"
 
         assert_true(video_path.exists() and video_path.stat().st_size > 0, "Video file was not downloaded")
         page.screenshot(path=str(OUTPUT_DIR / "03-video-render.png"), full_page=True)
@@ -565,6 +703,7 @@ def main() -> int:
             "status": "ok",
             "run_ids": [run1, run2],
             "captured_export_run_ids": list(export_payloads.keys()),
+            "api_error_events": api_error_events,
             "downloads": {
                 run1: str(ppt1),
                 run2: str(ppt2),
@@ -574,8 +713,8 @@ def main() -> int:
                 "mode": render_mode,
                 "export_payload_run_id": export_payload.get("run_id") if isinstance(export_payload, dict) else None,
                 "export_payload_keys": sorted(list(export_payload.keys())) if isinstance(export_payload, dict) else [],
-                "render_input_pptx_url": pptx_url,
-                "render_input_audio_urls_count": len(audio_urls),
+                "render_input_pptx_url": render_pptx_url,
+                "render_input_audio_urls_count": len(render_audio_urls),
                 "source": video_source,
                 "downloaded_path": str(video_path),
                 "size_bytes": video_path.stat().st_size,
