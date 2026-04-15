@@ -118,6 +118,12 @@ Optional but commonly needed:
 - `PAYPAL_CLIENT_SECRET`
 - `PAYPAL_PLAN_PRO`
 - `PAYPAL_PLAN_ENTERPRISE`
+- `STRIPE_SECRET_KEY`
+- `STRIPE_WEBHOOK_SECRET`
+- `STRIPE_PRICE_PRO`
+- `STRIPE_PRICE_ENTERPRISE`
+- `GENERATION_BILLING_ENABLED`
+- `BILLING_RECONCILE_TOKEN` (or `CRON_SECRET`)
 
 Notes:
 
@@ -197,6 +203,7 @@ The main UI component is in `src/app/page.tsx`. You can:
 - [Next.js Documentation](https://nextjs.org/docs) - Learn about Next.js features and API
 - [DEPLOYED_TESTING.md](d:/github/with-langgraph-fastapi/docs/DEPLOYED_TESTING.md) - Deployed-environment smoke tests and paid E2E checks
 - [VERCEL_RAILWAY_SPLIT_DEPLOYMENT.md](d:/github/with-langgraph-fastapi/docs/VERCEL_RAILWAY_SPLIT_DEPLOYMENT.md) - Production role split and env matrix for Vercel + Railway
+- [production-billing-deploy.md](d:/github/with-langgraph-fastapi/docs/runbooks/production-billing-deploy.md) - Supabase SQL + env + billing deployment checklist
 
 ## Contributing
 

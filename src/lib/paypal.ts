@@ -5,6 +5,8 @@
  * so the app can run in dev mode without PayPal credentials.
  */
 
+import { getPlanCatalog } from "./billing/plan-catalog";
+
 // --- Plan Configuration ---
 
 export interface PlanConfig {
@@ -26,29 +28,18 @@ interface PayPalCreateSubscriptionResponse {
     links?: PayPalLink[];
 }
 
-export const PLANS: Record<string, PlanConfig> = {
-    free: {
-        name: "Free",
-        price: 0,
-        quotaTotal: 3,
-        paypalPlanId: "",
-        features: ["3 videos / month", "720p quality", "Community support"],
-    },
-    pro: {
-        name: "Pro",
-        price: 9.9,
-        quotaTotal: 30,
-        paypalPlanId: process.env.PAYPAL_PLAN_PRO || "P-xxxPRO",
-        features: ["30 videos / month", "1080p quality", "Priority rendering", "Email support"],
-    },
-    enterprise: {
-        name: "Enterprise",
-        price: 29.9,
-        quotaTotal: -1,
-        paypalPlanId: process.env.PAYPAL_PLAN_ENTERPRISE || "P-xxxENTERPRISE",
-        features: ["Unlimited videos", "4K quality", "Priority rendering", "Custom branding", "Dedicated support"],
-    },
-};
+export const PLANS: Record<string, PlanConfig> = Object.fromEntries(
+    Object.entries(getPlanCatalog()).map(([planCode, plan]) => [
+        planCode,
+        {
+            name: plan.name,
+            price: plan.price,
+            quotaTotal: plan.quotaTotal,
+            paypalPlanId: plan.providerPlanIds.paypal || "",
+            features: plan.features,
+        } satisfies PlanConfig,
+    ]),
+);
 
 // --- Mock mode detection ---
 
@@ -80,7 +71,12 @@ async function getAccessToken(): Promise<string> {
     return data.access_token;
 }
 
-export async function createSubscription(planKey: string, returnUrl: string, cancelUrl: string) {
+export async function createSubscription(
+    planKey: string,
+    returnUrl: string,
+    cancelUrl: string,
+    customId?: string,
+) {
     const plan = PLANS[planKey];
     if (!plan || !plan.paypalPlanId) throw new Error(`Invalid plan: ${planKey}`);
 
@@ -103,6 +99,7 @@ export async function createSubscription(planKey: string, returnUrl: string, can
         },
         body: JSON.stringify({
             plan_id: plan.paypalPlanId,
+            custom_id: customId,
             application_context: {
                 brand_name: "AutoViralVid",
                 locale: "en-US",

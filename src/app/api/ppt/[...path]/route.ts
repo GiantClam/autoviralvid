@@ -12,8 +12,8 @@ async function forward(
   return forwardApiV1Request(request, {
     method,
     path: path || [],
-    upstreamPrefixSegments: [],
-    billingPrefixSegments: [],
+    upstreamPrefixSegments: ["ppt"],
+    billingPrefixSegments: ["ppt"],
   });
 }
 

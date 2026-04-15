@@ -18,6 +18,8 @@ FRONTEND_BASE = f"http://127.0.0.1:{FRONTEND_PORT}"
 RENDERER_BASE = f"http://127.0.0.1:{RENDERER_PORT}"
 OUTPUT_DIR = Path(os.getenv("UI_E2E_OUTPUT_DIR", "test_outputs/ui_ppt_prompt_web_e2e"))
 TIMEOUT_SECONDS = int(os.getenv("UI_E2E_GENERATE_TIMEOUT_SECONDS", "1200"))
+GENERATION_BILLING_ENABLED = os.getenv("UI_E2E_GENERATION_BILLING_ENABLED", "false")
+TOTAL_PAGES = int(os.getenv("UI_E2E_TOTAL_PAGES", "6"))
 
 
 def _wait_for_generation_done(page, timeout_seconds: int) -> None:
@@ -40,7 +42,10 @@ def run_web_e2e() -> dict:
     screenshots.mkdir(parents=True, exist_ok=True)
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True, args=["--no-sandbox", "--disable-setuid-sandbox"])
+        browser = p.chromium.launch(
+            headless=True,
+            args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"],
+        )
         context = browser.new_context(viewport={"width": 1600, "height": 960})
         page = context.new_page()
 
@@ -59,7 +64,7 @@ def run_web_e2e() -> dict:
             "1) Cover\n2) Company profile\n3) Product matrix\n4) Technology advantages\n5) Market and cooperation\n6) Closing"
         )
 
-        page.locator("input[type='number']").first.fill("6")
+        page.locator("input[type='number']").first.fill(str(TOTAL_PAGES))
         checkboxes = page.locator("input[type='checkbox']")
         for i in range(4):
             if checkboxes.nth(i).is_visible():
@@ -79,6 +84,10 @@ def run_web_e2e() -> dict:
         href = str(download_link.get_attribute("href") or "").strip()
         if not href:
             raise RuntimeError("Download via API href is empty")
+        if href.startswith("/"):
+            href = f"{FRONTEND_BASE}{href}"
+        if not (href.startswith("http://") or href.startswith("https://")):
+            raise RuntimeError(f"Download via API href is not a valid URL: {href}")
 
         resp = page.request.get(href, timeout=180000)
         if resp.status != 200:
@@ -137,6 +146,8 @@ def main() -> int:
             ROOT,
             {
                 "AUTH_REQUIRED": "false",
+                "GENERATION_BILLING_ENABLED": GENERATION_BILLING_ENABLED,
+                "UI_E2E_GENERATION_BILLING_ENABLED": GENERATION_BILLING_ENABLED,
                 "REMOTION_RENDERER_URL": RENDERER_BASE,
                 "AGENT_URL": RENDERER_BASE,
                 "NEXT_PUBLIC_AGENT_URL": RENDERER_BASE,

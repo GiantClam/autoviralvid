@@ -17,6 +17,10 @@ model User {
   sessions      Session[]
   profile       Profile?
   subscription  Subscription?
+  paymentCustomers      PaymentCustomer[]
+  paymentSubscriptions  PaymentSubscription[]
+  billingLedgers        BillingLedger[]
+  billingUsageRecords   BillingUsageRecord[]
 
   @@map("autoviralvid_users")
 }
@@ -46,6 +50,99 @@ model Subscription {
   user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("autoviralvid_subscriptions")
+}
+
+model PaymentCustomer {
+  id                 String   @id @default(cuid())
+  userId             String
+  provider           String
+  providerCustomerId String
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerCustomerId])
+  @@index([userId, provider])
+  @@map("autoviralvid_payment_customers")
+}
+
+model PaymentSubscription {
+  id                String   @id @default(cuid())
+  userId            String
+  provider          String
+  providerSubId     String
+  planCode          String   @default("free")
+  status            String   @default("active")
+  currentPeriodStart DateTime?
+  currentPeriodEnd   DateTime?
+  cancelAtPeriodEnd  Boolean @default(false)
+  metadata          Json?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerSubId])
+  @@index([userId, provider])
+  @@map("autoviralvid_payment_subscriptions")
+}
+
+model PaymentWebhookEvent {
+  id         String   @id @default(cuid())
+  provider   String
+  eventId    String
+  eventType  String
+  payloadHash String?
+  status     String   @default("processing")
+  processedAt DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([provider, eventId])
+  @@index([provider, status])
+  @@map("autoviralvid_payment_webhook_events")
+}
+
+model BillingLedger {
+  id             String   @id @default(cuid())
+  userId         String
+  type           String
+  units          Int
+  source         String
+  referenceType  String?
+  referenceId    String?
+  idempotencyKey String?  @unique
+  metadata       Json?
+  createdAt      DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([source, referenceType, referenceId])
+  @@map("autoviralvid_billing_ledger")
+}
+
+model BillingUsageRecord {
+  id             String   @id @default(cuid())
+  userId         String
+  endpoint       String
+  method         String
+  units          Int
+  status         String   @default("precharged")
+  requestId      String?
+  runId          String?
+  providerTraceId String?
+  idempotencyKey String?  @unique
+  metadata       Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status, createdAt])
+  @@index([endpoint, method, createdAt])
+  @@map("autoviralvid_billing_usage_records")
 }
 
 model Account {

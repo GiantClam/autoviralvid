@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/internal/billing/reconcile?lookbackHours=72&staleMinutes=30",
+      "schedule": "0 3 * * *"
+    }
+  ]
+}

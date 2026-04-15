@@ -2,10 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 
-const API_BASE =
-  process.env.NEXT_PUBLIC_AGENT_URL ||
-  process.env.NEXT_PUBLIC_API_BASE ||
-  "http://127.0.0.1:8124";
+const API_BASE = "/api/ppt";
 
 type Language = "zh-CN" | "en-US";
 type DeckStyle = "professional" | "creative" | "academic" | "minimal";
@@ -158,7 +155,7 @@ export default function PPTPromptPage() {
     setError(null);
     addLog("Loading template catalog...");
     try {
-      const data = await apiGet<TemplatesResponse>("/api/v1/ppt/templates");
+      const data = await apiGet<TemplatesResponse>("/templates");
       const templateRows = Array.isArray(data.templates) ? data.templates : [];
       setTemplates(templateRows);
       addLog(`Template catalog loaded: ${templateRows.length}`);
@@ -177,7 +174,7 @@ export default function PPTPromptPage() {
     setPhase("loading_preview");
     addLog(`Loading preview for ${projectName}...`);
     try {
-      const data = await apiGet<ProjectPreview>(`/api/v1/ppt/preview/${encodeURIComponent(projectName)}`);
+      const data = await apiGet<ProjectPreview>(`/preview/${encodeURIComponent(projectName)}`);
       setPreview(data);
       setPhase("done");
       addLog("Preview loaded");
@@ -189,7 +186,10 @@ export default function PPTPromptPage() {
   }, [addLog]);
 
   useEffect(() => {
-    void loadTemplates(false);
+    const timer = setTimeout(() => {
+      void loadTemplates(false);
+    }, 0);
+    return () => clearTimeout(timer);
   }, [loadTemplates]);
 
   const handleGenerate = useCallback(async () => {
@@ -217,7 +217,7 @@ export default function PPTPromptPage() {
     addLog(`Starting generation (pages=${totalPages}, style=${style}, template=${templateFamily})...`);
 
     try {
-      const data = await apiPost<AIPromptPptResult>("/api/v1/ppt/generate-from-prompt", {
+      const data = await apiPost<AIPromptPptResult>("/generate-from-prompt", {
         prompt: mergedPrompt,
         total_pages: totalPages,
         style,
@@ -252,7 +252,7 @@ export default function PPTPromptPage() {
   const pptxPath = String(result?.output_pptx || preview?.output_pptx || "").trim();
   const hasHttpPptx = pptxPath.startsWith("http://") || pptxPath.startsWith("https://");
   const apiDownloadUrl = result
-    ? `${API_BASE}/api/v1/ppt/download-output/${encodeURIComponent(result.project_name)}`
+    ? `${API_BASE}/download-output/${encodeURIComponent(result.project_name)}`
     : "";
 
   return (

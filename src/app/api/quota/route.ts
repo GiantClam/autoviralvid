@@ -3,7 +3,7 @@
  */
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { checkQuota } from "@/lib/quota";
+import { getBillingSnapshot } from "@/lib/billing/account";
 
 export async function GET() {
     try {
@@ -12,7 +12,8 @@ export async function GET() {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
-        const quota = await checkQuota(session.user.id);
+        const snapshot = await getBillingSnapshot(session.user.id);
+        const quota = snapshot.quota;
         return NextResponse.json(quota);
     } catch (error: unknown) {
         console.error("[api/quota] Error:", error);

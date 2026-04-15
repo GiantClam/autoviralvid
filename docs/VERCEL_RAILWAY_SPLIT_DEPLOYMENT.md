@@ -13,6 +13,21 @@ Use `PPT_EXECUTION_ROLE` to hint runtime behavior:
 - `worker`: enables worker-safe defaults
 - `auto`: infer from platform (`VERCEL*` -> `web`, else `worker`)
 
+## Billing rollout note
+
+If you are enabling subscription + credits + generation charging in production:
+
+- Run Supabase SQL first:
+  - `docs/sql/2026-04-15-billing-core-supabase.sql`
+- Then set billing env on Vercel:
+  - `DATABASE_URL`
+  - `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, `PAYPAL_PLAN_PRO`, `PAYPAL_PLAN_ENTERPRISE`
+  - `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_PRO`, `STRIPE_PRICE_ENTERPRISE`
+  - `GENERATION_BILLING_ENABLED=true`
+  - `BILLING_RECONCILE_TOKEN` (or `CRON_SECRET`)
+- Full checklist:
+  - `docs/runbooks/production-billing-deploy.md`
+
 ## Recommended Vercel env
 
 ```text
