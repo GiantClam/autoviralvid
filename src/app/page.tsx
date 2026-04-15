@@ -474,9 +474,7 @@ function HomeContent() {
     setView('project');
   }, [router]);
 
-  const isDevMode = !process.env.NEXT_PUBLIC_AUTH_ENABLED;
-
-  if (!isDevMode && status === 'loading') {
+  if (status === 'loading') {
     return (
       <div className="flex items-center justify-center h-screen bg-[#060610]">
         <div className="w-8 h-8 border-2 border-[#E11D48] border-t-transparent rounded-full animate-spin" />
@@ -484,7 +482,7 @@ function HomeContent() {
     );
   }
 
-  if (!isDevMode && status === 'unauthenticated') {
+  if (status === 'unauthenticated') {
     return <LandingPage />;
   }
 

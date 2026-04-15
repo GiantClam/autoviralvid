@@ -12,6 +12,13 @@ from threading import Lock
 from datetime import datetime, timezone
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
+
+_AGENT_DIR = Path(__file__).resolve().parent
+_ROOT_DIR = _AGENT_DIR.parent
+# Load env before importing modules that read os.environ at import time.
+_ = load_dotenv(_AGENT_DIR / ".env", override=False)
+_ = load_dotenv(_ROOT_DIR / ".env.local", override=False)
+
 from fastapi import FastAPI, Request, BackgroundTasks, HTTPException, Depends
 from starlette.middleware.cors import CORSMiddleware
 import uvicorn
@@ -23,9 +30,6 @@ from src.auth import get_current_user, AuthUser
 from src.rate_limiter import RateLimitMiddleware
 from pydantic import BaseModel, Field
 from typing import Dict, Any, Optional, List, Literal
-
-_ = load_dotenv()
-_ = load_dotenv("../.env.local", override=False)
 
 # 缁熶竴鏃ュ織閰嶇疆
 logger = logging.getLogger("workflow")

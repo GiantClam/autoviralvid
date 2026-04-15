@@ -25,19 +25,30 @@ logger = logging.getLogger("api_routes")
 # ---------------------------------------------------------------------------
 # Supabase client (module-level singleton)
 # ---------------------------------------------------------------------------
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = (
-    os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-    or os.getenv("SUPABASE_SERVICE_KEY")
-)
-
 supabase: Optional[Client] = None
-if SUPABASE_URL and SUPABASE_KEY:
+
+
+def _get_supabase() -> Optional[Client]:
+    """Lazily initialise Supabase so late-loaded env vars are still honored."""
+    global supabase
+    if supabase is not None:
+        return supabase
+
+    supabase_url = os.getenv("SUPABASE_URL")
+    supabase_key = (
+        os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+        or os.getenv("SUPABASE_SERVICE_KEY")
+    )
+    if not supabase_url or not supabase_key:
+        return None
+
     try:
-        supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+        supabase = create_client(supabase_url, supabase_key)
         logger.info("[api_routes] Supabase client initialised")
     except Exception as exc:
         logger.warning(f"[api_routes] Failed to create Supabase client: {exc}")
+        supabase = None
+    return supabase
 
 # ---------------------------------------------------------------------------
 # Service / client singletons (lazy – imported at call-sites that need them)
@@ -68,9 +79,10 @@ def _get_openrouter_client():
 
 def _require_supabase() -> Client:
     """Return the Supabase client or raise 503."""
-    if supabase is None:
+    client = _get_supabase()
+    if client is None:
         raise HTTPException(status_code=503, detail="Supabase is not configured")
-    return supabase
+    return client
 
 
 def _ensure_queue_worker(reason: str) -> None:
