@@ -6,6 +6,7 @@ const integrationOnlyTests = [
   'src/lib/render/remotion-full-render.test.ts',
   'src/lib/render/remotion-integration.test.ts',
   'src/lib/render/remotion-perf.test.ts',
+  'src/integration/paypal-sandbox-billing.test.ts',
   'src/integration/deployed-environment.test.ts',
 ];
 

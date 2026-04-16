@@ -20,7 +20,7 @@ Notes:
 Set these vars in production (primarily on Vercel).
 
 Required (Vercel):
-- `SUPABASE_URL`
+- `POSTGRES_PRISMA_URL` (Prisma Postgres DSN, e.g. `postgresql://...`)
 - `AUTH_SECRET` (or `NEXTAUTH_SECRET`)
 - `NEXTAUTH_URL`
 - `AGENT_URL` (Railway backend URL)

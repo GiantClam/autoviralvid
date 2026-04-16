@@ -20,7 +20,7 @@ If you are enabling subscription + credits + generation charging in production:
 - Run Supabase SQL first:
   - `docs/sql/2026-04-15-billing-core-supabase.sql`
 - Then set billing env on Vercel:
-  - `SUPABASE_URL`
+  - `POSTGRES_PRISMA_URL` (Prisma Postgres DSN)
   - `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, `PAYPAL_PLAN_PRO`, `PAYPAL_PLAN_ENTERPRISE`
   - `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_PRO`, `STRIPE_PRICE_ENTERPRISE`
   - `GENERATION_BILLING_ENABLED=true`

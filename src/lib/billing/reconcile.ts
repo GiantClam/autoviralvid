@@ -44,6 +44,11 @@ function parseLookbackHours(raw?: number): number {
   return Math.min(24 * 30, Math.max(1, Math.floor(raw)));
 }
 
+function isPostgresDsn(value: string | undefined): value is string {
+  if (!value) return false;
+  return value.startsWith("postgres://") || value.startsWith("postgresql://");
+}
+
 export async function runBillingReconcile(
   options?: {
     lookbackHours?: number;
@@ -66,11 +71,17 @@ export async function runBillingReconcile(
   let failedWebhookEvents = 0;
   let negativeBalances = 0;
 
-  if (!process.env.SUPABASE_URL && !process.env.DATABASE_URL) {
+  const hasPrismaDbDsn =
+    isPostgresDsn(process.env.POSTGRES_PRISMA_URL) ||
+    isPostgresDsn(process.env.DATABASE_URL) ||
+    isPostgresDsn(process.env.SUPABASE_URL);
+
+  if (!hasPrismaDbDsn) {
     mismatches.push({
       code: "table_missing",
       severity: "warning",
-      detail: "SUPABASE_URL is not configured. Reconcile checks are skipped.",
+      detail:
+        "POSTGRES_PRISMA_URL is not configured with a postgres DSN. Reconcile checks are skipped.",
     });
     return {
       generatedAt: now.toISOString(),

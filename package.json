@@ -17,6 +17,7 @@
     "test": "vitest run",
     "test:encoding-hygiene": "python scripts/check_encoding_hygiene.py",
     "test:integration": "cross-env RUN_INTEGRATION_TESTS=1 vitest run src/lib/render/render-api.test.ts src/lib/render/remotion-full-render.test.ts src/lib/render/remotion-integration.test.ts src/lib/render/remotion-perf.test.ts",
+    "test:integration:paypal": "cross-env RUN_INTEGRATION_TESTS=1 RUN_PAYPAL_SANDBOX_E2E=1 vitest run src/integration/paypal-sandbox-billing.test.ts",
     "test:deployed": "cross-env RUN_DEPLOYED_INTEGRATION_TESTS=1 vitest run src/integration/deployed-environment.test.ts",
     "test:ui:openclaw": "python scripts/run_ui_openclaw_e2e.py",
     "test:ui:product-ad": "cross-env UI_E2E_SCENARIO=product-ad python scripts/run_ui_openclaw_e2e.py",

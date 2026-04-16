@@ -4,11 +4,12 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("SUPABASE_URL")
+  url      = env("POSTGRES_PRISMA_URL")
 }
 
 model User {
   id            String    @id @default(cuid())
+  name          String?
   email         String?   @unique
   password      String?
   emailVerified DateTime?
