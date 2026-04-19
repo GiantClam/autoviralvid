@@ -55,7 +55,6 @@ def test_subagent_executor_applies_llm_patch_and_merges_skills(monkeypatch):
 
 
 def test_subagent_executor_skips_when_no_model_credentials(monkeypatch):
-    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     monkeypatch.delenv("AIBERM_API_KEY", raising=False)
     monkeypatch.delenv("AIBERM_API_BASE", raising=False)
@@ -257,22 +256,22 @@ def test_load_skill_content_supports_alias_pptx():
     assert "pptx-generator" in str(doc.get("path") or "").lower()
 
 
-def test_create_openai_client_prefers_aiberm_over_openrouter(monkeypatch):
+def test_create_openai_client_prefers_aiberm_over_openai(monkeypatch):
     monkeypatch.setenv("CONTENT_LLM_MODEL", "openai/gpt-5.3-codex")
     monkeypatch.setenv("AIBERM_API_BASE", "https://aiberm.example/v1")
     monkeypatch.setenv("AIBERM_API_KEY", "sk-aiberm")
-    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-openrouter")
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-openai")
 
     client, model, provider = _create_openai_client()
 
     assert client is not None
-    assert model == "openai/gpt-5.3-codex"
+    assert model == "gpt-5.3-codex"
     assert provider == "aiberm"
     assert "aiberm.example" in str(getattr(client, "base_url", ""))
 
 
 def test_create_openai_client_remaps_model_for_aiberm(monkeypatch):
-    monkeypatch.setenv("CONTENT_LLM_MODEL", "anthropic/claude-sonnet-4.6")
+    monkeypatch.setenv("CONTENT_LLM_MODEL", "openai/gpt-5.3-codex")
     monkeypatch.setenv("AIBERM_API_BASE", "https://aiberm.example/v1")
     monkeypatch.setenv("AIBERM_API_KEY", "sk-aiberm")
     monkeypatch.delenv("CRAZYROUTE_API_BASE", raising=False)
@@ -281,27 +280,27 @@ def test_create_openai_client_remaps_model_for_aiberm(monkeypatch):
     _client, model, provider = _create_openai_client()
 
     assert provider == "aiberm"
-    assert model == "claude-sonnet-4-6"
+    assert model == "gpt-5.3-codex"
 
 
-def test_create_openai_client_prefers_crazyroute_over_openrouter_when_aiberm_missing(monkeypatch):
+def test_create_openai_client_prefers_crazyroute_over_openai_when_aiberm_missing(monkeypatch):
     monkeypatch.setenv("CONTENT_LLM_MODEL", "openai/gpt-5.3-codex")
     monkeypatch.delenv("AIBERM_API_BASE", raising=False)
     monkeypatch.delenv("AIBERM_API_KEY", raising=False)
     monkeypatch.setenv("CRAZYROUTE_API_BASE", "https://crazyroute.example/v1")
     monkeypatch.setenv("CRAZYROUTE_API_KEY", "sk-crazyroute")
-    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-openrouter")
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-openai")
 
     client, model, provider = _create_openai_client()
 
     assert client is not None
-    assert model == "openai/gpt-5.3-codex"
+    assert model == "gpt-5.3-codex"
     assert provider == "crazyroute"
     assert "crazyroute.example" in str(getattr(client, "base_url", ""))
 
 
 def test_create_openai_client_remaps_model_for_crazyroute(monkeypatch):
-    monkeypatch.setenv("CONTENT_LLM_MODEL", "anthropic/claude-sonnet-4.6")
+    monkeypatch.setenv("CONTENT_LLM_MODEL", "openai/gpt-5.3-codex")
     monkeypatch.delenv("AIBERM_API_BASE", raising=False)
     monkeypatch.delenv("AIBERM_API_KEY", raising=False)
     monkeypatch.setenv("CRAZYROUTE_API_BASE", "https://crazyroute.example/v1")
@@ -310,21 +309,40 @@ def test_create_openai_client_remaps_model_for_crazyroute(monkeypatch):
     _client, model, provider = _create_openai_client()
 
     assert provider == "crazyroute"
-    assert model == "claude-sonnet-4-6"
+    assert model == "gpt-5.3-codex"
 
 
-def test_create_openai_client_remaps_model_for_openrouter(monkeypatch):
-    monkeypatch.setenv("CONTENT_LLM_MODEL", "claude-sonnet-4-6")
+def test_create_openai_client_supports_crazyrouter_env_alias(monkeypatch):
+    monkeypatch.setenv("CONTENT_LLM_MODEL", "openai/gpt-5.3-codex")
     monkeypatch.delenv("AIBERM_API_BASE", raising=False)
     monkeypatch.delenv("AIBERM_API_KEY", raising=False)
     monkeypatch.delenv("CRAZYROUTE_API_BASE", raising=False)
     monkeypatch.delenv("CRAZYROUTE_API_KEY", raising=False)
-    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-openrouter")
+    monkeypatch.setenv("CRAZYROUTER_API_BASE", "https://crazyrouter.example/v1")
+    monkeypatch.setenv("CRAZYROUTER_API_KEY", "sk-crazyrouter")
 
-    _client, model, provider = _create_openai_client()
+    client, model, provider = _create_openai_client()
 
-    assert provider == "openrouter"
-    assert model == "anthropic/claude-sonnet-4.6"
+    assert client is not None
+    assert provider == "crazyroute"
+    assert model == "gpt-5.3-codex"
+    assert "crazyrouter.example" in str(getattr(client, "base_url", ""))
+
+
+def test_create_openai_client_returns_none_when_gateway_missing(monkeypatch):
+    monkeypatch.setenv("CONTENT_LLM_MODEL", "openai/gpt-5.3-codex")
+    monkeypatch.delenv("AIBERM_API_BASE", raising=False)
+    monkeypatch.delenv("AIBERM_API_KEY", raising=False)
+    monkeypatch.delenv("CRAZYROUTE_API_BASE", raising=False)
+    monkeypatch.delenv("CRAZYROUTE_API_KEY", raising=False)
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-openai")
+    monkeypatch.setenv("OPENAI_API_BASE", "https://api.openai.com/v1")
+
+    client, model, provider = _create_openai_client()
+
+    assert client is None
+    assert provider == ""
+    assert model == ""
 
 
 def test_subagent_executor_handles_none_load_skills(monkeypatch):
@@ -356,4 +374,3 @@ def test_build_llm_input_strips_surrogate_characters():
     assert isinstance(messages, list)
     text = "\n".join(str(item.get("content") or "") for item in messages if isinstance(item, dict))
     assert chr(0xDC80) not in text
-

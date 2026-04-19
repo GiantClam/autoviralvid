@@ -53,20 +53,11 @@ def _resolve_content_model(default: str) -> str:
     return _normalize_text(os.getenv("CONTENT_LLM_MODEL", default), default)
 
 
-def _normalize_openai_model_id(model_id: str) -> str:
-    model = _normalize_text(model_id, "")
-    if "/" in model:
-        _, tail = model.split("/", 1)
-        return _normalize_text(tail, model)
-    return model
-
-
 def _resolve_model_for_provider(model_id: str, provider: str) -> str:
     model = _normalize_text(model_id, "")
     if not model:
         return model
     env_name_by_provider = {
-        "openrouter": "OPENROUTER_MODEL_ALIAS_MAP_JSON",
         "aiberm": "AIBERM_MODEL_ALIAS_MAP_JSON",
         "crazyroute": "CRAZYROUTE_MODEL_ALIAS_MAP_JSON",
     }
@@ -348,8 +339,14 @@ def _create_openai_client() -> tuple[Optional[OpenAI], str, str]:
         )
         return client, model, "aiberm"
 
-    crazyroute_base = _normalize_text(os.getenv("CRAZYROUTE_API_BASE", ""), "")
-    crazyroute_key = _normalize_text(os.getenv("CRAZYROUTE_API_KEY", ""), "")
+    crazyroute_base = _normalize_text(
+        os.getenv("CRAZYROUTE_API_BASE", "") or os.getenv("CRAZYROUTER_API_BASE", ""),
+        "",
+    )
+    crazyroute_key = _normalize_text(
+        os.getenv("CRAZYROUTE_API_KEY", "") or os.getenv("CRAZYROUTER_API_KEY", ""),
+        "",
+    )
     if crazyroute_base and crazyroute_key:
         model = _resolve_model_for_provider(
             _resolve_content_model("openai/gpt-4.1-mini"),
@@ -361,23 +358,6 @@ def _create_openai_client() -> tuple[Optional[OpenAI], str, str]:
         )
         return client, model, "crazyroute"
 
-    openrouter_key = _normalize_text(os.getenv("OPENROUTER_API_KEY", ""), "")
-    if openrouter_key:
-        model = _resolve_model_for_provider(
-            _resolve_content_model("openai/gpt-4.1-mini"),
-            "openrouter",
-        )
-        client = OpenAI(
-            api_key=openrouter_key,
-            base_url=_normalize_text(os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"), "https://openrouter.ai/api/v1"),
-        )
-        return client, model, "openrouter"
-
-    openai_key = _normalize_text(os.getenv("OPENAI_API_KEY", ""), "")
-    if openai_key:
-        model = _normalize_openai_model_id(_resolve_content_model("gpt-4.1-mini"))
-        client = OpenAI(api_key=openai_key)
-        return client, model, "openai"
     return None, "", ""
 
 

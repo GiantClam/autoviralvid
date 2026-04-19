@@ -1,5 +1,6 @@
 ﻿import json
 import logging
+import asyncio
 import os
 import time
 from typing import Any, Dict, List, Optional, Tuple
@@ -8,33 +9,16 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_OPENROUTER_BASE = "https://openrouter.ai/api/v1"
-_DEFAULT_OPENROUTER_FALLBACK_MODEL = os.getenv(
-    "OPENROUTER_FALLBACK_MODEL",
-    os.getenv(
-        "CONTENT_LLM_MODEL",
-        "meta-llama/llama-3.3-70b-instruct",
-    ),
-)
 _FAILOVER_STATUS_CODES = {401, 403, 404, 408, 409, 425, 429, 500, 502, 503, 504}
-_PROVIDER_CYCLE: Tuple[str, str, str] = ("aiberm", "crazyroute", "openrouter")
+_PROVIDER_CYCLE: Tuple[str, str] = ("aiberm", "crazyroute")
 _AIBERM_LIKE_MODEL_ALIASES: Dict[str, str] = {
-    "anthropic/claude-sonnet-4.6": "claude-sonnet-4-6",
-    "anthropic/claude-sonnet-4.5": "claude-sonnet-4-5",
-    "anthropic/claude-opus-4.6": "claude-opus-4-6",
-    "anthropic/claude-opus-4.5": "claude-opus-4-5",
-    "anthropic/claude-haiku-4.5": "claude-haiku-4-5",
+    # Gateways expose OpenAI models as unscoped ids.
+    "openai/gpt-5.3-codex": "gpt-5.3-codex",
+    "gpt-5.3-codex": "gpt-5.3-codex",
 }
+_DEFAULT_GLOBAL_MODEL_ALIASES: Dict[str, str] = dict(_AIBERM_LIKE_MODEL_ALIASES)
 _DEFAULT_PROVIDER_MODEL_ALIASES: Dict[str, Dict[str, str]] = {
-    # OpenRouter commonly expects Anthropic models in scoped dotted form.
-    "openrouter": {
-        "claude-sonnet-4-6": "anthropic/claude-sonnet-4.6",
-        "claude-sonnet-4-5": "anthropic/claude-sonnet-4.5",
-        "claude-opus-4-6": "anthropic/claude-opus-4.6",
-        "claude-opus-4-5": "anthropic/claude-opus-4.5",
-        "claude-haiku-4-5": "anthropic/claude-haiku-4.5",
-    },
-    # AIBERM-like gateways commonly expose Anthropic models as unscoped dashed ids.
+    # AIBERM-like gateways expose models as unscoped ids.
     "aiberm": dict(_AIBERM_LIKE_MODEL_ALIASES),
     "crazyroute": dict(_AIBERM_LIKE_MODEL_ALIASES),
 }
@@ -61,10 +45,18 @@ class OpenRouterClient:
         self.referer = referer or os.getenv("EMBEDDING_REFERER") or os.getenv("SITE_URL") or "https://saleagent.app"
         self.title = title
 
-        # 娴狅絿鎮婇弨顖涘瘮閿涙矮绱崗鍫滃▏閻?OPENROUTER_PROXY閿涘苯鍙惧▎?HTTP_PROXY/HTTPS_PROXY
-        proxy = os.getenv("OPENROUTER_PROXY")
-        http_proxy = os.getenv("OPENROUTER_HTTP_PROXY") or os.getenv("HTTP_PROXY")
-        https_proxy = os.getenv("OPENROUTER_HTTPS_PROXY") or os.getenv("HTTPS_PROXY")
+        # Use generic proxy env first; keep legacy OPENROUTER_* as compatibility fallback.
+        proxy = os.getenv("LLM_PROXY") or os.getenv("OPENROUTER_PROXY")
+        http_proxy = (
+            os.getenv("LLM_HTTP_PROXY")
+            or os.getenv("OPENROUTER_HTTP_PROXY")
+            or os.getenv("HTTP_PROXY")
+        )
+        https_proxy = (
+            os.getenv("LLM_HTTPS_PROXY")
+            or os.getenv("OPENROUTER_HTTPS_PROXY")
+            or os.getenv("HTTPS_PROXY")
+        )
         self.proxy: Optional[str] = proxy or https_proxy or http_proxy
 
         self._failure_threshold = max(
@@ -72,6 +64,29 @@ class OpenRouterClient:
         )
         self._cooldown_seconds = max(
             1, int(str(os.getenv("LLM_PROVIDER_COOLDOWN_SECONDS", "90")).strip() or "90")
+        )
+        self._transport_max_attempts = max(
+            1, int(str(os.getenv("LLM_TRANSPORT_MAX_ATTEMPTS", "2")).strip() or "2")
+        )
+        self._transport_retry_backoff_seconds = max(
+            0.0,
+            float(str(os.getenv("LLM_TRANSPORT_RETRY_BACKOFF_SECONDS", "0.8")).strip() or "0.8"),
+        )
+        self._http_connect_timeout_seconds = max(
+            2.0,
+            float(str(os.getenv("LLM_HTTP_CONNECT_TIMEOUT_SECONDS", "20")).strip() or "20"),
+        )
+        self._http_read_timeout_seconds = max(
+            10.0,
+            float(str(os.getenv("LLM_HTTP_READ_TIMEOUT_SECONDS", "240")).strip() or "240"),
+        )
+        self._http_write_timeout_seconds = max(
+            5.0,
+            float(str(os.getenv("LLM_HTTP_WRITE_TIMEOUT_SECONDS", "60")).strip() or "60"),
+        )
+        self._http_pool_timeout_seconds = max(
+            5.0,
+            float(str(os.getenv("LLM_HTTP_POOL_TIMEOUT_SECONDS", "60")).strip() or "60"),
         )
 
         self._endpoints = self._build_endpoints(api_base=api_base, api_key=api_key)
@@ -85,7 +100,8 @@ class OpenRouterClient:
         ]
         self.api_base = self._endpoints[0]["base"]
         self.api_key = self._endpoints[0]["key"]
-        self._global_model_aliases = self._load_aliases_from_env("LLM_MODEL_ALIAS_MAP_JSON")
+        self._global_model_aliases = dict(_DEFAULT_GLOBAL_MODEL_ALIASES)
+        self._global_model_aliases.update(self._load_aliases_from_env("LLM_MODEL_ALIAS_MAP_JSON"))
         self._provider_model_aliases = self._build_provider_alias_maps()
         self._ensure_provider_runtime_slots()
 
@@ -96,6 +112,13 @@ class OpenRouterClient:
             "round_robin_cursor": 0,
             "providers": {},
         }
+
+    @staticmethod
+    def _format_exception(exc: Exception) -> str:
+        text = str(exc).strip()
+        if text:
+            return f"{exc.__class__.__name__}: {text}"
+        return f"{exc.__class__.__name__}: {exc!r}"
 
     @staticmethod
     def _now() -> float:
@@ -296,7 +319,6 @@ class OpenRouterClient:
             for provider, mapping in _DEFAULT_PROVIDER_MODEL_ALIASES.items()
         }
         env_overrides = {
-            "openrouter": self._load_aliases_from_env("OPENROUTER_MODEL_ALIAS_MAP_JSON"),
             "aiberm": self._load_aliases_from_env("AIBERM_MODEL_ALIAS_MAP_JSON"),
             "crazyroute": self._load_aliases_from_env("CRAZYROUTE_MODEL_ALIAS_MAP_JSON"),
         }
@@ -321,8 +343,8 @@ class OpenRouterClient:
     @staticmethod
     def _provider_from_base(api_base: str) -> str:
         lowered = OpenRouterClient._normalize_base(api_base).lower()
-        if "openrouter.ai" in lowered:
-            return "openrouter"
+        if "api.openai.com" in lowered:
+            return "openai"
         aiberm_base = OpenRouterClient._normalize_base(os.getenv("AIBERM_API_BASE"))
         crazyroute_base = OpenRouterClient._normalize_base(
             os.getenv("CRAZYROUTE_API_BASE") or os.getenv("CRAZYROUTER_API_BASE")
@@ -364,11 +386,6 @@ class OpenRouterClient:
         return mapped
 
     def _build_endpoints(self, *, api_base: Optional[str], api_key: Optional[str]) -> List[Dict[str, str]]:
-        openrouter_base = self._normalize_base(
-            os.getenv("OPENROUTER_API_BASE")
-            or os.getenv("OPENROUTER_BASE_URL")
-            or _DEFAULT_OPENROUTER_BASE
-        )
         aiberm_base = self._normalize_base(os.getenv("AIBERM_API_BASE"))
         crazyroute_base = self._normalize_base(
             os.getenv("CRAZYROUTE_API_BASE") or os.getenv("CRAZYROUTER_API_BASE")
@@ -378,33 +395,26 @@ class OpenRouterClient:
             or os.getenv("AIBERM_API_BASE")
             or os.getenv("CRAZYROUTE_API_BASE")
             or os.getenv("CRAZYROUTER_API_BASE")
-            or os.getenv("OPENROUTER_API_BASE")
-            or os.getenv("OPENROUTER_BASE_URL")
-            or _DEFAULT_OPENROUTER_BASE
         )
-        openrouter_key = os.getenv("OPENROUTER_API_KEY") or os.getenv("LLM_API_KEY")
         aiberm_key = os.getenv("AIBERM_API_KEY")
         crazyroute_key = os.getenv("CRAZYROUTE_API_KEY") or os.getenv("CRAZYROUTER_API_KEY")
 
         def _pick_key_for_provider(provider: str) -> Optional[str]:
             if provider == "aiberm":
-                return aiberm_key or crazyroute_key or openrouter_key
+                return aiberm_key
             if provider == "crazyroute":
-                return crazyroute_key or aiberm_key or openrouter_key
-            if provider == "openrouter":
-                return openrouter_key or aiberm_key or crazyroute_key
-            return openrouter_key or aiberm_key or crazyroute_key
+                return crazyroute_key
+            return None
 
-        default_any_key = openrouter_key or aiberm_key or crazyroute_key
+        default_any_key = aiberm_key or crazyroute_key
         if not (api_key or default_any_key):
             raise OpenRouterError(
-                "missing OPENROUTER_API_KEY/LLM_API_KEY or AIBERM_API_KEY or CRAZYROUTE_API_KEY"
+                "missing AIBERM_API_KEY or CRAZYROUTE_API_KEY"
             )
 
         provider_bases: Dict[str, str] = {
             "aiberm": aiberm_base,
             "crazyroute": crazyroute_base,
-            "openrouter": openrouter_base,
         }
         provider_keys: Dict[str, Optional[str]] = {
             provider: _pick_key_for_provider(provider)
@@ -426,24 +436,6 @@ class OpenRouterClient:
                     "key": api_key or default_any_key or "",
                 }
             )
-
-        explicit_fallback_base = self._normalize_base(os.getenv("OPENROUTER_FALLBACK_API_BASE"))
-        explicit_fallback_key = os.getenv("OPENROUTER_FALLBACK_API_KEY")
-        if explicit_fallback_base:
-            fallback_provider = self._provider_from_base(explicit_fallback_base)
-            if fallback_provider in _PROVIDER_CYCLE:
-                provider_bases[fallback_provider] = explicit_fallback_base
-                if explicit_fallback_key:
-                    provider_keys[fallback_provider] = explicit_fallback_key
-            else:
-                extra_endpoints.append(
-                    {
-                        "name": "explicit_fallback",
-                        "provider": "default",
-                        "base": explicit_fallback_base,
-                        "key": explicit_fallback_key or default_any_key or "",
-                    }
-                )
 
         endpoints: List[Dict[str, str]] = []
         for provider in _PROVIDER_CYCLE:
@@ -478,19 +470,16 @@ class OpenRouterClient:
 
         if not endpoints:
             raise OpenRouterError(
-                "No LLM endpoints configured. Set AIBERM_API_BASE/KEY, CRAZYROUTE_API_BASE/KEY, or OPENROUTER_API_KEY."
+                "No LLM endpoints configured. Set AIBERM_API_BASE/KEY or CRAZYROUTE_API_BASE/KEY."
             )
         return endpoints
 
     def _headers(self, *, api_base: str, api_key: str) -> Dict[str, str]:
-        headers = {
+        _ = api_base
+        return {
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
         }
-        if "openrouter.ai" in api_base:
-            headers["HTTP-Referer"] = self.referer
-            headers["X-Title"] = self.title
-        return headers
 
     @staticmethod
     def _normalize_base(raw: str) -> str:
@@ -585,7 +574,10 @@ class OpenRouterClient:
                     None,
                 )
         except Exception as exc:
-            return None, f"{endpoint_name} stream fallback transport error: {exc}"
+            return None, (
+                f"{endpoint_name} stream fallback transport error: "
+                f"{self._format_exception(exc)}"
+            )
 
     @staticmethod
     def _is_failover_status(status_code: int, error_text: str) -> bool:
@@ -601,6 +593,29 @@ class OpenRouterClient:
                 "gateway",
                 "network",
                 "connection reset",
+            )
+        )
+
+    @staticmethod
+    def _is_non_retryable_request_error(status_code: int, error_text: str) -> bool:
+        if status_code not in {400, 422}:
+            return False
+        lowered = str(error_text or "").lower()
+        # model_not_found should still allow provider-level failover.
+        if "model_not_found" in lowered or "unsupported model" in lowered:
+            return False
+        return any(
+            token in lowered
+            for token in (
+                "invalid_request_error",
+                "context_length_exceeded",
+                "maximum context length",
+                "too many tokens",
+                "validation error",
+                "unprocessable entity",
+                "json schema",
+                "response_format",
+                "invalid messages",
             )
         )
 
@@ -667,35 +682,31 @@ class OpenRouterClient:
         api_base: str,
         endpoint_name: str,
     ) -> str:
-        model = self._remap_model_for_endpoint(
+        return self._remap_model_for_endpoint(
             requested_model=requested_model,
             api_base=api_base,
             endpoint_name=endpoint_name,
         )
-        if not model:
-            return model
-        author = model.split("/", 1)[0].strip().lower()
-        banned_on_current_key = {"openai", "google"}
-        if author not in banned_on_current_key:
-            return model
-        if "openrouter.ai" not in str(api_base or "").lower() and endpoint_name != "openrouter_fallback":
-            return model
-        fallback_model = str(_DEFAULT_OPENROUTER_FALLBACK_MODEL).strip()
-        if not fallback_model:
-            return model
-        if fallback_model != model:
-            logger.warning(
-                "[OpenRouterClient] swap model for %s: %s -> %s",
-                endpoint_name,
-                model,
-                fallback_model,
-            )
-        return fallback_model
 
-    async def _post_chat_json(self, request_payload: Dict[str, Any]) -> Dict[str, Any]:
+    async def _post_chat_json(
+        self,
+        request_payload: Dict[str, Any],
+        *,
+        transport_max_attempts: Optional[int] = None,
+        timeout_overrides: Optional[Dict[str, float]] = None,
+        allow_stream_fallback: bool = True,
+    ) -> Dict[str, Any]:
         attempt_errors: List[str] = []
         request_endpoints = self._ordered_endpoints_for_request()
-        async with httpx.AsyncClient(timeout=60, proxy=self.proxy) as client:
+        timeout_overrides = timeout_overrides or {}
+        timeout_config = httpx.Timeout(
+            connect=float(timeout_overrides.get("connect", self._http_connect_timeout_seconds)),
+            read=float(timeout_overrides.get("read", self._http_read_timeout_seconds)),
+            write=float(timeout_overrides.get("write", self._http_write_timeout_seconds)),
+            pool=float(timeout_overrides.get("pool", self._http_pool_timeout_seconds)),
+        )
+        max_attempts = max(1, int(transport_max_attempts or self._transport_max_attempts))
+        async with httpx.AsyncClient(timeout=timeout_config, proxy=self.proxy) as client:
             for idx, endpoint in enumerate(request_endpoints):
                 api_base = endpoint["base"]
                 api_key = endpoint["key"]
@@ -714,17 +725,44 @@ class OpenRouterClient:
                     json.dumps(effective_payload, ensure_ascii=False, indent=2),
                 )
 
-                try:
-                    response = await client.post(
-                        f"{api_base}/chat/completions",
-                        headers=self._headers(api_base=api_base, api_key=api_key),
-                        json=effective_payload,
+                response: Optional[httpx.Response] = None
+                transport_exc: Optional[Exception] = None
+                for transport_attempt in range(1, max_attempts + 1):
+                    try:
+                        response = await client.post(
+                            f"{api_base}/chat/completions",
+                            headers=self._headers(api_base=api_base, api_key=api_key),
+                            json=effective_payload,
+                        )
+                        transport_exc = None
+                        break
+                    except Exception as exc:
+                        transport_exc = exc
+                        retryable = transport_attempt < max_attempts
+                        detail = self._format_exception(exc)
+                        if retryable:
+                            delay = float(self._transport_retry_backoff_seconds) * transport_attempt
+                            logger.warning(
+                                "[OpenRouterClient] %s transport attempt %s/%s failed (%s), retrying in %.1fs",
+                                endpoint_name,
+                                transport_attempt,
+                                max_attempts,
+                                detail,
+                                delay,
+                            )
+                            if delay > 0:
+                                await asyncio.sleep(delay)
+                            continue
+                        break
+
+                if transport_exc is not None:
+                    error_msg = (
+                        f"{endpoint_name} transport error: "
+                        f"{self._format_exception(transport_exc)}"
                     )
-                except Exception as exc:
-                    error_msg = f"{endpoint_name} transport error: {exc}"
                     attempt_errors.append(error_msg)
                     logger.warning("[OpenRouterClient] %s", error_msg)
-                    if self._is_aiberm_like_base(api_base):
+                    if allow_stream_fallback and self._is_aiberm_like_base(api_base):
                         stream_data, stream_error = await self._retry_provider_via_stream(
                             client=client,
                             api_base=api_base,
@@ -749,8 +787,10 @@ class OpenRouterClient:
                     if len(attempt_errors) > 1:
                         raise OpenRouterError(
                             f"All LLM endpoints failed: {' | '.join(attempt_errors)}"
-                        ) from exc
-                    raise OpenRouterError(f"LLM request failed: {error_msg}") from exc
+                        ) from transport_exc
+                    raise OpenRouterError(f"LLM request failed: {error_msg}") from transport_exc
+
+                assert response is not None
 
                 logger.info("[OpenRouterClient] Response status(%s): %s", endpoint_name, response.status_code)
                 if response.status_code != 200:
@@ -759,6 +799,8 @@ class OpenRouterClient:
                     attempt_errors.append(error_msg)
                     self._mark_provider_failure(str(provider), detail=error_msg)
                     logger.error("[OpenRouterClient] %s", error_msg)
+                    if self._is_non_retryable_request_error(response.status_code, error_text):
+                        raise OpenRouterError(error_msg)
                     if idx < len(request_endpoints) - 1 and self._is_failover_status(response.status_code, error_text):
                         logger.warning(
                             "[OpenRouterClient] switching to fallback endpoint (%s -> %s)",
@@ -789,7 +831,7 @@ class OpenRouterClient:
                     error_msg = f"{endpoint_name} empty content response"
                     attempt_errors.append(error_msg)
                     logger.warning("[OpenRouterClient] %s", error_msg)
-                    if self._is_aiberm_like_base(api_base):
+                    if allow_stream_fallback and self._is_aiberm_like_base(api_base):
                         stream_data, stream_error = await self._retry_provider_via_stream(
                             client=client,
                             api_base=api_base,
@@ -916,11 +958,42 @@ class OpenRouterClient:
             request_payload["response_format"] = response_format
         return await self._post_chat_json(request_payload)
 
+    async def preflight_chat(
+        self,
+        *,
+        model: str,
+        prompt: str,
+        timeout_seconds: float = 18.0,
+    ) -> str:
+        timeout_cap = max(6.0, min(float(timeout_seconds or 18.0), 45.0))
+        req_payload: Dict[str, Any] = {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": "Health probe. Reply with exactly OK."},
+                {"role": "user", "content": str(prompt or "").strip()[:220]},
+            ],
+            "temperature": 0.0,
+            "max_tokens": 12,
+        }
+        data = await self._post_chat_json(
+            req_payload,
+            transport_max_attempts=1,
+            timeout_overrides={
+                "connect": min(8.0, timeout_cap),
+                "read": timeout_cap,
+                "write": min(8.0, timeout_cap),
+                "pool": min(8.0, timeout_cap),
+            },
+            allow_stream_fallback=False,
+        )
+        content = self._extract_text_from_response(data)
+        if not content:
+            raise OpenRouterError("preflight_empty_content")
+        return content
+
     def pick_content(self, resp: Dict[str, Any]) -> Optional[str]:
         try:
             content = self._extract_text_from_response(resp)
             return content or None
         except Exception:
             return None
-
-
