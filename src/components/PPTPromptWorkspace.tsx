@@ -23,6 +23,14 @@ const DIRECT_PPT_API_BASE = (() => {
   if (!raw) return "";
   return `${raw.replace(/\/+$/, "")}/api/v1/ppt`;
 })();
+const DIRECT_API_ORIGIN = (() => {
+  if (!DIRECT_PPT_API_BASE) return "";
+  try {
+    return new URL(DIRECT_PPT_API_BASE).origin;
+  } catch {
+    return "";
+  }
+})();
 const HISTORY_KEY = "autoviralvid-ppt-prompt-history";
 let cachedApiToken: string | null = null;
 
@@ -240,6 +248,29 @@ function envelopeFromUnknown<T>(status: number, payload: unknown, fallbackText: 
   return { success: false, error: fallbackText || `HTTP ${status}` };
 }
 
+function withTokenQuery(url: string, token: string | null): string {
+  if (!token) return url;
+  try {
+    const parsed = new URL(url);
+    parsed.searchParams.set("token", token);
+    return parsed.toString();
+  } catch {
+    return url.includes("?") ? `${url}&token=${encodeURIComponent(token)}` : `${url}?token=${encodeURIComponent(token)}`;
+  }
+}
+
+function resolvePptAssetUrl(url: string, token: string | null): string {
+  const raw = String(url || "").trim();
+  if (!raw) return raw;
+  if (raw.startsWith("http://") || raw.startsWith("https://")) {
+    return withTokenQuery(raw, token);
+  }
+  if (DIRECT_API_ORIGIN && (raw.startsWith("/api/v1/ppt/") || raw.startsWith("/api/ppt/"))) {
+    return withTokenQuery(`${DIRECT_API_ORIGIN}${raw}`, token);
+  }
+  return raw;
+}
+
 async function decodeEnvelope<T>(res: Response): Promise<ApiEnvelope<T>> {
   const contentType = String(res.headers.get("content-type") || "").toLowerCase();
   let payload: unknown = null;
@@ -318,6 +349,7 @@ export default function PPTPromptWorkspace({ embedded = false }: PPTPromptWorksp
   const [error, setError] = useState<string | null>(null);
   const [log, setLog] = useState<string[]>([]);
   const [history, setHistory] = useState<PptHistoryItem[]>(() => loadHistory());
+  const [assetToken, setAssetToken] = useState<string | null>(null);
 
   const isBusy = phase === "loading_templates" || phase === "loading_preview" || phase === "generating";
 
@@ -325,11 +357,18 @@ export default function PPTPromptWorkspace({ embedded = false }: PPTPromptWorksp
     () => templates.find((item) => item.name === templateFamily),
     [templateFamily, templates],
   );
+  const previewImageUrls = useMemo(
+    () =>
+      Array.isArray(preview?.preview_image_urls)
+        ? preview.preview_image_urls.map((url) => resolvePptAssetUrl(url, assetToken))
+        : [],
+    [assetToken, preview?.preview_image_urls],
+  );
 
   const pptxPath = String(result?.output_pptx || preview?.output_pptx || "").trim();
   const hasHttpPptx = pptxPath.startsWith("http://") || pptxPath.startsWith("https://");
   const apiDownloadUrl = result
-    ? `${API_BASE}/download-output/${encodeURIComponent(result.project_name)}`
+    ? resolvePptAssetUrl(`${API_BASE}/download-output/${encodeURIComponent(result.project_name)}`, assetToken)
     : "";
 
   const addLog = useCallback((msg: string) => {
@@ -370,6 +409,10 @@ export default function PPTPromptWorkspace({ embedded = false }: PPTPromptWorksp
     setPhase("loading_preview");
     addLog(`Loading preview for ${projectName}...`);
     try {
+      const token = await getApiToken();
+      if (token) {
+        setAssetToken(token);
+      }
       const data = await apiGet<ProjectPreview>(`/preview/${encodeURIComponent(projectName)}`);
       setPreview(data);
       setPhase("done");
@@ -426,6 +469,18 @@ export default function PPTPromptWorkspace({ embedded = false }: PPTPromptWorksp
     }, 0);
     return () => clearTimeout(timer);
   }, [loadTemplates]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void getApiToken().then((token) => {
+      if (!cancelled && token) {
+        setAssetToken(token);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleGenerate = useCallback(async () => {
     const promptText = prompt.trim();
@@ -719,9 +774,9 @@ export default function PPTPromptWorkspace({ embedded = false }: PPTPromptWorksp
 
                     <div className="rounded-lg border border-white/[0.08] bg-white/[0.03] p-3">
                       <div className="mb-2 text-gray-400">Page Preview</div>
-                      {preview?.preview_image_urls?.length ? (
+                      {previewImageUrls.length ? (
                         <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
-                          {preview.preview_image_urls.map((url, idx) => (
+                          {previewImageUrls.map((url, idx) => (
                             <img
                               key={`${url}-${idx}`}
                               src={url}
