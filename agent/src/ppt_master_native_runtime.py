@@ -13,6 +13,7 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 import uuid
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
@@ -54,6 +55,16 @@ def _normalize_language(value: Any) -> str:
     if text.startswith("en"):
         return "en-US"
     return "zh-CN"
+
+
+def _env_int(name: str, default: int) -> int:
+    raw = _text(os.getenv(name), "")
+    if not raw:
+        return int(default)
+    try:
+        return int(raw)
+    except Exception:
+        return int(default)
 
 
 def _run_cmd(
@@ -168,9 +179,14 @@ def _choose_template_family(
         )
     except Exception:
         raw_selected = ""
-    selected = _text(raw_selected, "").splitlines()[0].strip()
-    selected = selected.strip("` ").split()[:1]
-    selected_id = selected[0] if selected else ""
+    selected_line = ""
+    for line in _text(raw_selected, "").splitlines():
+        normalized = line.strip()
+        if normalized:
+            selected_line = normalized
+            break
+    selected_tokens = selected_line.strip("` ").split()[:1]
+    selected_id = selected_tokens[0] if selected_tokens else ""
     if selected_id in candidates:
         return selected_id
 
@@ -301,6 +317,9 @@ def _build_strategist_confirmations(
     research_items: List[Dict[str, str]],
     timeout_sec: int,
 ) -> str:
+    max_tokens = max(2000, min(8000, _env_int("PPT_MASTER_STRATEGIST_CONFIRM_MAX_TOKENS", 4500)))
+    source_limit = max(8000, min(120000, _env_int("PPT_MASTER_STRATEGIST_SOURCE_CHARS", 30000)))
+    template_limit = max(5000, min(60000, _env_int("PPT_MASTER_STRATEGIST_TEMPLATE_CHARS", 20000)))
     messages = [
         {
             "role": "system",
@@ -318,8 +337,8 @@ def _build_strategist_confirmations(
                 f"Total pages target: {total_pages}\n"
                 f"Style: {style}\n"
                 f"Template: {selected_template}\n"
-                f"Source markdown:\n{source_md_text[:120000]}\n\n"
-                f"Template design spec example:\n{template_design_spec_text[:50000]}\n\n"
+                f"Source markdown:\n{source_md_text[:source_limit]}\n\n"
+                f"Template design spec example:\n{template_design_spec_text[:template_limit]}\n\n"
                 f"Research evidence JSON: {json.dumps(research_items, ensure_ascii=False)}\n"
                 "Provide concise recommendations for the eight confirmations only."
             ),
@@ -327,7 +346,7 @@ def _build_strategist_confirmations(
     ]
     return _call_chat_text(
         messages=messages,
-        max_tokens=6000,
+        max_tokens=max_tokens,
         timeout_sec=max(60, min(timeout_sec, 900)),
         temperature=0.0,
     )
@@ -348,6 +367,10 @@ def _build_strategist_design_spec(
     confirmations_text: str,
     timeout_sec: int,
 ) -> str:
+    max_tokens = max(3000, min(14000, _env_int("PPT_MASTER_STRATEGIST_DESIGNSPEC_MAX_TOKENS", 9000)))
+    source_limit = max(8000, min(120000, _env_int("PPT_MASTER_STRATEGIST_SOURCE_CHARS", 30000)))
+    template_limit = max(5000, min(60000, _env_int("PPT_MASTER_STRATEGIST_TEMPLATE_CHARS", 20000)))
+    confirmations_limit = max(6000, min(50000, _env_int("PPT_MASTER_STRATEGIST_CONFIRMATIONS_CHARS", 20000)))
     messages = [
         {
             "role": "system",
@@ -367,17 +390,17 @@ def _build_strategist_design_spec(
                 f"Total pages target: {total_pages}\n"
                 f"Style: {style}\n"
                 f"Template: {selected_template}\n"
-                f"Source markdown:\n{source_md_text[:120000]}\n\n"
-                f"Template design spec example:\n{template_design_spec_text[:50000]}\n\n"
+                f"Source markdown:\n{source_md_text[:source_limit]}\n\n"
+                f"Template design spec example:\n{template_design_spec_text[:template_limit]}\n\n"
                 f"Research evidence JSON: {json.dumps(research_items, ensure_ascii=False)}\n"
-                f"Confirmed Eight Confirmations package:\n{confirmations_text[:40000]}\n\n"
+                f"Confirmed Eight Confirmations package:\n{confirmations_text[:confirmations_limit]}\n\n"
                 "Auto-confirmation: approved as-is. Produce the final complete design_spec.md now."
             ),
         },
     ]
     return _call_chat_text(
         messages=messages,
-        max_tokens=12000,
+        max_tokens=max_tokens,
         timeout_sec=max(60, min(timeout_sec, 1200)),
         temperature=0.0,
     )
@@ -489,6 +512,8 @@ def _executor_plan_page(
     previous_titles: List[str],
     timeout_sec: int,
 ) -> str:
+    max_tokens = max(1200, min(5000, _env_int("PPT_MASTER_EXECUTOR_PLAN_MAX_TOKENS", 2200)))
+    design_spec_limit = max(8000, min(100000, _env_int("PPT_MASTER_EXECUTOR_PLAN_DESIGNSPEC_CHARS", 30000)))
     messages = [
         {
             "role": "system",
@@ -510,13 +535,13 @@ def _executor_plan_page(
                 f"Language for content: {language}\n"
                 f"Page: {page_no}/{total_pages}\n"
                 f"Previous page titles: {json.dumps(previous_titles[-5:], ensure_ascii=False)}\n"
-                f"Design spec markdown:\n{design_spec_md_text[:100000]}"
+                f"Design spec markdown:\n{design_spec_md_text[:design_spec_limit]}"
             ),
         },
     ]
     return _call_chat_text(
         messages=messages,
-        max_tokens=4000,
+        max_tokens=max_tokens,
         timeout_sec=max(40, min(timeout_sec, 900)),
         temperature=0.0,
     )
@@ -538,6 +563,63 @@ def _extract_page_plan_section(plan_text: str, page_no: int) -> str:
     return text[:4000]
 
 
+def _extract_design_spec_section(
+    design_spec_text: str,
+    page_no: int,
+    total_pages: int,
+    max_chars: int,
+) -> str:
+    text = _text(design_spec_text, "")
+    if not text:
+        return ""
+
+    limit = max(4000, int(max_chars))
+    first_slide_header = re.search(r"(?im)^#+\s*(?:slide|page)\s*\d+\b", text)
+    global_limit = max(1200, min(8000, limit // 3))
+    global_part = text[: first_slide_header.start()] if first_slide_header else text[:global_limit]
+    global_part = _text(global_part, "")[:global_limit]
+
+    patterns = [
+        rf"(?ims)^#+\s*(?:slide|page)\s*{page_no}\b.*?(?=^#+\s*(?:slide|page)\s*\d+\b|\Z)",
+        rf"(?ims)^#+\s*第\s*{page_no}\s*页.*?(?=^#+\s*第\s*\d+\s*页|\Z)",
+        rf"(?ims)^#+\s*(?:{page_no}/{total_pages}).*?(?=^#+\s*(?:\d+/{total_pages})|\Z)",
+        rf"(?ims)\b(?:slide|page)\s*{page_no}\b.*?(?=(?:slide|page)\s*\d+\b|\Z)",
+    ]
+    page_part = ""
+    for pat in patterns:
+        match = re.search(pat, text)
+        if match:
+            page_part = _text(match.group(0), "")
+            break
+    if not page_part:
+        page_part = text[: max(2400, min(limit, 12000))]
+
+    combined = f"{global_part}\n\n{page_part}".strip()
+    return combined[:limit]
+
+
+def _build_fast_page_plan(*, page_no: int, total_pages: int) -> str:
+    if page_no == 1:
+        template = "01_cover.svg"
+        strategy = "Strong title slide with one-line subtitle and visual anchor."
+    elif page_no == total_pages:
+        template = "04_ending.svg"
+        strategy = "Summary and Q&A close with key takeaways."
+    elif page_no == 2:
+        template = "02_toc.svg"
+        strategy = "Agenda/table of contents that matches chapter flow."
+    elif page_no in {3, 6, 9}:
+        template = "02_chapter.svg"
+        strategy = "Chapter divider emphasizing transition and hierarchy."
+    else:
+        template = "03_content.svg"
+        strategy = "Content page with 3-5 concise bullets and evidence."
+    return (
+        f"Template mapping: {template}\n"
+        f"Adherence rules / layout strategy: {strategy}"
+    )
+
+
 def _executor_render_page(
     *,
     executor_base: str,
@@ -555,11 +637,22 @@ def _executor_render_page(
     total_pages: int,
     previous_titles: List[str],
     timeout_sec: int,
+    include_notes: bool = True,
 ) -> str:
+    max_tokens = max(4000, min(18000, _env_int("PPT_MASTER_EXECUTOR_RENDER_MAX_TOKENS", 9000)))
+    source_limit = max(1500, min(30000, _env_int("PPT_MASTER_EXECUTOR_SOURCE_CHARS", 8000)))
+    design_spec_limit = max(6000, min(50000, _env_int("PPT_MASTER_EXECUTOR_DESIGNSPEC_CHARS", 22000)))
+    template_svg_limit = max(3000, min(20000, _env_int("PPT_MASTER_EXECUTOR_TEMPLATE_SVG_CHARS", 12000)))
     render_model = _text(os.getenv("PPT_MASTER_EXECUTOR_RENDER_MODEL"), "")
     plan_section = _extract_page_plan_section(page_plan, page_no)
+    design_spec_excerpt = _extract_design_spec_section(
+        design_spec_text=design_spec_md_text,
+        page_no=page_no,
+        total_pages=total_pages,
+        max_chars=design_spec_limit,
+    )
     template_section = (
-        f"Template reference ({template_svg_name}):\n{template_svg_text[:20000]}"
+        f"Template reference ({template_svg_name}):\n{template_svg_text[:template_svg_limit]}"
         if _text(template_svg_text, "")
         else "Template reference: none (free design)"
     )
@@ -570,9 +663,14 @@ def _executor_render_page(
                 [
                     "You are executing ppt-master Executor visual construction phase.",
                     "Follow executor-base, selected style guidance, and shared-standards as the primary authority.",
-                    "Output only final artifacts in plain text with exactly two fenced blocks:",
-                    "1) ```svg ...``` containing one complete valid SVG document.",
-                    "2) ```notes ...``` containing speaker notes for this page.",
+                    (
+                        "Output only final artifacts in plain text with exactly two fenced blocks:\n"
+                        "1) ```svg ...``` containing one complete valid SVG document.\n"
+                        "2) ```notes ...``` containing speaker notes for this page."
+                        if include_notes
+                        else
+                        "Output only one fenced block: ```svg ...``` containing one complete valid SVG document."
+                    ),
                     "Do not output template mapping, confirmations, headings, or analysis text.",
                     "Write content in the requested language and keep outputs production-ready.",
                     executor_base,
@@ -585,23 +683,67 @@ def _executor_render_page(
             "role": "user",
             "content": (
                 f"Deck topic: {prompt}\n"
-                f"Source markdown excerpt:\n{source_md_text[:50000]}\n\n"
+                f"Source markdown excerpt:\n{source_md_text[:source_limit]}\n\n"
                 f"Language for content: {language}\n"
                 f"Page: {page_no}/{total_pages}\n"
                 f"Previous page titles: {json.dumps(previous_titles[-5:], ensure_ascii=False)}\n"
                 f"Confirmed global design parameters:\n{design_confirmation[:10000]}\n\n"
                 f"Page plan section:\n{plan_section}\n\n"
                 f"{template_section}\n\n"
-                f"Design specification:\n{design_spec_md_text[:90000]}"
+                f"Design specification (global + current page excerpt):\n{design_spec_excerpt}"
             ),
         },
     ]
     return _call_chat_text(
         messages=messages,
-        max_tokens=16000,
+        max_tokens=max_tokens,
         timeout_sec=max(50, min(timeout_sec, 1200)),
         temperature=0.0,
         model_override=(render_model or None),
+    )
+
+
+def _executor_generate_total_notes(
+    *,
+    executor_base: str,
+    design_spec_md_text: str,
+    prompt: str,
+    language: str,
+    page_stems: List[str],
+    page_titles: List[str],
+    timeout_sec: int,
+) -> str:
+    max_tokens = max(2000, min(12000, _env_int("PPT_MASTER_EXECUTOR_NOTES_MAX_TOKENS", 7000)))
+    design_spec_limit = max(8000, min(40000, _env_int("PPT_MASTER_EXECUTOR_NOTES_DESIGNSPEC_CHARS", 12000)))
+    stems_json = json.dumps(page_stems, ensure_ascii=False)
+    titles_json = json.dumps(page_titles, ensure_ascii=False)
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "You are generating presentation speaker notes.\n"
+                "Return markdown only. For each slide, create one section starting with:\n"
+                "# <stem>\n\n"
+                "Then provide concise speaking notes in the target language.\n"
+                "Do not use code fences."
+            ),
+        },
+        {
+            "role": "user",
+            "content": (
+                f"Deck topic: {prompt}\n"
+                f"Language: {language}\n"
+                f"Slide stems in strict order: {stems_json}\n"
+                f"Slide titles in strict order: {titles_json}\n"
+                f"Design spec excerpt:\n{design_spec_md_text[:design_spec_limit]}"
+            ),
+        },
+    ]
+    return _call_chat_text(
+        messages=messages,
+        max_tokens=max_tokens,
+        timeout_sec=max(40, min(timeout_sec, 600)),
+        temperature=0.2,
     )
 
 
@@ -825,8 +967,62 @@ def run_native_pipeline(
     template_family = _text(request_payload.get("template_family"), "auto")
     web_enrichment = _to_bool(request_payload.get("web_enrichment"), True)
     include_images = _to_bool(request_payload.get("include_images"), False)
+    fast_plan = _to_bool(
+        request_payload.get("fast_plan"),
+        _to_bool(os.getenv("PPT_MASTER_EXECUTOR_FAST_PLAN"), False),
+    )
+    notes_mode = _text(
+        request_payload.get("notes_mode"),
+        _text(os.getenv("PPT_MASTER_EXECUTOR_NOTES_MODE"), "batch"),
+    ).lower()
+    if notes_mode not in {"batch", "per_page"}:
+        notes_mode = "batch"
+
+    def _cap_timeout(*, floor: int, upper: int, env_name: str) -> int:
+        cap = _env_int(env_name, upper)
+        cap = max(floor, cap)
+        return max(floor, min(int(timeout_sec), cap))
+
+    t_confirm_timeout = _cap_timeout(
+        floor=40,
+        upper=420,
+        env_name="PPT_MASTER_STRATEGIST_CONFIRM_TIMEOUT_SEC",
+    )
+    t_design_spec_timeout = _cap_timeout(
+        floor=60,
+        upper=600,
+        env_name="PPT_MASTER_STRATEGIST_DESIGNSPEC_TIMEOUT_SEC",
+    )
+    t_executor_confirm_timeout = _cap_timeout(
+        floor=40,
+        upper=300,
+        env_name="PPT_MASTER_EXECUTOR_CONFIRM_TIMEOUT_SEC",
+    )
+    t_plan_timeout = _cap_timeout(
+        floor=30,
+        upper=180,
+        env_name="PPT_MASTER_EXECUTOR_PLAN_TIMEOUT_SEC",
+    )
+    t_render_timeout = _cap_timeout(
+        floor=45,
+        upper=300,
+        env_name="PPT_MASTER_EXECUTOR_RENDER_TIMEOUT_SEC",
+    )
+    t_render_retry_timeout = _cap_timeout(
+        floor=40,
+        upper=180,
+        env_name="PPT_MASTER_EXECUTOR_RENDER_RETRY_TIMEOUT_SEC",
+    )
+    t_xml_repair_timeout = _cap_timeout(
+        floor=30,
+        upper=120,
+        env_name="PPT_MASTER_EXECUTOR_XML_REPAIR_TIMEOUT_SEC",
+    )
 
     stage_rows: List[Dict[str, Any]] = []
+    perf_rows: List[Dict[str, Any]] = []
+    run_started_at = _utc_now()
+    run_t0 = time.perf_counter()
 
     def _record(stage: str, ok: bool, detail: str = "") -> None:
         stage_rows.append(
@@ -839,9 +1035,51 @@ def run_native_pipeline(
             }
         )
 
-    # Step 1: source material
+    def _perf(label: str, started: float, **meta: Any) -> None:
+        row: Dict[str, Any] = {
+            "label": label,
+            "elapsed_ms": round((time.perf_counter() - started) * 1000.0, 1),
+            "at": _utc_now(),
+        }
+        for key, value in meta.items():
+            if value is not None:
+                row[key] = value
+        perf_rows.append(row)
+
     runtime_input_dir = project_path / "_runtime_inputs"
     runtime_input_dir.mkdir(parents=True, exist_ok=True)
+    progress_path = runtime_input_dir / "runtime_progress.json"
+
+    def _update_progress(
+        stage: str,
+        detail: str,
+        *,
+        substage: str = "",
+        percent: Optional[float] = None,
+        current_page: Optional[int] = None,
+    ) -> None:
+        payload: Dict[str, Any] = {
+            "stage": stage,
+            "detail": _text(detail, stage),
+            "updated_at": _utc_now(),
+            "total_pages": int(total_pages),
+        }
+        if substage:
+            payload["substage"] = substage
+        if percent is not None:
+            payload["percent"] = round(float(percent), 1)
+        if current_page is not None:
+            payload["current_page"] = max(0, min(int(current_page), int(total_pages)))
+        try:
+            progress_path.write_text(
+                json.dumps(payload, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+        except Exception:
+            pass
+
+    # Step 1: source material
+    _update_progress("step1", "Initializing generation workspace", percent=3.0)
     source_seed = runtime_input_dir / "prompt_source.md"
     source_seed.write_text(f"# Prompt\n\n{prompt}\n", encoding="utf-8")
     _record("step1_source_ready", True, "prompt_source_md_created")
@@ -864,6 +1102,7 @@ def run_native_pipeline(
         detail = _text(stderr or stdout, f"exit_{code}")[:500]
         raise RuntimeError(f"script_nonzero:project_manager.py:{detail}")
     _record("step2_import_sources", True, "import-sources --move")
+    _update_progress("step2", "Preparing source files", percent=8.0)
     sources_dir = project_path / "sources"
     source_md_candidates = sorted(sources_dir.glob("*.md"), key=lambda p: p.stat().st_mtime, reverse=True)
     source_md = source_md_candidates[0] if source_md_candidates else (sources_dir / "prompt_source.md")
@@ -884,13 +1123,17 @@ def run_native_pipeline(
         template_path = templates_dir / "layouts" / selected_template
     _copy_template_assets(template_path=template_path, project_path=project_path)
     _record("step3_template_selected", True, selected_template)
+    _update_progress("step3", f"Template selected: {selected_template}", percent=12.0)
 
     # Step 4: strategist (auto-confirm mode, no blocking prompt to user)
     strategist_doc = (references_dir / "strategist.md").read_text(encoding="utf-8", errors="ignore")
     design_spec_ref = (templates_dir / "design_spec_reference.md").read_text(encoding="utf-8", errors="ignore")
     research_items: List[Dict[str, str]] = []
+    _update_progress("step4", "Collecting web research context", substage="research", percent=14.0)
     if web_enrichment:
+        t0 = time.perf_counter()
         research_items = _search_fetch_web(query=prompt, language=language, repo_root=repo_root, limit=3)
+        _perf("step4.web_enrichment", t0, items=len(research_items))
     if web_enrichment and not research_items:
         _record("step4_research_fallback", True, "web_enrichment_no_relevant_hit_prompt_only")
     research_path = project_path / "research_notes.json"
@@ -906,6 +1149,8 @@ def run_native_pipeline(
     debug_dir = project_path / "_runtime_inputs" / "strategist_raw"
     debug_dir.mkdir(parents=True, exist_ok=True)
 
+    _update_progress("step4", "Generating confirmation checklist", substage="confirmations", percent=18.0)
+    t0 = time.perf_counter()
     confirmations_text = _build_strategist_confirmations(
         strategist_doc=strategist_doc,
         prompt=prompt,
@@ -916,8 +1161,9 @@ def run_native_pipeline(
         source_md_text=source_md_text,
         template_design_spec_text=template_design_spec_text,
         research_items=research_items,
-        timeout_sec=max(60, min(timeout_sec, 900)),
+        timeout_sec=t_confirm_timeout,
     )
+    _perf("step4.confirmations", t0, timeout_sec=t_confirm_timeout)
     (debug_dir / "confirmations_proposed.md").write_text(confirmations_text, encoding="utf-8")
     _record("step4_confirmations", True, "eight_confirmations_proposed")
 
@@ -928,6 +1174,8 @@ def run_native_pipeline(
     )
     _record("step4_confirmations_auto_approved", True, "approved")
 
+    _update_progress("step4", "Generating design specification", substage="design_spec", percent=22.0)
+    t0 = time.perf_counter()
     design_spec_md_text = _build_strategist_design_spec(
         strategist_doc=strategist_doc,
         design_spec_ref=design_spec_ref,
@@ -940,8 +1188,9 @@ def run_native_pipeline(
         template_design_spec_text=template_design_spec_text,
         research_items=research_items,
         confirmations_text=confirmations_text,
-        timeout_sec=max(60, min(timeout_sec, 1200)),
+        timeout_sec=t_design_spec_timeout,
     )
+    _perf("step4.design_spec", t0, timeout_sec=t_design_spec_timeout)
     if not _text(design_spec_md_text, ""):
         raise RuntimeError("llm_stage_failed:strategist_empty")
     (debug_dir / "design_spec_generated.md").write_text(design_spec_md_text, encoding="utf-8")
@@ -952,6 +1201,7 @@ def run_native_pipeline(
         True,
         "design_spec_md_generated_auto_confirm",
     )
+    _update_progress("step4", "Design specification ready", substage="completed", percent=24.0)
 
     # Step 5: optional image generation (non-blocking)
     image_status = {"status": "disabled", "reason": "include_images_false"}
@@ -963,6 +1213,7 @@ def run_native_pipeline(
             timeout_sec=max(60, min(timeout_sec, 300)),
         )
     _record("step5_image_generator", True, f"{image_status['status']}:{image_status['reason']}")
+    _update_progress("step5", "Preparing assets for rendering", percent=25.0)
 
     # Step 6: executor sequentially
     executor_base = (references_dir / "executor-base.md").read_text(encoding="utf-8", errors="ignore")
@@ -993,30 +1244,45 @@ def run_native_pipeline(
 
     debug_dir = project_path / "_runtime_inputs" / "executor_raw"
     debug_dir.mkdir(parents=True, exist_ok=True)
+    t0 = time.perf_counter()
     design_confirmation = _executor_confirm_design_parameters(
         executor_base=executor_base,
         design_spec_md_text=design_spec_md_text,
         language=language,
         total_pages=total_pages,
-        timeout_sec=max(50, min(timeout_sec, 1200)),
+        timeout_sec=t_executor_confirm_timeout,
     )
+    _perf("step6.executor_confirm", t0, timeout_sec=t_executor_confirm_timeout)
     (debug_dir / "design_confirmation.txt").write_text(design_confirmation, encoding="utf-8")
 
     notes_sections: List[str] = []
     page_titles: List[str] = []
+    page_stems: List[str] = []
     for idx in range(total_pages):
         page_no = idx + 1
-        page_plan = _executor_plan_page(
-            executor_base=executor_base,
-            executor_style=executor_style,
-            design_spec_md_text=design_spec_md_text,
-            prompt=prompt,
-            language=language,
-            page_no=page_no,
-            total_pages=total_pages,
-            previous_titles=page_titles,
-            timeout_sec=max(50, min(timeout_sec, 1200)),
+        _update_progress(
+            "step6",
+            f"Generating slides {page_no}/{total_pages}",
+            percent=25.0 + (float(max(page_no - 1, 0)) / float(max(total_pages, 1))) * 65.0,
+            current_page=max(page_no - 1, 0),
         )
+        plan_t0 = time.perf_counter()
+        if fast_plan:
+            page_plan = _build_fast_page_plan(page_no=page_no, total_pages=total_pages)
+            _perf("step6.page_plan.fast", plan_t0, page_no=page_no)
+        else:
+            page_plan = _executor_plan_page(
+                executor_base=executor_base,
+                executor_style=executor_style,
+                design_spec_md_text=design_spec_md_text,
+                prompt=prompt,
+                language=language,
+                page_no=page_no,
+                total_pages=total_pages,
+                previous_titles=page_titles,
+                timeout_sec=t_plan_timeout,
+            )
+            _perf("step6.page_plan.llm", plan_t0, page_no=page_no, timeout_sec=t_plan_timeout)
         (debug_dir / f"page_{page_no:02d}_plan.txt").write_text(page_plan, encoding="utf-8")
 
         plan_text_lower = _text(page_plan, "").lower()
@@ -1034,6 +1300,7 @@ def run_native_pipeline(
             else:
                 template_svg_name = "03_content.svg"
         template_svg_text = _text(template_svg_text_by_name.get(template_svg_name), "")
+        render_t0 = time.perf_counter()
         llm_raw = _executor_render_page(
             executor_base=executor_base,
             executor_style=executor_style,
@@ -1049,8 +1316,10 @@ def run_native_pipeline(
             page_no=page_no,
             total_pages=total_pages,
             previous_titles=page_titles,
-            timeout_sec=max(50, min(timeout_sec, 1200)),
+            timeout_sec=t_render_timeout,
+            include_notes=(notes_mode == "per_page"),
         )
+        _perf("step6.page_render.llm", render_t0, page_no=page_no, timeout_sec=t_render_timeout)
         (debug_dir / f"page_{page_no:02d}_render_1.txt").write_text(
             llm_raw,
             encoding="utf-8",
@@ -1059,6 +1328,7 @@ def run_native_pipeline(
         svg_markup = _sanitize_svg_markup(_extract_svg_document(svg_markup) or svg_markup)
         used_fallback_svg = False
         if "<svg" not in _text(svg_markup, "").lower():
+            retry_t0 = time.perf_counter()
             llm_raw_retry = _executor_render_page(
                 executor_base=executor_base,
                 executor_style=executor_style,
@@ -1074,7 +1344,14 @@ def run_native_pipeline(
                 page_no=page_no,
                 total_pages=total_pages,
                 previous_titles=page_titles,
-                timeout_sec=max(50, min(timeout_sec, 1200)),
+                timeout_sec=t_render_retry_timeout,
+                include_notes=(notes_mode == "per_page"),
+            )
+            _perf(
+                "step6.page_render.retry_llm",
+                retry_t0,
+                page_no=page_no,
+                timeout_sec=t_render_retry_timeout,
             )
             (debug_dir / f"page_{page_no:02d}_render_2.txt").write_text(
                 llm_raw_retry,
@@ -1107,10 +1384,17 @@ def run_native_pipeline(
             )
             repaired_svg = ""
             try:
+                repair_t0 = time.perf_counter()
                 repaired_svg = _repair_svg_xml_with_llm(
                     invalid_svg=svg_markup,
                     page_no=page_no,
-                    timeout_sec=max(30, min(timeout_sec, 600)),
+                    timeout_sec=t_xml_repair_timeout,
+                )
+                _perf(
+                    "step6.page_xml_repair.llm",
+                    repair_t0,
+                    page_no=page_no,
+                    timeout_sec=t_xml_repair_timeout,
                 )
             except Exception as exc:
                 _record(
@@ -1159,10 +1443,43 @@ def run_native_pipeline(
         stem = f"{page_no:02d}_{_safe_slug(raw_title, f'slide_{page_no}')}"
         svg_file = svg_output / f"{stem}.svg"
         svg_file.write_text(svg_markup, encoding="utf-8")
+        page_stems.append(stem)
         page_titles.append(raw_title)
-        notes_sections.append(f"# {stem}\n\n{_text(speaker_notes, raw_title)}\n")
-    (notes_dir / "total.md").write_text("\n\n".join(notes_sections), encoding="utf-8")
+        if notes_mode == "per_page":
+            notes_sections.append(f"# {stem}\n\n{_text(speaker_notes, raw_title)}\n")
+        _update_progress(
+            "step6",
+            f"Generating slides {page_no}/{total_pages}",
+            percent=25.0 + (float(page_no) / float(max(total_pages, 1))) * 65.0,
+            current_page=page_no,
+        )
+
+    if notes_mode == "batch":
+        notes_t0 = time.perf_counter()
+        try:
+            notes_total_text = _executor_generate_total_notes(
+                executor_base=executor_base,
+                design_spec_md_text=design_spec_md_text,
+                prompt=prompt,
+                language=language,
+                page_stems=page_stems,
+                page_titles=page_titles,
+                timeout_sec=max(60, min(timeout_sec, 600)),
+            )
+            _perf("step6.notes_batch", notes_t0, mode="batch")
+            if not _text(notes_total_text, ""):
+                raise RuntimeError("empty_notes")
+        except Exception as exc:
+            _perf("step6.notes_batch_fallback", notes_t0, detail=_text(exc, "unknown")[:120])
+            notes_total_text = "\n\n".join(
+                [f"# {stem}\n\n{title}\n" for stem, title in zip(page_stems, page_titles)]
+            )
+        (notes_dir / "total.md").write_text(notes_total_text, encoding="utf-8")
+    else:
+        (notes_dir / "total.md").write_text("\n\n".join(notes_sections), encoding="utf-8")
+
     _record("step6_executor", True, f"svg_pages={total_pages}")
+    _update_progress("step7", "Finalizing and packaging PPTX", percent=96.0, current_page=total_pages)
 
     # Step 7: post-process and export
     commands = [
@@ -1172,11 +1489,13 @@ def run_native_pipeline(
     ]
     export_with_warnings = False
     for cmd in commands:
+        cmd_t0 = time.perf_counter()
         code, stdout, stderr = _run_cmd(
             cmd=cmd,
             cwd=scripts_dir,
             timeout_sec=max(90, min(timeout_sec, 1800)),
         )
+        _perf("step7.command", cmd_t0, script=Path(cmd[1]).name, exit_code=code)
         if code != 0:
             script_name = Path(cmd[1]).name
             if script_name == "svg_to_pptx.py":
@@ -1207,6 +1526,34 @@ def run_native_pipeline(
     if not output_pptx:
         raise RuntimeError("artifact_missing:output_pptx")
 
+    total_elapsed_ms = round((time.perf_counter() - run_t0) * 1000.0, 1)
+    runtime_profile_path = project_path / "runtime_profile.json"
+    runtime_profile_path.write_text(
+        json.dumps(
+            {
+                "started_at": run_started_at,
+                "finished_at": _utc_now(),
+                "total_elapsed_ms": total_elapsed_ms,
+                "total_pages": total_pages,
+                "fast_plan": bool(fast_plan),
+                "notes_mode": notes_mode,
+                "timeouts": {
+                    "step4_confirmations": t_confirm_timeout,
+                    "step4_design_spec": t_design_spec_timeout,
+                    "step6_executor_confirm": t_executor_confirm_timeout,
+                    "step6_page_plan": t_plan_timeout,
+                    "step6_page_render": t_render_timeout,
+                    "step6_page_render_retry": t_render_retry_timeout,
+                    "step6_xml_repair": t_xml_repair_timeout,
+                },
+                "records": perf_rows,
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+
     return {
         "run_id": f"ppt_master_native_{uuid.uuid4().hex[:12]}",
         "stages": stage_rows,
@@ -1217,6 +1564,7 @@ def run_native_pipeline(
             "source_md": str(source_md),
             "image_status": image_status["status"],
             "image_reason": image_status["reason"],
+            "runtime_profile": str(runtime_profile_path),
         },
         "export": {
             "output_pptx": output_pptx,

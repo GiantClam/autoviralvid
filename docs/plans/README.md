@@ -186,11 +186,10 @@ Recommended Railway worker env for PPT heavy pipeline:
 - optional: `PPT_EXPORT_WORKER_SHARED_SECRET=<same-shared-hmac-secret-as-vercel>`
 - optional: `PPT_EXPORT_WORKER_REQUIRE_SIGNATURE=true` (auto-enabled when shared secret exists)
 
-V7 PPT export API in split mode:
+PPT API (current):
 
-- Submit: `POST /api/v1/v7/export/submit`
-- Poll: `GET /api/v1/v7/export/status/{task_id}`
-- `POST /api/v1/v7/export` stays available on worker, but is disabled by default on web role.
+- V7 export API is decommissioned (as of 2026-04-16).
+- Use: `POST /api/v1/ppt/generate-from-prompt`
 
 ## Documentation
 

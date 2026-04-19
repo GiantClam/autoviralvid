@@ -1,5 +1,9 @@
 ﻿# Subscription + Credits + Billing Implementation Plan
 
+
+> Status update (2026-04-16): Any V7 endpoint billing references are decommissioned and historical only.
+> Current production PPT chargeable endpoint: `/ppt/generate-from-prompt`.
+
 > Use this plan to execute the work task-by-task with tight verification after each step.
 
 **Goal:** 在 Vercel 部署架构下落地 `Stripe + PayPal + 统一积分账本 + 所有视频/生成类 API 扣费 + 失败回滚 + 对账` 的生产级计费系统。
@@ -26,7 +30,7 @@
 - 仅 PayPal，缺 Stripe 订阅与 webhook。
 - 扣费是“计数器模式”，缺“可审计账本（ledger）”和幂等事件表。
 - 仍存在绕过扣费路径：`src/app/ppt/page.tsx` 直接请求 `NEXT_PUBLIC_AGENT_URL/api/v1/ppt/*`。
-- 扣费规则只覆盖部分 `/projects/{id}/...`，未统一覆盖全部生成型 API（含 v7/ppt 相关生成端点）。
+- 扣费规则只覆盖部分 `/projects/{id}/...`，未统一覆盖全部生成型 API（当前重点为 `/ppt/generate-from-prompt`）。
 - 缺 provider 无关的统一 Plan/Price Catalog。
 
 ### 架构决策
@@ -176,7 +180,7 @@ Expected: PASS。
 - Modify: `src/app/api/projects/[...path]/route.ts`
 - Create: `src/app/api/ppt/[...path]/route.ts`
 - Modify: `src/app/ppt/page.tsx`
-- Modify: `src/components/ProjectForm.tsx`（v7 export path 统一走受控代理）
+- Modify: `src/components/ProjectForm.tsx`（仅保留 prompt 生成链路）
 
 **Step 1: 策略表化**
 - 按 endpoint + method 配置 `units`，例如：
@@ -185,7 +189,6 @@ Expected: PASS。
   - `/projects/{id}/videos` = 1
   - `/projects/{id}/digital-human` = 2
   - `/projects/{id}/render` = 1
-  - `/v7/export` = 1
   - `/ppt/generate-from-prompt` = 1
 
 **Step 2: 代理层统一预扣费**
@@ -267,7 +270,6 @@ Expected: PASS。
 
 **Step 2: 灰度开关**
 - `BILLING_ENFORCE_PPT=false`（先观察后开启）
-- `BILLING_ENFORCE_V7=false`
 - 稳定后全量置 true。
 
 **Step 3: 回滚策略**

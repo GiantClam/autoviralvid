@@ -54,4 +54,22 @@ describe("projects proxy route", () => {
       billingPrefixSegments: [],
     });
   });
+
+  it("returns 410 for removed v7 endpoints", async () => {
+    const { POST } = await import("./route");
+    const request = new NextRequest("http://localhost/api/projects/v7/export", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({}),
+    });
+
+    const response = await POST(request, {
+      params: Promise.resolve({ path: ["v7", "export"] }),
+    });
+    const payload = await response.json();
+
+    expect(response.status).toBe(410);
+    expect(payload.error).toBe("deprecated_endpoint");
+    expect(forwardApiV1RequestMock).not.toHaveBeenCalled();
+  });
 });

@@ -42,12 +42,6 @@ describe("billing charge policy", () => {
     expect(promptGenerate?.id).toBe("ppt-prompt-generate");
     expect(promptGenerate?.units).toBe(1);
 
-    const v7Export = resolveGenerationChargeRule("POST", "/v7/export");
-    expect(v7Export?.id).toBe("ppt-v7-export");
-
-    const v7ExportSubmit = resolveGenerationChargeRule("POST", "/v7/export/submit");
-    expect(v7ExportSubmit?.id).toBe("ppt-v7-export-submit");
-
     const pptRender = resolveGenerationChargeRule("POST", "/ppt/render");
     expect(pptRender?.id).toBe("ppt-video-render");
   });

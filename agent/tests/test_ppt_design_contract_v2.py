@@ -56,3 +56,37 @@ def test_validate_executor_page_rejects_numeric_only_title() -> None:
         topic_keywords={"霍尔木兹", "危机"},
     )
     assert "title_is_numeric_only" in issues
+
+
+def test_choose_template_family_handles_empty_llm_response(monkeypatch, tmp_path: Path) -> None:
+    layouts_dir = tmp_path / "layouts"
+    layouts_dir.mkdir(parents=True, exist_ok=True)
+    (layouts_dir / "mckinsey").mkdir(parents=True, exist_ok=True)
+    (layouts_dir / "education_textbook_light").mkdir(parents=True, exist_ok=True)
+
+    index_path = layouts_dir / "layouts_index.json"
+    index_path.write_text(
+        """
+{
+  "layouts": {
+    "mckinsey": {"summary": "consulting style", "tone": "professional", "keywords": ["consulting"]},
+    "education_textbook_light": {"summary": "education style", "tone": "neutral", "keywords": ["education"]}
+  }
+}
+""".strip(),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(runtime, "_call_chat_text", lambda **_: "")
+
+    selected = runtime._choose_template_family(  # noqa: SLF001
+        prompt="test topic",
+        style="professional",
+        language="zh-CN",
+        template_family="auto",
+        layouts_dir=layouts_dir,
+        layouts_index_path=index_path,
+        timeout_sec=60,
+    )
+
+    assert selected == "mckinsey"

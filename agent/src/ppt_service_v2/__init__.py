@@ -57,7 +57,7 @@ _LLM_ENV_KEYS = (
     "AIBERM_API_KEY",
     "CRAZYROUTE_API_KEY",
     "CRAZYROUTER_API_KEY",
-    "OPENROUTER_API_KEY",
+    "OPENAI_API_KEY",
     "LLM_API_KEY",
 )
 _ALLOWED_SUGGESTED_ELEMENTS = {"text", "image", "chart", "table", "latex", "shape"}
@@ -438,7 +438,7 @@ class PPTService:
         from src.openrouter_client import OpenRouterClient
 
         client = OpenRouterClient()
-        model = _text(os.getenv("CONTENT_LLM_MODEL") or os.getenv("OPENROUTER_MODEL"), "claude-sonnet-4-6")
+        model = _text(os.getenv("CONTENT_LLM_MODEL") or os.getenv("OPENAI_MODEL"), "openai/gpt-5.3-codex")
         prompt = f"""
 你是一名资深企业咨询顾问，请根据需求生成 PPT 大纲。
 要求页数：{int(req.num_slides)}
@@ -528,7 +528,7 @@ class PPTService:
         from src.openrouter_client import OpenRouterClient
 
         client = OpenRouterClient()
-        model = _text(os.getenv("CONTENT_LLM_MODEL") or os.getenv("OPENROUTER_MODEL"), "claude-sonnet-4-6")
+        model = _text(os.getenv("CONTENT_LLM_MODEL") or os.getenv("OPENAI_MODEL"), "openai/gpt-5.3-codex")
         out: List[SlideContent] = []
         for item in req.outline.slides:
             prompt = f"""
@@ -602,8 +602,13 @@ class PPTService:
             return self._fallback_content(req)
 
     async def parse_document(self, file_url: str, file_type: str) -> ParsedDocument:
-        slide = SlideContent(title="Parsed Document", elements=[SlideElement(type="text", content=_text(file_url))], narration="Parsed document placeholder", duration=60)
-        return ParsedDocument(source_type=file_type if file_type in {"pptx", "ppt", "pdf"} else "pptx", source_url=_text(file_url), title="Parsed Document", slides=[slide], total_pages=1)
+        from src.document_parser import parse_document as parse_uploaded_document
+
+        source_url = _text(file_url)
+        normalized_type = _text(file_type, "pptx").lower()
+        if normalized_type not in {"pptx", "ppt", "pdf"}:
+            normalized_type = "pptx"
+        return await parse_uploaded_document(source_url, normalized_type)
 
     async def enhance_slides(self, *, slides: List[SlideContent], language: str, enhance_narration: bool, generate_tts: bool, voice_style: str) -> List[SlideContent]:
         _ = language, enhance_narration, generate_tts, voice_style

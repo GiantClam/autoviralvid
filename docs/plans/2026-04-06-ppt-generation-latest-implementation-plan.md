@@ -1,5 +1,9 @@
 ﻿# PPT 生成最新实现方案（2026-04-07）
 
+
+> Status update (2026-04-16): V7 route/export references in this plan are decommissioned and kept only for historical context.
+> Current production PPT path: `POST /api/v1/ppt/generate-from-prompt`.
+
 ## 1. 当前主流程（DrawingML-first）
 
 主入口：`POST /api/v1/ppt/pipeline` 与 `POST /api/v1/ppt/export`
@@ -35,7 +39,7 @@
 - 增加 `ppt_quality_service.py`（质量评估薄门面）
 - 增加 `ppt_retry_service.py`（重试薄门面）
 - 增加 `ppt_svg_finalizer.py`（SVG 后处理单入口）
-- `v7_routes.py` 强制 `retry_scope=deck`、`render_channel=local`
+- （历史）`v7_routes.py` 曾强制 `retry_scope=deck`、`render_channel=local`（现已下线）
 - `ppt_retry_orchestrator.py` 补充 `compute_render_path_downgrade` 兼容接口（no-op）
 - `ppt_service.py` 统一禁用 partial scope 重试，保持 deck 级一致性
 
@@ -43,7 +47,6 @@
 
 - `test_ppt_retry_scope_consistency.py`
 - `test_ppt_export_retry_flow.py`
-- `test_v7_export_submit_status.py`
 - `test_ppt_svg_finalizer.py`
 - `test_ppt_retry_orchestrator.py`
 
@@ -61,9 +64,8 @@
 pytest -q \
   agent/tests/test_ppt_retry_scope_consistency.py \
   agent/tests/test_ppt_export_retry_flow.py \
-  agent/tests/test_v7_export_submit_status.py \
   agent/tests/test_ppt_svg_finalizer.py \
   agent/tests/test_ppt_retry_orchestrator.py
 ```
 
-该基线覆盖了：重试范围一致性、导出主链、v7 路由约束、SVG 后处理、重试编排兼容。
+该基线覆盖了：重试范围一致性、导出主链、SVG 后处理、重试编排兼容。

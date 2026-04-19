@@ -328,9 +328,12 @@ async def _multimodal_audit(
     try:
         from src.openrouter_client import OpenRouterClient
     except Exception as exc:
-        return {"enabled": False, "error": f"openrouter_client_unavailable: {exc}"}
-    if not os.getenv("OPENROUTER_API_KEY") and not os.getenv("LLM_API_KEY"):
-        return {"enabled": False, "error": "openrouter_key_missing"}
+        return {"enabled": False, "error": f"llm_client_unavailable: {exc}"}
+    if not any(
+        str(os.getenv(key) or "").strip()
+        for key in ("AIBERM_API_KEY", "CRAZYROUTE_API_KEY", "OPENAI_API_KEY", "LLM_API_KEY")
+    ):
+        return {"enabled": False, "error": "llm_key_missing"}
 
     slide_count = len(png_bytes_list)
     default_max = slide_count if str(route_mode or "").strip().lower() == "refine" else min(slide_count, 8)
@@ -348,7 +351,7 @@ async def _multimodal_audit(
     try:
         OpenRouterClient()
     except Exception as exc:
-        return {"enabled": False, "error": f"openrouter_client_init_failed: {exc}"}
+        return {"enabled": False, "error": f"llm_client_init_failed: {exc}"}
 
     semaphore = asyncio.Semaphore(3)
 

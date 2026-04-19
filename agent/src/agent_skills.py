@@ -783,7 +783,7 @@ async def plan_storyboard_impl(
         print("[DEBUG] plan_storyboard_impl: Outline is empty, attempting fallback...")
         # (Fallback logic is mostly same)
         outline = await or_client.chat_completions(
-            model="anthropic/claude-sonnet-4.5" if is_reasoning_model else model,
+            model="openai/gpt-5.3-codex" if is_reasoning_model else model,
             messages=[
                 {
                     "role": "system",

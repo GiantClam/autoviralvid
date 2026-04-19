@@ -5,8 +5,9 @@ import {
     Sparkles, Zap, Star,
     Palette, Shirt, UtensilsCrossed, Cpu, Sofa,
     BookOpen, Laugh, Plane, Video, GraduationCap,
-    ShoppingBag, Megaphone, Film, ArrowRight, Presentation,
+    ShoppingBag, Megaphone, Film, ArrowRight,
     Wand2, Search, X,
+    FileText,
 } from 'lucide-react';
 import { useT } from '@/lib/i18n';
 import SocialPanel from '@/components/SocialPanel';
@@ -30,7 +31,7 @@ export function TemplateGallery({ onSelect }: TemplateGalleryProps) {
         { id: 'home-living', title: t("gallery.tplHomeLiving"), description: t("gallery.tplHomeLivingDesc"), icon: Sofa, tag: t("gallery.tagEcommerce"), tagType: 'default' as const, gradient: 'from-emerald-500 to-teal-600', category: 'ecommerce' as const },
         { id: 'brand-story', title: t("gallery.tplBrandStory"), description: t("gallery.tplBrandStoryDesc"), icon: Star, tag: t("gallery.tagPro"), tagType: 'pro' as const, gradient: 'from-blue-500 to-indigo-600', category: 'general' as const },
         { id: 'digital-human', title: t("gallery.tplDigitalHuman"), description: t("gallery.tplDigitalHumanDesc"), icon: Video, tag: t("gallery.tagDigitalHuman"), tagType: 'digital-human' as const, gradient: 'from-rose-500 to-purple-600', category: 'general' as const },
-        { id: 'ppt-v7', title: t("gallery.tplPptV7"), description: t("gallery.tplPptV7Desc"), icon: Presentation, tag: t("gallery.tagPptV7"), tagType: 'pro' as const, gradient: 'from-cyan-500 to-indigo-600', category: 'general' as const },
+        { id: 'ppt-generator', title: 'PPT Generator', description: 'Generate presentation decks from prompts via ppt-master templates.', icon: FileText, tag: 'PPT', tagType: 'pro' as const, gradient: 'from-indigo-500 to-cyan-600', category: 'general' as const },
         { id: 'knowledge-edu', title: t("gallery.tplKnowledgeEdu"), description: t("gallery.tplKnowledgeEduDesc"), icon: BookOpen, tag: t("gallery.tagContent"), tagType: 'default' as const, gradient: 'from-sky-500 to-blue-600', category: 'content' as const },
         { id: 'funny-skit', title: t("gallery.tplFunnySkit"), description: t("gallery.tplFunnySkitDesc"), icon: Laugh, tag: t("gallery.tagContent"), tagType: 'default' as const, gradient: 'from-lime-500 to-green-600', category: 'content' as const },
         { id: 'travel-vlog', title: t("gallery.tplTravelVlog"), description: t("gallery.tplTravelVlogDesc"), icon: Plane, tag: t("gallery.tagContent"), tagType: 'default' as const, gradient: 'from-rose-500 to-orange-600', category: 'content' as const },

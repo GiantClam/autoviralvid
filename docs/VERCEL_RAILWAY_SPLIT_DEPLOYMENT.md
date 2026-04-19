@@ -34,6 +34,9 @@ If you are enabling subscription + credits + generation charging in production:
 PPT_EXECUTION_ROLE=web
 PPT_EXPORT_SYNC_ENABLED=false
 PPT_EXPORT_WORKER_BASE_URL=https://your-railway-worker-domain
+# Internal token for Vercel cron -> worker dispatch
+# (use a strong random value and keep same value on worker side)
+PPT_PROMPT_DISPATCH_TOKEN=
 # Optional shared token when worker auth is enabled:
 # PPT_EXPORT_WORKER_TOKEN=
 # Optional HMAC signing secret (recommended):
@@ -41,6 +44,17 @@ PPT_EXPORT_WORKER_BASE_URL=https://your-railway-worker-domain
 PPT_MODULE_RETRY_ENABLED=false
 PPT_INSTALLED_SKILL_EXECUTOR_ENABLED=false
 ```
+
+## Vercel async task dispatch (prompt-to-ppt)
+
+- Prompt jobs are persisted in Supabase table `autoviralvid_ppt_export_tasks`.
+- Vercel cron triggers:
+  - `GET /api/internal/ppt/prompt-jobs/dispatch?limit=1` (every 2 minutes)
+- This internal route forwards to worker:
+  - `POST /api/v1/ppt/internal/prompt-jobs/dispatch`
+- Frontend only does submit + polling:
+  - `POST /api/v1/ppt/generate-from-prompt`
+  - `GET /api/v1/ppt/jobs/{job_id}`
 
 ## Recommended Railway env
 
@@ -81,11 +95,8 @@ If you need installed external skill runtime on Railway:
 - Persist job state in DB and expose status polling endpoint.
 - Do not run long-running subagent/compile loops on Vercel runtime.
 
-## V7 export API mode
+## PPT API mode (current)
 
-- Web role should call:
-  - `POST /api/v1/v7/export/submit`
-  - `GET /api/v1/v7/export/status/{task_id}`
-- Worker role supports both:
-  - async submit/status
-  - sync `POST /api/v1/v7/export`
+- V7 export endpoints are decommissioned (as of 2026-04-16).
+- Use only:
+  - `POST /api/v1/ppt/generate-from-prompt`

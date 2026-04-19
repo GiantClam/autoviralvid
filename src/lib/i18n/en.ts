@@ -107,7 +107,6 @@ const en = {
     tplHomeLiving: "Home & Living",
     tplBrandStory: "Brand Story",
     tplDigitalHuman: "Digital Human",
-    tplPptV7: "PPT & Video V7",
     tplKnowledgeEdu: "Knowledge & Edu",
     tplFunnySkit: "Comedy Skit",
     tplTravelVlog: "Travel Vlog",
@@ -128,8 +127,6 @@ const en = {
       "Narrative-driven brand promotion with a warm, emotional tone.",
     tplDigitalHumanDesc:
       "Upload a portrait and audio, then let AI drive a digital presenter.",
-    tplPptV7Desc:
-      "Dual-agent PPT generation with narration synthesis and export.",
     tplKnowledgeEduDesc:
       "Problem-led, visual explanations for educational content.",
     tplFunnySkitDesc:
@@ -142,7 +139,6 @@ const en = {
     tagEcommerce: "E-Com",
     tagPro: "Pro",
     tagDigitalHuman: "Avatar",
-    tagPptV7: "PPT V7",
     tagContent: "Content",
     professionalQuality: "Professional Quality",
     allTemplates: "All Templates",
@@ -216,23 +212,6 @@ const en = {
       '{label}: "{fileType}" is not supported. Supported: {allowedTypes}',
     getUploadUrlFailedWithStatus: "Failed to get upload URL: {status}",
     uploadFailedWithStatus: "Upload failed: {status}",
-    v7NonJson: "V7 API returned a non-JSON response: {preview}",
-    v7RequestFailedWithStatus: "V7 API request failed: {status}",
-    v7RequestFailed: "V7 API request failed",
-    v7GenerateFailed: "PPT V7 generation failed",
-    pptV7Config: "PPT V7 Config",
-    pptV7Mode: "Dual-agent / MiniMax / Remotion",
-    pptV7Params: "PPT V7 Parameters",
-    slideCount: "Slides",
-    pipeline: "Pipeline",
-    pptV7Waiting: "Waiting to start",
-    pptV7GeneratingContent: "Generating content...",
-    pptV7SynthesizingVoice: "Synthesizing narration...",
-    pptV7Exporting: "Exporting PPTX...",
-    pptV7Completed: "Completed",
-    pptV7CompletedSlides: "Completed: {count} slides",
-    generatePptV7: "Generate PPT V7",
-    processing: "Processing...",
   },
 
   sidebar: {
@@ -283,8 +262,6 @@ const en = {
     step03: "Export",
     errorTitle: "Generation Error",
     errorDesc: "Please check the parameters and try again.",
-    pptV7WorkspaceTitle: "PPT V7 Workspace",
-    pptV7WorkspaceDesc: "Progress, results, and downloads appear here.",
   },
 
   quota: {
@@ -338,33 +315,6 @@ const en = {
     historyLink: "History",
     aiPowered: "AI Powered",
     userFallback: "User",
-  },
-
-  pptV7: {
-    resultPanelTitle: "PPT V7 Result Panel",
-    resultPanelDesc: "Dual-agent pipeline: MiniMax + Remotion",
-    retry: "Retry",
-    running: "Running",
-    completed: "Completed",
-    idle: "Idle",
-    requirement: "Requirement",
-    requirementPlaceholder:
-      "Fill in the requirement on the left, then click Generate PPT V7",
-    targetSlides: "Target Slides",
-    progress: "Progress",
-    done: "Done",
-    waiting: "Waiting",
-    latestResult: "Latest Result",
-    resultSummary: "Run ID: {runId} / {slideCount} slides",
-    downloadPptx: "Download PPTX",
-    slidePreviews: "Slide Previews",
-    recentRuns: "Recent Runs",
-    noHistory: "No run history yet.",
-    open: "Open",
-    stepGenerate: "Generate Content",
-    stepTts: "Synthesize Voice",
-    stepExport: "Export PPTX",
-    stepDone: "Done",
   },
 
   storyboard: {

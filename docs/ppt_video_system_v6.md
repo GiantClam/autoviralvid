@@ -1,5 +1,9 @@
 # PPT & 视频生成系统 — 技术方案 (v7)
 
+
+> Status update (2026-04-16): V7 route/export chain is decommissioned. This file is historical design reference only.
+> Current production PPT path: `POST /api/v1/ppt/generate-from-prompt`.
+
 > 最后更新: 2026-03-23
 > 状态: 已落地验证，可生成商业级 PPT + 讲解视频
 > v7 改进: Skill目录架构 + Marp双路输出 + Remotion截图序列 + Ken Burns动效 + 并发工作流 + 文本溢出校验

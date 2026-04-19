@@ -1,5 +1,8 @@
 # V7 Marp-Remotion Pipeline Implementation Plan
 
+> Status update (2026-04-16): V7 route and export chain are decommissioned. This document is kept for historical reference only.
+> Current production PPT path: `POST /api/v1/ppt/generate-from-prompt`.
+
 > Use this plan to execute the work task-by-task with tight verification after each step.
 
 **Goal:** 让现有 v7 管线严格对齐附件方案：双 Agent 结构化输出、强校验 schema、Marp+Remotion 实时渲染、不走截图主轨、动作与 TTS 对齐。
@@ -136,4 +139,3 @@ export default function MarpPresentation(...) { ... }
 
 Run: `npm run test`
 Expected: PASS.
-

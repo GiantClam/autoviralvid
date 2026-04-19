@@ -55,18 +55,6 @@ const GENERATION_CHARGE_RULES: readonly GenerationChargeRule[] = [
     units: 1,
   },
   {
-    id: "ppt-v7-export",
-    method: "POST",
-    pattern: /^\/v7\/export$/,
-    units: 1,
-  },
-  {
-    id: "ppt-v7-export-submit",
-    method: "POST",
-    pattern: /^\/v7\/export\/submit$/,
-    units: 1,
-  },
-  {
     id: "ppt-video-render",
     method: "POST",
     pattern: /^\/ppt\/render$/,

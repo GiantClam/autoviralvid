@@ -14,6 +14,7 @@ import logging
 from datetime import datetime, timezone
 from typing import List, Optional, Dict, Any
 
+import httpx
 from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
 from pydantic import BaseModel, Field, field_validator
 from supabase import create_client, Client
@@ -65,16 +66,16 @@ def _get_project_service():
     return _project_service
 
 
-_openrouter_client = None
+_llm_client = None
 
 
-def _get_openrouter_client():
-    """Lazily import and cache the OpenRouterClient singleton."""
-    global _openrouter_client
-    if _openrouter_client is None:
+def _get_llm_provider_client():
+    """Lazily import and cache the provider client singleton."""
+    global _llm_client
+    if _llm_client is None:
         from src.openrouter_client import OpenRouterClient
-        _openrouter_client = OpenRouterClient()
-    return _openrouter_client
+        _llm_client = OpenRouterClient()
+    return _llm_client
 
 
 def _require_supabase() -> Client:
@@ -98,6 +99,53 @@ def _ensure_queue_worker(reason: str) -> None:
 
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+_SUPABASE_TRANSIENT_EXCEPTIONS = (
+    httpx.ConnectError,
+    httpx.ReadError,
+    httpx.WriteError,
+    httpx.TimeoutException,
+    httpx.RemoteProtocolError,
+    httpx.NetworkError,
+    OSError,
+)
+
+
+def _is_transient_supabase_error(exc: Exception) -> bool:
+    current: Exception | None = exc
+    while current is not None:
+        if isinstance(current, _SUPABASE_TRANSIENT_EXCEPTIONS):
+            return True
+        current = current.__cause__
+    return False
+
+
+async def _execute_supabase_request_with_retry(
+    execute_fn,
+    *,
+    label: str,
+    max_attempts: int = 3,
+    backoff_seconds: float = 0.4,
+):
+    attempt = 1
+    while True:
+        try:
+            return execute_fn()
+        except Exception as exc:
+            if attempt >= max_attempts or not _is_transient_supabase_error(exc):
+                raise
+            delay = backoff_seconds * attempt
+            logger.warning(
+                "[supabase_retry] %s failed (attempt %s/%s): %s; retrying in %.1fs",
+                label,
+                attempt,
+                max_attempts,
+                exc,
+                delay,
+            )
+            await asyncio.sleep(delay)
+            attempt += 1
 
 
 def _compute_task_summary(tasks: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -268,38 +316,66 @@ async def list_projects(limit: int = 40, user: AuthUser = Depends(get_current_us
     """Return the most recent projects from the *autoviralvid_jobs* table."""
     sb = _require_supabase()
     try:
-        res = (
-            sb.table("autoviralvid_jobs")
-            .select(
-                "run_id, slogan, cover_url, video_url, share_slug, "
-                "status, storyboards, created_at, updated_at"
+        try:
+            res = await _execute_supabase_request_with_retry(
+                lambda: (
+                    sb.table("autoviralvid_jobs")
+                    .select(
+                        "run_id, slogan, cover_url, video_url, share_slug, "
+                        "status, storyboards, created_at, updated_at"
+                    )
+                    .order("created_at", desc=True)
+                    .limit(limit)
+                    .execute()
+                ),
+                label="autoviralvid_jobs:list_projects",
             )
-            .order("created_at", desc=True)
-            .limit(limit)
-            .execute()
-        )
+        except Exception as jobs_exc:
+            if _is_transient_supabase_error(jobs_exc):
+                logger.warning(
+                    "[list_projects] transient Supabase failure, returning empty list: %s",
+                    jobs_exc,
+                )
+                return {"projects": []}
+            raise
         projects = res.data or []
         run_ids = [p.get("run_id") for p in projects if p.get("run_id")]
 
         task_rows: List[Dict[str, Any]] = []
         session_rows: List[Dict[str, Any]] = []
         if run_ids:
-            task_rows = (
-                sb.table("autoviralvid_video_tasks")
-                .select("run_id, status")
-                .in_("run_id", run_ids)
-                .execute()
-                .data
-                or []
-            )
-            session_rows = (
-                sb.table("autoviralvid_crew_sessions")
-                .select("run_id, status, result")
-                .in_("run_id", run_ids)
-                .execute()
-                .data
-                or []
-            )
+            try:
+                task_res = await _execute_supabase_request_with_retry(
+                    lambda: (
+                        sb.table("autoviralvid_video_tasks")
+                        .select("run_id, status")
+                        .in_("run_id", run_ids)
+                        .execute()
+                    ),
+                    label="autoviralvid_video_tasks:list_projects",
+                )
+                task_rows = task_res.data or []
+            except Exception as task_exc:
+                logger.warning(
+                    "[list_projects] task summary query failed, continuing without task summary: %s",
+                    task_exc,
+                )
+            try:
+                session_res = await _execute_supabase_request_with_retry(
+                    lambda: (
+                        sb.table("autoviralvid_crew_sessions")
+                        .select("run_id, status, result")
+                        .in_("run_id", run_ids)
+                        .execute()
+                    ),
+                    label="autoviralvid_crew_sessions:list_projects",
+                )
+                session_rows = session_res.data or []
+            except Exception as session_exc:
+                logger.warning(
+                    "[list_projects] session query failed, continuing without session summary: %s",
+                    session_exc,
+                )
 
         tasks_by_run: Dict[str, List[Dict[str, Any]]] = {}
         for row in task_rows:
@@ -905,9 +981,9 @@ AI_CHAT_MODEL = os.getenv("CONTENT_LLM_MODEL", "openai/gpt-4o-mini")
 
 @router.post("/ai/chat")
 async def ai_chat(body: AIAssistantRequest, user: AuthUser = Depends(get_current_user)):
-    """Simple LLM call via OpenRouter for creative assistance."""
+    """Simple LLM call for creative assistance."""
     try:
-        client = _get_openrouter_client()
+        client = _get_llm_provider_client()
 
         system_prompt = (
             "你是一个专业的短视频创意助手。帮助用户优化视频主题、文案、分镜脚本。"

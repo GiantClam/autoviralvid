@@ -5,7 +5,7 @@ This module keeps a minimal API:
     - client.chat_completion(...)
 
 It loads environment variables from the project `.env` files and delegates
-requests to `OpenRouterClient`.
+requests to the configured OpenAI-compatible provider client.
 """
 
 from __future__ import annotations
@@ -59,7 +59,7 @@ def _env_int(name: str, default: int) -> int:
 
 
 class LLMClient:
-    """Small wrapper around OpenRouter client with repo-level env defaults."""
+    """Small wrapper around provider client with repo-level env defaults."""
 
     def __init__(
         self,

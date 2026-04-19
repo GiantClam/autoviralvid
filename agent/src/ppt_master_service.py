@@ -60,9 +60,13 @@ class PPTMasterService:
         include_images: bool = False,
         web_enrichment: Optional[bool] = None,
         image_asset_enrichment: Optional[bool] = None,
+        project_name: Optional[str] = None,
     ) -> Dict[str, Any]:
         start_time = datetime.now()
-        project_name = f"ai_gen_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        project_name = (
+            str(project_name or "").strip()
+            or f"ai_gen_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        )
         resolved_template = str(template_name or template_family or "").strip() or "auto"
 
         try:

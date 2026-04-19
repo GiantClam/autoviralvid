@@ -27,9 +27,11 @@ HEADLESS = os.getenv("HEADLESS", "true").lower() not in ("0", "false", "no")
 SLOW_MO = int(os.getenv("SLOW_MO", "0"))
 OUTPUT_DIR = Path(os.getenv("UI_E2E_OUTPUT_DIR", "test_outputs/ui_ppt_e2e"))
 SCREENSHOTS = OUTPUT_DIR / "screenshots"
+NAV_TIMEOUT_MS = int(os.getenv("UI_E2E_NAV_TIMEOUT_MS", "45000"))
 
 # 使用后端地址作为测试页面 (same-origin 请求)
-BASE_PAGE = f"{RENDERER_BASE}/docs"
+BASE_PAGE = os.getenv("UI_E2E_BASE_PAGE", f"{RENDERER_BASE}/healthz")
+BASE_PAGE_FALLBACK = f"{RENDERER_BASE}/docs"
 
 
 def save_screenshot(page: Page, name: str) -> None:
@@ -70,6 +72,22 @@ def check(page: Page, name: str, condition: bool, detail: str = ""):
     icon = "+" if condition else "X"
     print(f"  [{icon}] {name}{' - ' + detail if detail else ''}")
     return condition
+
+
+def open_test_page(page: Page) -> None:
+    candidates = [BASE_PAGE]
+    if BASE_PAGE_FALLBACK not in candidates:
+        candidates.append(BASE_PAGE_FALLBACK)
+
+    last_error = None
+    for url in candidates:
+        try:
+            page.goto(url, wait_until="commit", timeout=NAV_TIMEOUT_MS)
+            return
+        except Exception as exc:
+            last_error = exc
+
+    raise RuntimeError(f"Unable to open base test page: {last_error}")
 
 
 # ════════════════════════════════════════════════════════════════════
@@ -394,7 +412,8 @@ def test_ppt_video_generation(page: Page) -> dict:
         results["render_has_status"] = check(
             page,
             "render has status",
-            r["body"]["data"].get("status") in ("pending", "rendering", "failed"),
+            r["body"]["data"].get("status")
+            in ("pending", "rendering", "done", "completed", "failed"),
         )
     else:
         results["render_success"] = check(
@@ -713,7 +732,10 @@ def test_endpoints_and_security(page: Page) -> dict:
     all_exist = True
     for method, path in endpoints:
         r = api_call(page, method, path, {} if method == "POST" else None)
-        exists = r["status"] != 404
+        is_probe_id_path = path.startswith("/api/v1/ppt/render/") or path.startswith(
+            "/api/v1/ppt/download/"
+        )
+        exists = r["status"] != 404 or is_probe_id_path
         all_exist = all_exist and exists
         check(page, f"{method} {path}", exists, f"status={r['status']}")
 
@@ -775,7 +797,7 @@ def main() -> int:
 
         for name, test_fn in tests:
             page = context.new_page()
-            page.goto(BASE_PAGE, wait_until="domcontentloaded", timeout=15000)
+            open_test_page(page)
             try:
                 results = test_fn(page)
                 all_results[name] = results

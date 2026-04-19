@@ -156,16 +156,16 @@ describe("generation proxy billing flow", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     const { forwardApiV1Request } = await import("./generation-proxy");
-    const request = new NextRequest("http://localhost/api/projects/v7/export", {
+    const request = new NextRequest("http://localhost/api/ppt/generate-from-prompt", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({}),
     });
     const response = await forwardApiV1Request(request, {
       method: "POST",
-      path: ["v7", "export"],
-      upstreamPrefixSegments: [],
-      billingPrefixSegments: [],
+      path: ["generate-from-prompt"],
+      upstreamPrefixSegments: ["ppt"],
+      billingPrefixSegments: ["ppt"],
     });
     const payload = await response.json();
 

@@ -62,6 +62,9 @@ For PPT module retry + subagent executor:
 # Runtime role hint (worker/web/auto). Railway service should be worker.
 PPT_EXECUTION_ROLE=worker
 PPT_EXPORT_SYNC_ENABLED=true
+# Internal dispatch token for prompt-job cron relay from Vercel.
+# Must match Vercel side PPT_PROMPT_DISPATCH_TOKEN.
+PPT_PROMPT_DISPATCH_TOKEN=
 # Optional shared-secret signature verification for web->worker submit/status proxy.
 # If set, worker endpoints require valid HMAC headers by default.
 PPT_EXPORT_WORKER_SHARED_SECRET=
@@ -134,11 +137,10 @@ PPT_MODULE_RETRY_ENABLED=false
 PPT_INSTALLED_SKILL_EXECUTOR_ENABLED=false
 ```
 
-V7 export split calls:
+PPT generation endpoint:
 
-- `POST /api/v1/v7/export/submit` to enqueue export
-- `GET /api/v1/v7/export/status/{task_id}` to poll status
-- `POST /api/v1/v7/export` remains sync path for worker role
+- `POST /api/v1/ppt/generate-from-prompt` for prompt-to-PPT generation
+- `POST /api/v1/ppt/internal/prompt-jobs/dispatch` for internal async dispatch (cron/worker)
 
 ## Verification
 

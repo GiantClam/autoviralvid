@@ -3,6 +3,7 @@ import sys
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import httpx
 import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -145,3 +146,73 @@ async def test_get_project_status_returns_frontend_compatible_summary_shape():
     assert result["summary"]["queued"] == 1
     assert result["summary"]["succeeded"] == 1
     assert result["summary"]["all_done"] is False
+
+
+@pytest.mark.asyncio
+async def test_list_projects_retries_transient_jobs_failure():
+    sb = MagicMock()
+
+    jobs_chain = MagicMock()
+    jobs_chain.select.return_value = jobs_chain
+    jobs_chain.order.return_value = jobs_chain
+    jobs_chain.limit.return_value = jobs_chain
+    jobs_chain.execute.side_effect = [
+        httpx.WriteError("EOF occurred in violation of protocol (_ssl.c:2427)"),
+        MagicMock(
+            data=[
+                {
+                    "run_id": "run-retry",
+                    "status": "completed",
+                    "video_url": "https://cdn/retry.mp4",
+                }
+            ]
+        ),
+    ]
+
+    tasks_chain = MagicMock()
+    tasks_chain.select.return_value = tasks_chain
+    tasks_chain.in_.return_value = tasks_chain
+    tasks_chain.execute.return_value = MagicMock(data=[])
+
+    sessions_chain = MagicMock()
+    sessions_chain.select.return_value = sessions_chain
+    sessions_chain.in_.return_value = sessions_chain
+    sessions_chain.execute.return_value = MagicMock(data=[])
+
+    def table_side_effect(name):
+        if name == "autoviralvid_jobs":
+            return jobs_chain
+        if name == "autoviralvid_video_tasks":
+            return tasks_chain
+        if name == "autoviralvid_crew_sessions":
+            return sessions_chain
+        raise AssertionError(f"Unexpected table access: {name}")
+
+    sb.table.side_effect = table_side_effect
+
+    with patch.object(api_routes, "supabase", sb):
+        result = await api_routes.list_projects(40, SimpleNamespace(id="u1"))
+
+    assert len(result["projects"]) == 1
+    assert result["projects"][0]["run_id"] == "run-retry"
+    assert jobs_chain.execute.call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_list_projects_returns_empty_when_jobs_query_keeps_failing():
+    sb = MagicMock()
+
+    jobs_chain = MagicMock()
+    jobs_chain.select.return_value = jobs_chain
+    jobs_chain.order.return_value = jobs_chain
+    jobs_chain.limit.return_value = jobs_chain
+    jobs_chain.execute.side_effect = httpx.WriteError(
+        "EOF occurred in violation of protocol (_ssl.c:2427)"
+    )
+
+    sb.table.side_effect = lambda name: jobs_chain if name == "autoviralvid_jobs" else None
+
+    with patch.object(api_routes, "supabase", sb):
+        result = await api_routes.list_projects(40, SimpleNamespace(id="u1"))
+
+    assert result == {"projects": []}

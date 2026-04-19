@@ -1,5 +1,9 @@
 ﻿# PPT Master Phased Refactor Implementation Plan
 
+
+> Status update (2026-04-16): Any V7-specific route/export content in this plan is decommissioned and retained as historical context only.
+> Current production PPT path: `POST /api/v1/ppt/generate-from-prompt`.
+
 > Use this plan to execute the work task-by-task with tight verification after each step.
 
 **Goal:** 在现有 MiniMax PPT 生成链路中引入 ppt-master 风格的 `design_spec + 双轨渲染 + 分级降级`，并保证每阶段可测试、可回归。

@@ -110,74 +110,6 @@ async function uploadFileToR2(
   return public_url;
 }
 
-type V7GenerateResponse = {
-  title: string;
-  design_system: string;
-  slides: Array<Record<string, unknown>>;
-};
-
-export type V7ExportResponse = {
-  run_id: string;
-  pptx_url: string;
-  slide_image_urls: string[];
-  slide_count: number;
-  skill?: string;
-  video_mode?: string;
-  video_slide_count?: number;
-  video_slides?: Array<Record<string, unknown>>;
-  generator_meta?: Record<string, unknown>;
-};
-
-export type PptV7Step = "idle" | "generating" | "tts" | "exporting" | "done";
-
-export interface PptV7PanelState {
-  enabled: boolean;
-  busy: boolean;
-  step: PptV7Step;
-  error: string;
-  result: V7ExportResponse | null;
-  requirement: string;
-  slideCount: number;
-}
-
-async function callV7Api<T>(
-  path: "generate" | "tts" | "export",
-  body: Record<string, unknown>,
-  t: Translator,
-): Promise<T> {
-  const res = await fetch(`/api/projects/v7/${path}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-
-  const raw = await res.text();
-  let json: {
-    success?: boolean;
-    data?: T;
-    error?: string;
-    detail?: string;
-  } | null = null;
-  try {
-    json = raw ? JSON.parse(raw) : null;
-  } catch {
-    throw new Error(t("form.v7NonJson", { preview: raw.slice(0, 200) }));
-  }
-
-  if (!res.ok) {
-    if (res.status === 401) {
-      throw new Error(t("settings.loginRequired"));
-    }
-    throw new Error(
-      json?.error || json?.detail || t("form.v7RequestFailedWithStatus", { status: res.status }),
-    );
-  }
-  if (!json?.success) {
-    throw new Error(json?.error || t("form.v7RequestFailed"));
-  }
-  return json.data as T;
-}
-
 type TemplateOption = {
   id: string;
   labelKey?: TranslationKey;
@@ -196,7 +128,6 @@ const TEMPLATE_IDS: ReadonlyArray<TemplateOption> = [
   { id: "knowledge-edu", labelKey: "gallery.tplKnowledgeEdu" },
   { id: "funny-skit", labelKey: "gallery.tplFunnySkit" },
   { id: "travel-vlog", labelKey: "gallery.tplTravelVlog" },
-  { id: "ppt-v7", labelKey: "gallery.tplPptV7" },
 ];
 
 const STYLE_KEYS = [
@@ -219,11 +150,9 @@ const ORIENTATION_KEYS = [
 interface ProjectFormProps {
   onTemplateChange?: (templateId: string) => void;
   initialTemplateId?: string;
-  onPptV7StateChange?: (state: PptV7PanelState) => void;
-  pptV7RetryToken?: number;
 }
 
-export default function ProjectForm({ onTemplateChange, initialTemplateId, onPptV7StateChange, pptV7RetryToken }: ProjectFormProps) {
+export default function ProjectForm({ onTemplateChange, initialTemplateId }: ProjectFormProps) {
   const t = useT();
   const { createProject, generateStoryboard, submitDigitalHuman, isLoading, phase, error, project } =
     useProject();
@@ -247,30 +176,11 @@ export default function ProjectForm({ onTemplateChange, initialTemplateId, onPpt
   const [audioUploading, setAudioUploading] = useState(false);
   const [audioUploadPct, setAudioUploadPct] = useState(0);
   const [audioFileName, setAudioFileName] = useState("");
-  const [pptSlideCount, setPptSlideCount] = useState(10);
-  const [pptV7Busy, setPptV7Busy] = useState(false);
-  const [pptV7Step, setPptV7Step] = useState<PptV7Step>("idle");
-  const [pptV7Error, setPptV7Error] = useState<string>("");
-  const [pptV7Result, setPptV7Result] = useState<V7ExportResponse | null>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const audioInputRef = useRef<HTMLInputElement>(null);
-  const lastRetryTokenRef = useRef<number>(pptV7RetryToken ?? 0);
 
   const isDigitalHuman = templateId === "digital-human";
-  const isPptV7 = templateId === "ppt-v7";
   const aspectRatio = ORIENTATION_KEYS.find((o) => o.value === orientation)?.ratio ?? "9:16";
-
-  useEffect(() => {
-    onPptV7StateChange?.({
-      enabled: isPptV7,
-      busy: pptV7Busy,
-      step: pptV7Step,
-      error: pptV7Error,
-      result: pptV7Result,
-      requirement: theme.trim(),
-      slideCount: pptSlideCount,
-    });
-  }, [isPptV7, onPptV7StateChange, pptSlideCount, pptV7Busy, pptV7Error, pptV7Result, pptV7Step, theme]);
 
   useEffect(() => {
     if (!project?.run_id) {
@@ -355,71 +265,13 @@ export default function ProjectForm({ onTemplateChange, initialTemplateId, onPpt
   const handleTemplateChange = useCallback(
     (id: string) => {
       setTemplateId(id);
-      if (id !== "ppt-v7") {
-        setPptV7Error("");
-        setPptV7Result(null);
-        setPptV7Step("idle");
-      }
       onTemplateChange?.(id);
     },
     [onTemplateChange],
   );
 
-  const runPptV7 = useCallback(async () => {
-    const requirement = theme.trim();
-    if (!requirement) return;
-
-    setPptV7Busy(true);
-    setPptV7Error("");
-    setPptV7Result(null);
-
-    try {
-      setPptV7Step("generating");
-      const generated = await callV7Api<V7GenerateResponse>("generate", {
-        requirement,
-        num_slides: Math.max(3, Math.min(30, pptSlideCount)),
-        language: "zh-CN",
-      }, t);
-
-      setPptV7Step("tts");
-      const ttsData = await callV7Api<{ slides: Array<Record<string, unknown>> }>("tts", {
-        slides: generated.slides,
-        voice_style: "zh-CN-female",
-      }, t);
-
-      setPptV7Step("exporting");
-      const exported = await callV7Api<V7ExportResponse>("export", {
-        slides: ttsData.slides,
-      }, t);
-
-      setPptV7Result(exported);
-      setPptV7Step("done");
-    } catch (err) {
-      setPptV7Error(err instanceof Error ? err.message : t("form.v7GenerateFailed"));
-      setPptV7Step("idle");
-    } finally {
-      setPptV7Busy(false);
-    }
-  }, [pptSlideCount, t, theme]);
-
-  useEffect(() => {
-    const token = pptV7RetryToken ?? 0;
-    if (token === 0 || token === lastRetryTokenRef.current) {
-      return;
-    }
-    lastRetryTokenRef.current = token;
-    if (!isPptV7 || pptV7Busy || !theme.trim()) {
-      return;
-    }
-    void runPptV7();
-  }, [isPptV7, pptV7Busy, pptV7RetryToken, runPptV7, theme]);
-
   const handleSubmit = useCallback(async () => {
     if (!theme.trim()) return;
-    if (isPptV7) {
-      await runPptV7();
-      return;
-    }
 
     const params: Record<string, unknown> = {
       template_id: templateId,
@@ -469,8 +321,6 @@ export default function ProjectForm({ onTemplateChange, initialTemplateId, onPpt
     orientation,
     aspectRatio,
     isDigitalHuman,
-    isPptV7,
-    runPptV7,
     audioUrl,
     voiceMode,
     voiceText,
@@ -478,7 +328,7 @@ export default function ProjectForm({ onTemplateChange, initialTemplateId, onPpt
     t,
   ]);
 
-  const busy = isLoading || phase === "generating_storyboard" || pptV7Busy;
+  const busy = isLoading || phase === "generating_storyboard";
 
   const inp =
     "w-full rounded-xl bg-white/[0.03] border border-white/[0.06] text-gray-200 text-[13px] " +
@@ -507,9 +357,9 @@ export default function ProjectForm({ onTemplateChange, initialTemplateId, onPpt
           <Clapperboard className="w-4 h-4 text-white" />
         </div>
         <div className="flex-1">
-          <h2 className="text-sm font-bold text-white tracking-tight">{isPptV7 ? t("form.pptV7Config") : t("form.videoConfig")}</h2>
+          <h2 className="text-sm font-bold text-white tracking-tight">{t("form.videoConfig")}</h2>
           <span className="text-[10px] text-gray-500">
-            {isPptV7 ? t("form.pptV7Mode") : isDigitalHuman ? t("form.digitalHumanMode") : t("form.aiGenMode")}
+            {isDigitalHuman ? t("form.digitalHumanMode") : t("form.aiGenMode")}
           </span>
         </div>
       </div>
@@ -546,60 +396,7 @@ export default function ProjectForm({ onTemplateChange, initialTemplateId, onPpt
           />
         </section>
 
-        {isPptV7 && (
-          <section className="rounded-xl border border-white/[0.08] bg-white/[0.02] p-3 space-y-3">
-            <div className="text-xs font-semibold text-gray-300">{t("form.pptV7Params")}</div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <div className="text-[11px] text-gray-500 mb-1">{t("form.slideCount")}</div>
-                <input
-                  data-testid="ppt-v7-slide-count"
-                  type="number"
-                  min={3}
-                  max={30}
-                  value={pptSlideCount}
-                  onChange={(e) => setPptSlideCount(Math.max(3, Math.min(30, Number(e.target.value) || 10)))}
-                  className={inp}
-                />
-              </div>
-              <div>
-                <div className="text-[11px] text-gray-500 mb-1">{t("form.pipeline")}</div>
-                <div className="h-[42px] rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 flex items-center text-xs text-gray-400">
-                  {pptV7Step === "idle" && t("form.pptV7Waiting")}
-                  {pptV7Step === "generating" && t("form.pptV7GeneratingContent")}
-                  {pptV7Step === "tts" && t("form.pptV7SynthesizingVoice")}
-                  {pptV7Step === "exporting" && t("form.pptV7Exporting")}
-                  {pptV7Step === "done" && t("form.pptV7Completed")}
-                </div>
-              </div>
-            </div>
-            {pptV7Error && (
-              <div className="rounded-lg bg-red-500/[0.08] border border-red-500/20 px-3 py-2 text-xs text-red-400">
-                {pptV7Error}
-              </div>
-            )}
-            {pptV7Result && (
-              <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/[0.08] p-3 space-y-2">
-                <div className="text-xs text-emerald-300">
-                  {t("form.pptV7CompletedSlides", { count: pptV7Result.slide_count })}
-                </div>
-                <a
-                  href={pptV7Result.pptx_url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-2 text-xs font-semibold text-emerald-300 hover:text-emerald-200"
-                >
-                  {t("pptV7.downloadPptx")}
-                </a>
-              </div>
-            )}
-          </section>
-        )}
-
         <Divider />
-
-        {!isPptV7 && (
-          <>
         <section>
           <Label icon={ImagePlus}>{isDigitalHuman ? t("form.imageDigitalHumanLabel") : t("form.imageLabel")}</Label>
           <input
@@ -836,8 +633,6 @@ export default function ProjectForm({ onTemplateChange, initialTemplateId, onPpt
             })}
           </div>
         </section>
-          </>
-        )}
 
         {error && (
           <div className="rounded-lg bg-red-500/[0.08] border border-red-500/20 px-3 py-2 text-xs text-red-400 flex items-center gap-2">
@@ -870,12 +665,10 @@ export default function ProjectForm({ onTemplateChange, initialTemplateId, onPpt
           )}
           <span className="relative z-10">
             {busy
-              ? (isPptV7 ? t("form.processing") : t("form.generating"))
-              : isPptV7
-                ? t("form.generatePptV7")
-                : isDigitalHuman
-                  ? t("form.generateDigitalHuman")
-                  : t("form.startGenerate")}
+              ? t("form.generating")
+              : isDigitalHuman
+                ? t("form.generateDigitalHuman")
+                : t("form.startGenerate")}
           </span>
         </button>
       </div>

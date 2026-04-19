@@ -17,15 +17,11 @@ type SessionLike = {
   };
 } | null;
 
-const DEFAULT_LONG_REQUEST_TIMEOUT_MS = 15 * 60 * 1000;
+const DEFAULT_LONG_REQUEST_TIMEOUT_MS = 45 * 60 * 1000;
 
 function shouldUseLongRequestTransport(method: string, normalizedPath: string): boolean {
   if (method !== "POST") return false;
-  return (
-    normalizedPath === "/ppt/generate-from-prompt" ||
-    normalizedPath === "/v7/export" ||
-    normalizedPath === "/v7/export/submit"
-  );
+  return normalizedPath === "/ppt/generate-from-prompt";
 }
 
 function normalizeNodeHeaders(headers: http.IncomingHttpHeaders): HeadersInit {

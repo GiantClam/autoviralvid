@@ -1,6 +1,10 @@
 {
   "crons": [
     {
+      "path": "/api/internal/ppt/prompt-jobs/dispatch?limit=1",
+      "schedule": "*/2 * * * *"
+    },
+    {
       "path": "/api/internal/billing/reconcile?lookbackHours=72&staleMinutes=30",
       "schedule": "0 3 * * *"
     }

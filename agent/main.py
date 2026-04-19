@@ -31,7 +31,7 @@ from src.rate_limiter import RateLimitMiddleware
 from pydantic import BaseModel, Field
 from typing import Dict, Any, Optional, List, Literal
 
-# 缁熶竴鏃ュ織閰嶇疆
+# Unified logger setup
 logger = logging.getLogger("workflow")
 logger.setLevel(logging.INFO)
 
@@ -78,7 +78,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="AutoViralVid API",
     description=(
-        "Backend API for AutoViralVid 鈥?AI-powered short video creation platform.\n\n"
+        "Backend API for AutoViralVid - AI-powered short video creation platform.\n\n"
         "## Key Features\n"
         "- **Project Management**: Create and manage video projects with templates\n"
         "- **AI Storyboard Generation**: Generate storyboards from themes using LLMs\n"
@@ -95,7 +95,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS 鈥?only allow configured frontend origins (no wildcard in production)
+# CORS: only allow configured frontend origins (no wildcard in production)
 _cors_raw = os.getenv("CORS_ORIGIN", "http://localhost:3000")
 _cors_origins = [o.strip() for o in _cors_raw.split(",") if o.strip()]
 if not _cors_origins:
@@ -110,7 +110,7 @@ app.add_middleware(
     expose_headers=["X-Request-Id", "X-RateLimit-Limit", "X-RateLimit-Remaining"],
 )
 
-# Rate limiting 鈥?default 120 requests/minute per IP
+# Rate limiting: default 120 requests/minute per IP
 _rate_limit_rpm = int(os.getenv("RATE_LIMIT_RPM", "120"))
 app.add_middleware(RateLimitMiddleware, rpm=_rate_limit_rpm)
 
@@ -122,19 +122,15 @@ from src.ppt_routes import router as ppt_router
 
 app.include_router(ppt_router)
 
-# Register Premium routes (鍟嗕笟绾ц棰戠粍浠?
+# Register Premium routes
 from src.premium_routes import router as premium_router
 
 app.include_router(premium_router)
 
-# Register V7 routes (concurrent workflow + MiniMax unified output)
-from src.v7_routes import router as v7_router
-
-app.include_router(v7_router)
 
 
 # ---------------------------------------------------------------------------
-# Global exception handlers 鈥?return consistent JSON error envelopes
+# Global exception handlers: return consistent JSON error envelopes
 # ---------------------------------------------------------------------------
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
@@ -165,7 +161,7 @@ async def http_exception_handler(_request: Request, exc: HTTPException):
 
 @app.exception_handler(Exception)
 async def generic_exception_handler(_request: Request, exc: Exception):
-    """Catch-all for unhandled server errors 鈥?never leak tracebacks."""
+    """Catch-all for unhandled server errors; never leak tracebacks."""
     logger.error(f"[unhandled] {exc}", exc_info=True)
     return JSONResponse(
         status_code=500,
@@ -1049,4 +1045,5 @@ def main():
 warnings.filterwarnings("ignore", category=UserWarning, module="pydantic")
 if __name__ == "__main__":
     main()
+
 
