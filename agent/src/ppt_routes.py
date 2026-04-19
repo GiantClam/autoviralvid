@@ -8,11 +8,13 @@ import json
 import os
 import re
 import uuid
+import mimetypes
 from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
 from threading import Lock
 from typing import Any, Dict, List, Optional, Tuple
+from urllib.parse import quote
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -96,7 +98,7 @@ def _is_likely_garbled_prompt(value: Any) -> bool:
     text = str(value or "").strip()
     if not text:
         return True
-    replacement_hits = text.count("�")
+    replacement_hits = text.count("\uFFFD")
     question_hits = text.count("?")
     total_hits = replacement_hits + question_hits
     if total_hits == 0:
@@ -1467,6 +1469,14 @@ async def get_prompt_project_preview(
 
         service = PPTMasterService()
         data = service.get_project_preview(project_name)
+        preview_urls = data.get("preview_image_urls")
+        if isinstance(preview_urls, list) and not preview_urls:
+            file_names = data.get("preview_image_files")
+            if isinstance(file_names, list):
+                data["preview_image_urls"] = [
+                    f"/api/v1/ppt/preview-assets/{quote(project_name)}/{quote(str(name))}"
+                    for name in file_names
+                ]
         return ApiResponse(success=True, data=data)
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -1475,6 +1485,50 @@ async def get_prompt_project_preview(
     except Exception as e:
         logger.error(f"[ppt_routes] get prompt project preview failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/preview-assets/{project_name}/{asset_name}")
+async def get_prompt_preview_asset(
+    project_name: str,
+    asset_name: str,
+    user: AuthUser = Depends(get_current_user),
+):
+    """Serve generated slide preview assets (svg/png/jpg/webp)."""
+    if not re.match(r"^[a-zA-Z0-9._-]+$", project_name):
+        raise HTTPException(status_code=400, detail="invalid project_name format")
+    if "/" in asset_name or "\\" in asset_name:
+        raise HTTPException(status_code=400, detail="invalid asset_name format")
+
+    ext = Path(asset_name).suffix.lower()
+    if ext not in {".svg", ".png", ".jpg", ".jpeg", ".webp"}:
+        raise HTTPException(status_code=400, detail="unsupported preview asset type")
+
+    try:
+        from src.ppt_master_service import PPTMasterService
+
+        service = PPTMasterService()
+        project_path = service._resolve_project_path(project_name)
+        if not project_path.exists() or not project_path.is_dir():
+            raise HTTPException(status_code=404, detail=f"project not found: {project_name}")
+
+        candidate_paths = [
+            project_path / "svg_final" / asset_name,
+            project_path / "svg_output" / asset_name,
+            project_path / asset_name,
+        ]
+        for row in candidate_paths:
+            try:
+                resolved = row.resolve()
+                if project_path.resolve() not in resolved.parents:
+                    continue
+            except Exception:
+                continue
+            if row.exists() and row.is_file():
+                media_type = mimetypes.guess_type(row.name)[0] or "application/octet-stream"
+                return FileResponse(str(row), media_type=media_type, filename=row.name)
+        raise HTTPException(status_code=404, detail=f"preview asset not found: {asset_name}")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get("/download-output/{project_name}")

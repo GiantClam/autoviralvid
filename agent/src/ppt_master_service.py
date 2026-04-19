@@ -388,8 +388,10 @@ class PPTMasterService:
             raise FileNotFoundError(f"project not found: {project_name}")
         candidates = sorted(
             project_path.glob("*.pptx"),
-            key=lambda p: p.stat().st_mtime,
-            reverse=True,
+            key=lambda p: (
+                1 if p.stem.lower().endswith("_svg") else 0,
+                -p.stat().st_mtime,
+            ),
         )
         if not candidates:
             raise FileNotFoundError(f"pptx not found for project: {project_name}")
@@ -453,13 +455,15 @@ class PPTMasterService:
         design_excerpt = self._read_excerpt(design_spec_path)
         notes_excerpt = self._read_excerpt(notes_total_path)
 
-        preview_images = []
+        preview_images: List[str] = []
         for item in export.get("slide_image_urls") or []:
             value = str(item or "").strip()
             if value.startswith("http://") or value.startswith("https://"):
                 preview_images.append(value)
 
-        svg_count = len(list((project_path / "svg_final").glob("*.svg")))
+        svg_files = sorted((project_path / "svg_final").glob("*.svg"))
+        preview_image_files = [row.name for row in svg_files]
+        svg_count = len(svg_files)
         output_pptx = ""
         try:
             output_pptx = str(self.resolve_output_pptx_path(project_name))
@@ -474,6 +478,7 @@ class PPTMasterService:
             "design_excerpt": design_excerpt,
             "notes_excerpt": notes_excerpt,
             "preview_image_urls": preview_images,
+            "preview_image_files": preview_image_files,
             "svg_count": svg_count,
         }
 

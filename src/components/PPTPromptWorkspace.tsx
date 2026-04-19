@@ -18,7 +18,13 @@ import {
 } from "lucide-react";
 
 const API_BASE = "/api/ppt";
+const DIRECT_PPT_API_BASE = (() => {
+  const raw = (process.env.NEXT_PUBLIC_AGENT_URL || process.env.NEXT_PUBLIC_API_BASE || "").trim();
+  if (!raw) return "";
+  return `${raw.replace(/\/+$/, "")}/api/v1/ppt`;
+})();
 const HISTORY_KEY = "autoviralvid-ppt-prompt-history";
+let cachedApiToken: string | null = null;
 
 type DeckStyle = "professional" | "creative" | "academic" | "minimal";
 type Phase = "idle" | "loading_templates" | "loading_preview" | "generating" | "done" | "error";
@@ -172,8 +178,7 @@ function persistHistory(next: PptHistoryItem[]): void {
 }
 
 async function apiGet<T>(path: string): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`);
-  const json = (await res.json()) as ApiEnvelope<T>;
+  const json = await apiRequest<T>("GET", path);
   if (!json.success) {
     throw new Error(readEnvelopeError(json.error));
   }
@@ -184,12 +189,7 @@ async function apiGet<T>(path: string): Promise<T> {
 }
 
 async function apiPost<T>(path: string, body: Record<string, unknown>): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  const json = (await res.json()) as ApiEnvelope<T>;
+  const json = await apiRequest<T>("POST", path, body);
   if (!json.success) {
     throw new Error(readEnvelopeError(json.error));
   }
@@ -197,6 +197,108 @@ async function apiPost<T>(path: string, body: Record<string, unknown>): Promise<
     throw new Error("API returned success without data");
   }
   return json.data;
+}
+
+async function getApiToken(): Promise<string | null> {
+  if (cachedApiToken) {
+    return cachedApiToken;
+  }
+  try {
+    const res = await fetch("/api/auth/api-token", { method: "POST" });
+    if (!res.ok) {
+      return null;
+    }
+    const payload = (await res.json()) as { token?: string };
+    const token = String(payload?.token || "").trim();
+    if (!token) {
+      return null;
+    }
+    cachedApiToken = token;
+    return token;
+  } catch {
+    return null;
+  }
+}
+
+function envelopeFromUnknown<T>(status: number, payload: unknown, fallbackText: string): ApiEnvelope<T> {
+  if (payload && typeof payload === "object") {
+    const asObj = payload as Record<string, unknown>;
+    if ("success" in asObj) {
+      return asObj as ApiEnvelope<T>;
+    }
+    const detail =
+      typeof asObj.error === "string"
+        ? asObj.error
+        : typeof asObj.detail === "string"
+          ? asObj.detail
+          : fallbackText;
+    return { success: false, error: detail || `HTTP ${status}` };
+  }
+  if (status >= 200 && status < 300 && payload !== undefined) {
+    return { success: true, data: payload as T };
+  }
+  return { success: false, error: fallbackText || `HTTP ${status}` };
+}
+
+async function decodeEnvelope<T>(res: Response): Promise<ApiEnvelope<T>> {
+  const contentType = String(res.headers.get("content-type") || "").toLowerCase();
+  let payload: unknown = null;
+  let fallbackText = "";
+
+  if (contentType.includes("application/json")) {
+    try {
+      payload = await res.json();
+    } catch {
+      payload = null;
+    }
+  } else {
+    try {
+      fallbackText = (await res.text()).slice(0, 300);
+    } catch {
+      fallbackText = "";
+    }
+  }
+
+  if (!res.ok && !fallbackText && payload && typeof payload === "object") {
+    const asObj = payload as Record<string, unknown>;
+    fallbackText = String(asObj.error || asObj.detail || "").trim();
+  }
+  return envelopeFromUnknown<T>(res.status, payload, fallbackText);
+}
+
+async function apiRequest<T>(
+  method: "GET" | "POST",
+  path: string,
+  body?: Record<string, unknown>,
+): Promise<ApiEnvelope<T>> {
+  const primaryResponse = await fetch(`${API_BASE}${path}`, {
+    method,
+    headers: body ? { "Content-Type": "application/json" } : undefined,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+
+  if (primaryResponse.status !== 404 || !DIRECT_PPT_API_BASE) {
+    return decodeEnvelope<T>(primaryResponse);
+  }
+
+  const token = await getApiToken();
+  if (!token) {
+    return decodeEnvelope<T>(primaryResponse);
+  }
+
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${token}`,
+  };
+  if (body) {
+    headers["Content-Type"] = "application/json";
+  }
+
+  const fallbackResponse = await fetch(`${DIRECT_PPT_API_BASE}${path}`, {
+    method,
+    headers,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  return decodeEnvelope<T>(fallbackResponse);
 }
 
 function delay(ms: number): Promise<void> {

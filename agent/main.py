@@ -205,9 +205,10 @@ async def debug_auth():
     from src.auth import AUTH_REQUIRED, _DEV_BYPASS, AUTH_SECRET
 
     return {
-        "AUTH_SECRET": AUTH_SECRET,
         "AUTH_REQUIRED": AUTH_REQUIRED,
         "_DEV_BYPASS": _DEV_BYPASS,
+        "AUTH_SECRET_SET": bool(AUTH_SECRET),
+        "AUTH_SECRET_LENGTH": len(str(AUTH_SECRET or "")),
     }
 
 

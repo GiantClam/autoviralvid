@@ -98,3 +98,33 @@ def test_run_skill_runtime_inproc(monkeypatch) -> None:
     monkeypatch.setattr("src.ppt_master_blackbox_local.run_blackbox_request", _fake_blackbox)
     result = asyncio.run(service._run_skill_runtime({"prompt": "demo"}))
     assert result["export"]["output_pptx"] == "/tmp/demo.pptx"
+
+
+def test_resolve_output_pptx_path_prefers_non_svg(tmp_path) -> None:
+    service = PPTMasterService()
+    service.output_base = tmp_path
+
+    project = tmp_path / "demo_project"
+    project.mkdir(parents=True, exist_ok=True)
+    svg_pptx = project / "demo_svg.pptx"
+    normal_pptx = project / "demo.pptx"
+    svg_pptx.write_bytes(b"svg")
+    normal_pptx.write_bytes(b"normal")
+    os.utime(svg_pptx, (normal_pptx.stat().st_atime + 10, normal_pptx.stat().st_mtime + 10))
+
+    resolved = service.resolve_output_pptx_path("demo_project")
+    assert resolved.name == "demo.pptx"
+
+
+def test_get_project_preview_collects_svg_files(tmp_path) -> None:
+    service = PPTMasterService()
+    service.output_base = tmp_path
+
+    project = tmp_path / "preview_project"
+    (project / "svg_final").mkdir(parents=True, exist_ok=True)
+    (project / "svg_final" / "page_001.svg").write_text("<svg/>", encoding="utf-8")
+    (project / "svg_final" / "page_002.svg").write_text("<svg/>", encoding="utf-8")
+
+    preview = service.get_project_preview("preview_project")
+    assert preview["svg_count"] == 2
+    assert preview["preview_image_files"] == ["page_001.svg", "page_002.svg"]
